@@ -1,0 +1,17 @@
+# Bỏ qua file cấu hình cá nhân của Visual Studio
+.vs/
+
+# Bỏ qua các thư mục build và file nhị phân
+[Bb]in/
+[Oo]bj/
+
+# Bỏ qua các gói NuGet đã tải về
+packages/
+
+# Bỏ qua file cài đặt của người dùng
+*.user
+*.suo
+
+# (QUAN TRỌNG) Bỏ qua file chứa mật khẩu database
+# Nếu bạn dùng project API, file này nên được giữ bí mật
+appsettings.Development.json
