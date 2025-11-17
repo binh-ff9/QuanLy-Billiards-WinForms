@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using System;
 using System.Drawing;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Billiard.WinForm
@@ -12,45 +13,77 @@ namespace Billiard.WinForm
     public partial class LoginForm : Form
     {
         private readonly BilliardDbContext _context;
+        private bool _isLoggingIn = false;
 
         public LoginForm(BilliardDbContext context)
         {
             _context = context;
             InitializeComponent();
+
+            // Initialize UI
+            InitializeUI();
+        }
+
+        private void InitializeUI()
+        {
+            // Set form start position
+            this.StartPosition = FormStartPosition.CenterScreen;
+
+            // Set focus to username textbox after form is shown
+            this.Shown += (s, e) => txtUsername.Focus();
         }
 
         private void LoginForm_Load(object sender, EventArgs e)
         {
-            // Focus vào textbox username
-            txtUsername.Focus();
+            // Additional initialization if needed
+            txtUsername.Select();
         }
 
         private async void BtnLogin_Click(object sender, EventArgs e)
         {
+            // Prevent multiple simultaneous login attempts
+            if (_isLoggingIn) return;
+
             try
             {
+                _isLoggingIn = true;
+
                 // Validate input
                 if (string.IsNullOrWhiteSpace(txtUsername.Text))
                 {
-                    MessageBox.Show("Vui lòng nhập số điện thoại!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    txtUsername.Focus();
+                    ShowError("Vui lòng nhập số điện thoại!", txtUsername);
                     return;
                 }
 
                 if (string.IsNullOrWhiteSpace(txtPassword.Text))
                 {
-                    MessageBox.Show("Vui lòng nhập mật khẩu!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    txtPassword.Focus();
+                    ShowError("Vui lòng nhập mật khẩu!", txtPassword);
                     return;
                 }
 
-                // Disable button and show loading
-                btnLogin.Enabled = false;
-                btnLogin.Text = "Đang đăng nhập...";
-                this.Cursor = Cursors.WaitCursor;
+                // Show loading state
+                SetLoadingState(true);
 
+                // Perform login
+                await PerformLogin();
+            }
+            catch (Exception ex)
+            {
+                this.Cursor = Cursors.Default;
+                MessageBox.Show($"Lỗi kết nối cơ sở dữ liệu:\n{ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _isLoggingIn = false;
+                SetLoadingState(false);
+            }
+        }
+
+        private async Task PerformLogin()
+        {
+            try
+            {
                 // Query database
                 var nhanVien = await _context.NhanViens
                     .Include(nv => nv.MaNhomNavigation)
@@ -58,8 +91,6 @@ namespace Billiard.WinForm
                         nv.Sdt == txtUsername.Text.Trim() &&
                         nv.MatKhau == txtPassword.Text &&
                         nv.TrangThai == "Đang làm");
-
-                this.Cursor = Cursors.Default;
 
                 if (nhanVien == null)
                 {
@@ -69,78 +100,133 @@ namespace Billiard.WinForm
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error);
 
-                    btnLogin.Enabled = true;
-                    btnLogin.Text = "Đăng nhập";
                     txtPassword.Clear();
                     txtPassword.Focus();
                     return;
                 }
 
                 // Log activity
-                try
+                await LogActivity(nhanVien);
+
+                // Create main form
+                var mainForm = Program.GetService<MainForm>();
+                if (mainForm == null)
                 {
-                    var logEntry = new LichSuHoatDong
-                    {
-                        MaNv = nhanVien.MaNv,
-                        HanhDong = "Đăng nhập hệ thống",
-                        ChiTiet = $"Đăng nhập từ máy {Environment.MachineName}",
-                        ThoiGian = DateTime.Now
-                    };
-                    _context.LichSuHoatDongs.Add(logEntry);
-                    await _context.SaveChangesAsync();
-                }
-                catch
-                {
-                    // Ignore logging errors
+                    throw new Exception("Không thể khởi tạo MainForm");
                 }
 
-                // Successful login - create and show main form
-                var mainForm = Program.GetService<MainForm>();
+                // Set session data
                 mainForm.MaNV = nhanVien.MaNv;
                 mainForm.TenNV = nhanVien.TenNv;
                 mainForm.ChucVu = nhanVien.MaNhomNavigation?.TenNhom ?? "Nhân viên";
 
-                // Show main form and hide login
+                // Show main form
                 mainForm.Show();
+
+                // Setup form closed event
+                mainForm.FormClosed += (s, args) =>
+                {
+                    // Show login form again when main form closes
+                    this.Show();
+                    ResetForm();
+                };
                 this.Hide();
-
-                // When main form closes, close the application
-                mainForm.FormClosed += (s, args) => Application.Exit();
-
-                // Reset form for next login
-                txtUsername.Clear();
-                txtPassword.Clear();
-                btnLogin.Enabled = true;
-                btnLogin.Text = "Đăng nhập";
             }
             catch (Exception ex)
             {
-                this.Cursor = Cursors.Default;
-                MessageBox.Show($"Lỗi kết nối cơ sở dữ liệu:\n{ex.Message}", "Lỗi",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-
-                btnLogin.Enabled = true;
-                btnLogin.Text = "Đăng nhập";
+                throw new Exception($"Lỗi trong quá trình đăng nhập: {ex.Message}", ex);
             }
+        }
+
+        private async Task LogActivity(NhanVien nhanVien)
+        {
+            try
+            {
+                var logEntry = new LichSuHoatDong
+                {
+                    MaNv = nhanVien.MaNv,
+                    HanhDong = "Đăng nhập hệ thống",
+                    ChiTiet = $"Đăng nhập từ máy {Environment.MachineName}",
+                    ThoiGian = DateTime.Now
+                };
+                _context.LichSuHoatDongs.Add(logEntry);
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                // Ignore logging errors
+            }
+        }
+
+        private void SetLoadingState(bool isLoading)
+        {
+            if (InvokeRequired)
+            {
+                Invoke(new Action(() => SetLoadingState(isLoading)));
+                return;
+            }
+
+            btnLogin.Enabled = !isLoading;
+            txtUsername.Enabled = !isLoading;
+            txtPassword.Enabled = !isLoading;
+
+            if (isLoading)
+            {
+                btnLogin.Text = "Đang đăng nhập...";
+                this.Cursor = Cursors.WaitCursor;
+            }
+            else
+            {
+                btnLogin.Text = "Đăng nhập";
+                this.Cursor = Cursors.Default;
+            }
+        }
+
+        private void ResetForm()
+        {
+            txtUsername.Clear();
+            txtPassword.Clear();
+            chkRemember.Checked = false;
+            txtUsername.Focus();
+        }
+
+        private void ShowError(string message, Control focusControl)
+        {
+            MessageBox.Show(message, "Thông báo",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            focusControl?.Focus();
         }
 
         private void TxtPassword_KeyPress(object sender, KeyPressEventArgs e)
         {
             if (e.KeyChar == (char)Keys.Enter)
             {
-                BtnLogin_Click(sender, e);
                 e.Handled = true;
+                BtnLogin_Click(sender, e);
             }
         }
 
+        private void TxtUsername_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (e.KeyChar == (char)Keys.Enter)
+            {
+                e.Handled = true;
+                txtPassword.Focus();
+            }
+        }
+
+        #region UI Events
+
         private void BtnLogin_MouseEnter(object sender, EventArgs e)
         {
-            btnLogin.BackColor = Color.FromArgb(79, 70, 229);
+            if (btnLogin.Enabled)
+                btnLogin.BackColor = Color.FromArgb(79, 70, 229);
         }
 
         private void BtnLogin_MouseLeave(object sender, EventArgs e)
         {
-            btnLogin.BackColor = Color.FromArgb(99, 102, 241);
+            if (btnLogin.Enabled)
+                btnLogin.BackColor = Color.FromArgb(99, 102, 241);
         }
 
         private void BtnClose_Click(object sender, EventArgs e)
@@ -171,9 +257,16 @@ namespace Billiard.WinForm
 
         private void LblForgotPassword_Click(object sender, EventArgs e)
         {
-            // Open Forgot Password Form
-            var forgotPasswordForm = Program.GetService<ForgotPasswordForm>();
-            forgotPasswordForm.ShowDialog();
+            try
+            {
+                var forgotPasswordForm = Program.GetService<ForgotPasswordForm>();
+                forgotPasswordForm.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void LblForgotPassword_MouseEnter(object sender, EventArgs e)
@@ -188,14 +281,20 @@ namespace Billiard.WinForm
 
         private void LblSignup_Click(object sender, EventArgs e)
         {
-            // Open Signup Form
-            var signupForm = Program.GetService<SignupForm>();
-            var result = signupForm.ShowDialog();
-
-            if (result == DialogResult.OK)
+            try
             {
-                // User successfully registered, can auto-focus on login form
-                txtUsername.Focus();
+                var signupForm = Program.GetService<SignupForm>();
+                var result = signupForm.ShowDialog();
+
+                if (result == DialogResult.OK)
+                {
+                    txtUsername.Focus();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -211,7 +310,6 @@ namespace Billiard.WinForm
 
         private void PnlMain_Paint(object sender, PaintEventArgs e)
         {
-            // Draw rounded corners for main panel
             e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
             var path = GetRoundedRectangle(pnlMain.ClientRectangle, 12);
             pnlMain.Region = new Region(path);
@@ -228,9 +326,11 @@ namespace Billiard.WinForm
             return path;
         }
 
+        #endregion
+
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            if (e.CloseReason == CloseReason.UserClosing)
+            if (e.CloseReason == CloseReason.UserClosing && this.Visible)
             {
                 var result = MessageBox.Show(
                     "Bạn có chắc muốn thoát ứng dụng?",

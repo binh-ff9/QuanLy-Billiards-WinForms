@@ -59,7 +59,8 @@
             lblSignup.Location = new Point(95, 524);
             lblSignup.Name = "lblSignup";
             lblSignup.Size = new Size(311, 37);
-            lblSignup.TabIndex = 9;
+            lblSignup.TabIndex = 6;
+            lblSignup.TabStop = false;
             lblSignup.Text = "Chưa có tài khoản? Đăng ký ngay";
             lblSignup.TextAlign = ContentAlignment.MiddleCenter;
             lblSignup.Click += LblSignup_Click;
@@ -74,7 +75,8 @@
             lblForgotPassword.Location = new Point(95, 494);
             lblForgotPassword.Name = "lblForgotPassword";
             lblForgotPassword.Size = new Size(311, 30);
-            lblForgotPassword.TabIndex = 8;
+            lblForgotPassword.TabIndex = 5;
+            lblForgotPassword.TabStop = false;
             lblForgotPassword.Text = "Quên mật khẩu?";
             lblForgotPassword.TextAlign = ContentAlignment.MiddleCenter;
             lblForgotPassword.Click += LblForgotPassword_Click;
@@ -108,6 +110,7 @@
             chkRemember.Name = "chkRemember";
             chkRemember.Size = new Size(191, 29);
             chkRemember.TabIndex = 2;
+            chkRemember.TabStop = false;
             chkRemember.Text = "Ghi nhớ đăng nhập";
             chkRemember.UseVisualStyleBackColor = true;
             // 
@@ -143,6 +146,7 @@
             txtUsername.PlaceholderText = "Nhập số điện thoại";
             txtUsername.Size = new Size(300, 37);
             txtUsername.TabIndex = 0;
+            txtUsername.KeyPress += TxtUsername_KeyPress;
             // 
             // lblUsername
             // 

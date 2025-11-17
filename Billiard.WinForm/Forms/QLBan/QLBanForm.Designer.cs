@@ -1,4 +1,4 @@
-﻿namespace Billiard.WinForm.Forms.Menu
+﻿namespace Billiard.WinForm.Forms.QLBan
 {
     partial class QLBanForm
     {
@@ -492,9 +492,9 @@
             this.Controls.Add(this.pnlFilters);
             this.Controls.Add(this.pnlToolbar);
             this.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.Name = "QuanLyBanForm";
+            this.Name = "QLBanForm";
             this.Text = "Quản lý bàn";
-            this.Load += new System.EventHandler(this.QuanLyBanForm_Load);
+            this.Load += new System.EventHandler(this.QLBanForm_Load);
             this.pnlToolbar.ResumeLayout(false);
             this.pnlFilters.ResumeLayout(false);
             this.pnlFilters.PerformLayout();
