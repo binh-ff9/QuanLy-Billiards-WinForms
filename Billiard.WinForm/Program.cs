@@ -2,6 +2,7 @@
 using Billiard.DAL.Data;
 using Billiard.WinForm.Forms;
 using Billiard.WinForm.Forms.Auth;
+using Billiard.WinForm.Forms.QLBan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,8 +35,8 @@ namespace Billiard.WinForm
             ConfigureServices(serviceCollection);
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            // Chạy DichVuForm thay vì LoginForm
-            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
+            // Run LoginForm
+            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -52,20 +53,22 @@ namespace Billiard.WinForm
                 )
             );
 
-            // Register Services
+            // Register Services (BLL Layer)
             services.AddScoped<DichVuService>();
             services.AddScoped<MatHangService>();
+            services.AddScoped<BanBiaService>();
 
-            // Register Forms
+            // Register Forms (GUI Layer)
             services.AddTransient<MainForm>();
             services.AddTransient<LoginForm>();
             services.AddTransient<SignupForm>();
             services.AddTransient<ForgotPasswordForm>();
             services.AddTransient<ResetPasswordForm>();
 
-            // Register DichVu Forms
+            // Register Feature Forms
             services.AddTransient<DichVuForm>();
             services.AddTransient<DichVuEditForm>();
+            services.AddTransient<QLBanForm>(); 
         }
 
         public static T GetService<T>() where T : class

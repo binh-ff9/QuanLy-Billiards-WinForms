@@ -1,56 +1,76 @@
-﻿using Billiard.DAL.Data;
+﻿using Billiard.BLL.Services;
 using Billiard.DAL.Entities;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace Billiard.WinForm.Forms.Menu
+namespace Billiard.WinForm.Forms.QLBan
 {
     public partial class QLBanForm : Form
     {
-        private readonly BilliardDbContext _context;
-        private readonly MainForm _mainForm;
+        private readonly BanBiaService _banBiaService;
+        private MainForm _mainForm;
         private List<BanBium> _allTables;
         private string _currentAreaFilter = "all";
         private string _currentStatusFilter = "all";
         private string _currentTypeFilter = "all";
+        private System.Windows.Forms.Timer _refreshTimer;
 
-        public QLBanForm(BilliardDbContext context, MainForm mainForm)
+        public QLBanForm(BanBiaService banBiaService)
         {
-            _context = context;
-            _mainForm = mainForm;
+            _banBiaService = banBiaService;
             InitializeComponent();
-            SetupPermissions();
+            InitializeRefreshTimer();
+
+            // Đảm bảo form hiển thị đúng
+            this.AutoScroll = false;
+            this.AutoSize = false;
+        }
+
+        private void InitializeRefreshTimer()
+        {
+            _refreshTimer = new System.Windows.Forms.Timer();
+            _refreshTimer.Interval = 30000; // 30 seconds
+            _refreshTimer.Tick += async (s, e) => await LoadBanBia();
         }
 
         private void SetupPermissions()
         {
-            // Kiểm tra quyền và ẩn/hiện các button
+            if (_mainForm == null) return;
+
             var chucVu = _mainForm.ChucVu;
             bool isAdmin = chucVu == "Admin";
             bool isQuanLy = chucVu == "Quản lý" || isAdmin;
             bool isThuNgan = chucVu == "Thu ngân" || isQuanLy;
 
-            // Tất cả đều thấy nút xem sơ đồ
             btnXemSoDo.Visible = true;
-
-            // Thu ngân trở lên mới thấy đặt bàn
             btnXemBanDat.Visible = isThuNgan;
             btnDatBan.Visible = isThuNgan;
-
-            // Quản lý trở lên mới thấy thêm bàn
             btnThemBan.Visible = isQuanLy;
         }
 
-        private async void QuanLyBanForm_Load(object sender, EventArgs e)
+        public void SetMainForm(MainForm mainForm)
+        {
+            _mainForm = mainForm;
+            SetupPermissions();
+        }
+
+        private async void QLBanForm_Load(object sender, EventArgs e)
         {
             try
             {
+                // Start timer
+                _refreshTimer.Start();
+
+                // Load data
                 await LoadBanBia();
+
+                // Force layout update
+                this.PerformLayout();
+                this.Refresh();
             }
             catch (Exception ex)
             {
@@ -59,25 +79,25 @@ namespace Billiard.WinForm.Forms.Menu
             }
         }
 
-        private async System.Threading.Tasks.Task LoadBanBia()
+        private async Task LoadBanBia()
         {
             try
             {
+                // Show loading cursor
+                this.Cursor = Cursors.WaitCursor;
+
                 flpBanBia.Controls.Clear();
+                flpBanBia.SuspendLayout(); // Tạm dừng layout để tăng hiệu suất
 
-                // Load tất cả bàn từ database
-                _allTables = await _context.BanBia
-                    .Include(b => b.MaKhuVucNavigation)
-                    .Include(b => b.MaLoaiNavigation)
-                    .Include(b => b.MaKhNavigation)
-                    .Where(b => b.TrangThai != "Bảo trì")
-                    .OrderBy(b => b.TenBan)
-                    .ToListAsync();
-
+                _allTables = await _banBiaService.GetAllTablesAsync();
                 ApplyFilters();
+
+                flpBanBia.ResumeLayout(); // Tiếp tục layout
+                this.Cursor = Cursors.Default;
             }
             catch (Exception ex)
             {
+                this.Cursor = Cursors.Default;
                 MessageBox.Show($"Lỗi tải danh sách bàn: {ex.Message}", "Lỗi",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
@@ -85,31 +105,29 @@ namespace Billiard.WinForm.Forms.Menu
 
         private void ApplyFilters()
         {
+            flpBanBia.SuspendLayout();
             flpBanBia.Controls.Clear();
 
             var filteredTables = _allTables.AsEnumerable();
 
-            // Filter by area
+            // Apply filters
             if (_currentAreaFilter != "all")
             {
                 filteredTables = filteredTables.Where(b =>
                     b.MaKhuVucNavigation?.TenKhuVuc == _currentAreaFilter);
             }
 
-            // Filter by status
             if (_currentStatusFilter != "all")
             {
                 filteredTables = filteredTables.Where(b => b.TrangThai == _currentStatusFilter);
             }
 
-            // Filter by type
             if (_currentTypeFilter != "all")
             {
                 filteredTables = filteredTables.Where(b =>
                     b.MaLoaiNavigation?.TenLoai == _currentTypeFilter);
             }
 
-            // Filter by search text
             var searchText = txtSearch.Text.Trim().ToLower();
             if (!string.IsNullOrEmpty(searchText))
             {
@@ -131,13 +149,16 @@ namespace Billiard.WinForm.Forms.Menu
                     flpBanBia.Controls.Add(card);
                 }
             }
+
+            flpBanBia.ResumeLayout();
+            flpBanBia.PerformLayout();
         }
 
         private void ShowEmptyState()
         {
             var pnlEmpty = new Panel
             {
-                Size = new Size(800, 300),
+                Size = new Size(flpBanBia.Width - 40, 300),
                 BackColor = Color.White
             };
 
@@ -145,27 +166,36 @@ namespace Billiard.WinForm.Forms.Menu
             {
                 Text = "🎱",
                 Font = new Font("Segoe UI", 48F),
-                AutoSize = true,
-                Location = new Point(350, 80)
+                AutoSize = true
             };
+            lblIcon.Location = new Point(
+                (pnlEmpty.Width - lblIcon.Width) / 2,
+                80
+            );
 
             var lblTitle = new Label
             {
                 Text = "Không tìm thấy bàn nào",
                 Font = new Font("Segoe UI", 16F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(71, 85, 105),
-                AutoSize = true,
-                Location = new Point(280, 160)
+                AutoSize = true
             };
+            lblTitle.Location = new Point(
+                (pnlEmpty.Width - lblTitle.Width) / 2,
+                160
+            );
 
             var lblDesc = new Label
             {
                 Text = "Thử thay đổi bộ lọc hoặc tìm kiếm khác",
                 Font = new Font("Segoe UI", 11F),
                 ForeColor = Color.Gray,
-                AutoSize = true,
-                Location = new Point(280, 195)
+                AutoSize = true
             };
+            lblDesc.Location = new Point(
+                (pnlEmpty.Width - lblDesc.Width) / 2,
+                195
+            );
 
             pnlEmpty.Controls.AddRange(new Control[] { lblIcon, lblTitle, lblDesc });
             flpBanBia.Controls.Add(pnlEmpty);
@@ -175,8 +205,8 @@ namespace Billiard.WinForm.Forms.Menu
         {
             var card = new Panel
             {
-                Width = 200,
-                Height = 240,
+                Width = 220,
+                Height = 280,
                 Margin = new Padding(10),
                 BorderStyle = BorderStyle.FixedSingle,
                 Cursor = Cursors.Hand,
@@ -186,27 +216,44 @@ namespace Billiard.WinForm.Forms.Menu
             // Background color based on status
             card.BackColor = ban.TrangThai switch
             {
-                "Trống" => Color.FromArgb(220, 252, 231),
-                "Đang chơi" => Color.FromArgb(254, 226, 226),
-                "Đã đặt" => Color.FromArgb(254, 243, 199),
+                "Trống" => Color.FromArgb(240, 253, 244),
+                "Đang chơi" => Color.FromArgb(254, 242, 242),
+                "Đã đặt" => Color.FromArgb(255, 251, 235),
                 _ => Color.White
             };
 
-            // Table icon/image
+            // Border color based on status
+            card.Paint += (s, e) =>
+            {
+                var borderColor = ban.TrangThai switch
+                {
+                    "Trống" => Color.FromArgb(34, 197, 94),
+                    "Đang chơi" => Color.FromArgb(239, 68, 68),
+                    "Đã đặt" => Color.FromArgb(234, 179, 8),
+                    _ => Color.Gray
+                };
+
+                using (var pen = new Pen(borderColor, 3))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+                }
+            };
+
+            // Table image panel
             var pnlImage = new Panel
             {
                 Location = new Point(0, 0),
-                Size = new Size(200, 120),
+                Size = new Size(220, 140),
                 BackColor = Color.FromArgb(248, 250, 252)
             };
 
             var lblIcon = new Label
             {
                 Text = "🎱",
-                Font = new Font("Segoe UI", 48F),
+                Font = new Font("Segoe UI", 56F),
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Size = new Size(200, 120)
+                Size = new Size(220, 140)
             };
             pnlImage.Controls.Add(lblIcon);
 
@@ -225,7 +272,7 @@ namespace Billiard.WinForm.Forms.Menu
                 },
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Size = new Size(80, 25),
+                Size = new Size(85, 28),
                 Location = new Point(10, 10)
             };
             pnlImage.Controls.Add(lblStatus);
@@ -241,8 +288,8 @@ namespace Billiard.WinForm.Forms.Menu
                     BackColor = Color.FromArgb(168, 85, 247),
                     AutoSize = false,
                     TextAlign = ContentAlignment.MiddleCenter,
-                    Size = new Size(70, 25),
-                    Location = new Point(120, 10)
+                    Size = new Size(75, 28),
+                    Location = new Point(135, 10)
                 };
                 pnlImage.Controls.Add(lblVIP);
             }
@@ -251,12 +298,12 @@ namespace Billiard.WinForm.Forms.Menu
             var lblName = new Label
             {
                 Text = ban.TenBan,
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 15F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(0, 130),
-                Size = new Size(200, 30)
+                Location = new Point(0, 150),
+                Size = new Size(220, 32)
             };
 
             // Table info
@@ -266,8 +313,8 @@ namespace Billiard.WinForm.Forms.Menu
                 ForeColor = Color.FromArgb(100, 116, 139),
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(0, 165),
-                Size = new Size(200, 20)
+                Location = new Point(0, 185),
+                Size = new Size(220, 22)
             };
 
             if (ban.TrangThai == "Đang chơi" && ban.GioBatDau.HasValue)
@@ -277,7 +324,6 @@ namespace Billiard.WinForm.Forms.Menu
                 lblInfo.ForeColor = Color.FromArgb(239, 68, 68);
                 lblInfo.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
 
-                // Customer name
                 var lblCustomer = new Label
                 {
                     Text = $"👤 {ban.MaKhNavigation?.TenKh ?? "Khách lẻ"}",
@@ -285,8 +331,8 @@ namespace Billiard.WinForm.Forms.Menu
                     ForeColor = Color.FromArgb(71, 85, 105),
                     AutoSize = false,
                     TextAlign = ContentAlignment.MiddleCenter,
-                    Location = new Point(0, 190),
-                    Size = new Size(200, 20)
+                    Location = new Point(0, 210),
+                    Size = new Size(220, 22)
                 };
                 card.Controls.Add(lblCustomer);
             }
@@ -296,82 +342,146 @@ namespace Billiard.WinForm.Forms.Menu
             }
             else
             {
-                lblInfo.Text = ban.MaLoaiNavigation?.TenLoai ?? "Không rõ";
+                lblInfo.Text = $"📍 {ban.MaKhuVucNavigation?.TenKhuVuc ?? "Khu vực"}";
             }
 
             // Price
             var lblPrice = new Label
             {
                 Text = $"{ban.MaLoaiNavigation?.GiaGio:N0} đ/giờ",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(99, 102, 241),
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(0, 210),
-                Size = new Size(200, 25)
+                Location = new Point(0, 235),
+                Size = new Size(220, 28)
             };
 
             card.Controls.AddRange(new Control[] { pnlImage, lblName, lblInfo, lblPrice });
 
-            // Click event
-            card.Click += (s, e) => ShowTableDetail(ban);
+            // Click event - gán cho tất cả controls
+            EventHandler clickHandler = (s, e) => ShowTableDetail(ban);
+            card.Click += clickHandler;
+
             foreach (Control ctrl in card.Controls)
             {
-                ctrl.Click += (s, e) => ShowTableDetail(ban);
+                ctrl.Click += clickHandler;
+                if (ctrl.HasChildren)
+                {
+                    foreach (Control subCtrl in ctrl.Controls)
+                    {
+                        subCtrl.Click += clickHandler;
+                    }
+                }
             }
 
             // Hover effect
-            card.MouseEnter += (s, e) => card.BorderStyle = BorderStyle.Fixed3D;
-            card.MouseLeave += (s, e) => card.BorderStyle = BorderStyle.FixedSingle;
+            card.MouseEnter += (s, e) =>
+            {
+                card.BorderStyle = BorderStyle.Fixed3D;
+                var currentColor = card.BackColor;
+                card.BackColor = Color.FromArgb(
+                    Math.Max(0, currentColor.R - 10),
+                    Math.Max(0, currentColor.G - 10),
+                    Math.Max(0, currentColor.B - 10)
+                );
+            };
+
+            card.MouseLeave += (s, e) =>
+            {
+                card.BorderStyle = BorderStyle.FixedSingle;
+                card.BackColor = ban.TrangThai switch
+                {
+                    "Trống" => Color.FromArgb(240, 253, 244),
+                    "Đang chơi" => Color.FromArgb(254, 242, 242),
+                    "Đã đặt" => Color.FromArgb(255, 251, 235),
+                    _ => Color.White
+                };
+            };
 
             return card;
         }
 
         private void ShowTableDetail(BanBium ban)
         {
-            var detailPanel = new Panel { AutoScroll = true, Width = 270 };
+            if (_mainForm == null) return;
+
+            var detailPanel = new Panel
+            {
+                AutoScroll = true,
+                Width = 270,
+                Padding = new Padding(10)
+            };
+
+            int yPos = 10;
 
             // Title
             var lblTitle = new Label
             {
                 Text = ban.TenBan,
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(0, 0)
+                Location = new Point(10, yPos),
+                ForeColor = Color.FromArgb(30, 41, 59)
             };
             detailPanel.Controls.Add(lblTitle);
+            yPos += 40;
 
-            // Status
-            var lblStatus = new Label
+            // Status Badge
+            var pnlStatus = new Panel
             {
-                Text = $"Trạng thái: {ban.TrangThai}",
-                Font = new Font("Segoe UI", 10F),
-                AutoSize = true,
-                Location = new Point(0, 35)
+                Location = new Point(10, yPos),
+                Size = new Size(250, 35),
+                BackColor = ban.TrangThai switch
+                {
+                    "Trống" => Color.FromArgb(220, 252, 231),
+                    "Đang chơi" => Color.FromArgb(254, 226, 226),
+                    "Đã đặt" => Color.FromArgb(254, 243, 199),
+                    _ => Color.LightGray
+                }
             };
-            detailPanel.Controls.Add(lblStatus);
 
-            // Info
-            var yPos = 60;
-            AddDetailLabel(detailPanel, $"Loại bàn: {ban.MaLoaiNavigation?.TenLoai}", ref yPos);
-            AddDetailLabel(detailPanel, $"Khu vực: {ban.MaKhuVucNavigation?.TenKhuVuc}", ref yPos);
-            AddDetailLabel(detailPanel, $"Giá: {ban.MaLoaiNavigation?.GiaGio:N0} đ/giờ", ref yPos);
+            var lblStatusBadge = new Label
+            {
+                Text = ban.TrangThai,
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = ban.TrangThai switch
+                {
+                    "Trống" => Color.FromArgb(21, 128, 61),
+                    "Đang chơi" => Color.FromArgb(153, 27, 27),
+                    "Đã đặt" => Color.FromArgb(146, 64, 14),
+                    _ => Color.Gray
+                },
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 0),
+                Size = new Size(250, 35)
+            };
+            pnlStatus.Controls.Add(lblStatusBadge);
+            detailPanel.Controls.Add(pnlStatus);
+            yPos += 50;
+
+            // Info section
+            AddDetailLabel(detailPanel, $"📍 Khu vực: {ban.MaKhuVucNavigation?.TenKhuVuc}", ref yPos);
+            AddDetailLabel(detailPanel, $"🎯 Loại bàn: {ban.MaLoaiNavigation?.TenLoai}", ref yPos);
+            AddDetailLabel(detailPanel, $"💰 Giá: {ban.MaLoaiNavigation?.GiaGio:N0} đ/giờ", ref yPos);
 
             if (ban.TrangThai == "Đang chơi" && ban.GioBatDau.HasValue)
             {
                 var duration = DateTime.Now - ban.GioBatDau.Value;
-                AddDetailLabel(detailPanel, $"Bắt đầu: {ban.GioBatDau:HH:mm}", ref yPos);
-                AddDetailLabel(detailPanel, $"Thời gian: {(int)duration.TotalHours}h {duration.Minutes}m", ref yPos);
-                AddDetailLabel(detailPanel, $"Khách: {ban.MaKhNavigation?.TenKh ?? "Khách lẻ"}", ref yPos);
+                AddDetailLabel(detailPanel, $"⏰ Bắt đầu: {ban.GioBatDau:HH:mm}", ref yPos);
+                AddDetailLabel(detailPanel, $"⏱️ Thời gian: {(int)duration.TotalHours}h {duration.Minutes}m", ref yPos);
+                AddDetailLabel(detailPanel, $"👤 Khách: {ban.MaKhNavigation?.TenKh ?? "Khách lẻ"}", ref yPos);
             }
 
+            yPos += 15;
+
             // Action buttons
-            yPos += 20;
             var btnPanel = new FlowLayoutPanel
             {
-                Location = new Point(0, yPos),
-                Width = 270,
-                Height = 200,
+                Location = new Point(10, yPos),
+                Width = 250,
+                Height = 250,
                 FlowDirection = FlowDirection.TopDown
             };
 
@@ -407,53 +517,49 @@ namespace Billiard.WinForm.Forms.Menu
                 Text = text,
                 Font = new Font("Segoe UI", 10F),
                 AutoSize = true,
-                Location = new Point(0, yPos)
+                Location = new Point(10, yPos),
+                MaximumSize = new Size(250, 0),
+                ForeColor = Color.FromArgb(71, 85, 105)
             };
             panel.Controls.Add(lbl);
-            yPos += 25;
+            yPos += 28;
         }
 
         private Button CreateActionButton(string text, Color backColor)
         {
-            return new Button
+            var btn = new Button
             {
                 Text = text,
-                Width = 250,
-                Height = 40,
+                Width = 240,
+                Height = 45,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = backColor,
                 ForeColor = Color.White,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
                 Margin = new Padding(0, 5, 0, 5)
             };
+            btn.FlatAppearance.BorderSize = 0;
+            return btn;
         }
 
-        private async System.Threading.Tasks.Task BatDauChoiBan(BanBium ban)
+        private async Task BatDauChoiBan(BanBium ban)
         {
             try
             {
-                ban.TrangThai = "Đang chơi";
-                ban.GioBatDau = DateTime.Now;
+                var result = await _banBiaService.StartTableAsync(ban.MaBan, _mainForm.MaNV);
 
-                var hoaDon = new HoaDon
+                if (result)
                 {
-                    MaBan = ban.MaBan,
-                    ThoiGianBatDau = DateTime.Now,
-                    TrangThai = "Đang chơi",
-                    MaNv = _mainForm.MaNV,
-                    TienBan = 0,
-                    TienDichVu = 0,
-                    TongTien = 0
-                };
-                _context.HoaDons.Add(hoaDon);
-
-                await _context.SaveChangesAsync();
-
-                MessageBox.Show($"Đã bắt đầu chơi bàn {ban.TenBan}", "Thành công",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                await LoadBanBia();
+                    MessageBox.Show($"Đã bắt đầu chơi bàn {ban.TenBan}", "Thành công",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    await LoadBanBia();
+                }
+                else
+                {
+                    MessageBox.Show("Không thể bắt đầu chơi bàn này!", "Lỗi",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
             catch (Exception ex)
             {
@@ -472,17 +578,25 @@ namespace Billiard.WinForm.Forms.Menu
             MessageBox.Show($"Chức năng thêm dịch vụ cho bàn {ban.TenBan} đang được phát triển", "Thông báo");
         }
 
-        private async System.Threading.Tasks.Task TamDungBan(BanBium ban)
+        private async Task TamDungBan(BanBium ban)
         {
             var result = MessageBox.Show($"Tạm dừng bàn {ban.TenBan}?", "Xác nhận",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
             if (result == DialogResult.Yes)
             {
-                ban.TrangThai = "Trống";
-                ban.GioBatDau = null;
-                await _context.SaveChangesAsync();
-                await LoadBanBia();
+                var success = await _banBiaService.PauseTableAsync(ban.MaBan);
+                if (success)
+                {
+                    MessageBox.Show("Đã tạm dừng bàn", "Thành công",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    await LoadBanBia();
+                }
+                else
+                {
+                    MessageBox.Show("Không thể tạm dừng bàn!", "Lỗi",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
 
@@ -493,7 +607,6 @@ namespace Billiard.WinForm.Forms.Menu
             var button = sender as Button;
             _currentAreaFilter = button.Tag.ToString();
 
-            // Update button styles
             foreach (Control ctrl in pnlKhuVucFilters.Controls)
             {
                 if (ctrl is Button btn)
@@ -594,5 +707,12 @@ namespace Billiard.WinForm.Forms.Menu
         }
 
         #endregion
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            _refreshTimer?.Stop();
+            _refreshTimer?.Dispose();
+            base.OnFormClosing(e);
+        }
     }
 }

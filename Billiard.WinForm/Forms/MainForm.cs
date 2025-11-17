@@ -1,55 +1,74 @@
-﻿using Billiard.DAL.Data;
+﻿using Billiard.BLL.Services;
+using Billiard.DAL.Data;
 using Billiard.DAL.Entities;
 using Billiard.WinForm.Forms;
-using Billiard.WinForm.Forms.Menu;
+using Billiard.WinForm.Forms.QLBan;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using Billiard.WinForm.Forms; // Nếu DichVuForm nằm trong namespace này
+
 namespace Billiard.WinForm
 {
     public partial class MainForm : Form
     {
         private readonly BilliardDbContext _context;
+        private readonly BanBiaService _banBiaService;
         private Button _activeButton;
         private Form _activeForm;
+        private System.Timers.Timer _refreshTimer;
 
         // Session info
         public int MaNV { get; set; }
         public string TenNV { get; set; }
         public string ChucVu { get; set; }
 
-        public MainForm(BilliardDbContext context)
+        public MainForm(BilliardDbContext context, BanBiaService banBiaService)
         {
             InitializeComponent();
             _context = context;
-
-            // Rounded corners for panels
-            SetRoundedCorners();
+            _banBiaService = banBiaService;
         }
 
         private async void MainForm_Load(object sender, EventArgs e)
         {
             try
             {
+                // Show loading indicator
+                this.Cursor = Cursors.WaitCursor;
+
                 // Load user info from session
                 LoadUserInfo();
 
                 // Load statistics
                 await LoadStatistics();
 
-                // Auto-refresh every 30 seconds
-                var timer = new System.Timers.Timer { Interval = 30000 };
-                timer.Elapsed += async (s, ev) => await LoadStatistics();
-                timer.Start();
+                // Setup auto-refresh timer
+                SetupRefreshTimer();
+
+                // Set initial styles
+                ApplyInitialStyles();
+
+                this.Cursor = Cursors.Default;
             }
             catch (Exception ex)
             {
+                this.Cursor = Cursors.Default;
                 MessageBox.Show($"Lỗi khi tải dữ liệu: {ex.Message}", "Lỗi",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void SetupRefreshTimer()
+        {
+            _refreshTimer = new System.Timers.Timer
+            {
+                Interval = 30000, // 30 seconds
+                AutoReset = true,
+                Enabled = true
+            };
+            _refreshTimer.Elapsed += async (s, ev) => await LoadStatistics();
         }
 
         private void LoadUserInfo()
@@ -71,24 +90,95 @@ namespace Billiard.WinForm
             };
         }
 
+        private void ApplyInitialStyles()
+        {
+            // Set stat cards initial values
+            lblBanTrongValue.Text = "0";
+            lblDangChoiValue.Text = "0";
+            lblDatTruocValue.Text = "0";
+            lblDoanhThuValue.Text = "0đ";
+            lblKhachHangValue.Text = "0";
+
+            // Show welcome panel
+            ShowWelcomePanel();
+
+            // Hide detail panel initially
+            pnlDetail.Visible = false;
+        }
+
+        private void ShowWelcomePanel()
+        {
+            pnlMain.Controls.Clear();
+
+            var welcomePanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.White
+            };
+
+            var lblWelcome = new Label
+            {
+                Text = "🎱",
+                Font = new Font("Segoe UI", 72F),
+                AutoSize = true,
+                ForeColor = Color.FromArgb(99, 102, 241)
+            };
+            lblWelcome.Location = new Point(
+                (pnlMain.Width - lblWelcome.Width) / 2,
+                (pnlMain.Height - lblWelcome.Height) / 2 - 100
+            );
+
+            var lblTitle = new Label
+            {
+                Text = "Chào mừng đến Quản Lý Quán Bi-a Pro",
+                Font = new Font("Segoe UI", 24F, FontStyle.Bold),
+                AutoSize = true,
+                ForeColor = Color.FromArgb(30, 41, 59)
+            };
+            lblTitle.Location = new Point(
+                (pnlMain.Width - lblTitle.Width) / 2,
+                lblWelcome.Bottom + 30
+            );
+
+            var lblDesc = new Label
+            {
+                Text = "Chọn menu bên trái để bắt đầu",
+                Font = new Font("Segoe UI", 14F),
+                AutoSize = true,
+                ForeColor = Color.FromArgb(100, 116, 139)
+            };
+            lblDesc.Location = new Point(
+                (pnlMain.Width - lblDesc.Width) / 2,
+                lblTitle.Bottom + 20
+            );
+
+            welcomePanel.Controls.AddRange(new Control[] { lblWelcome, lblTitle, lblDesc });
+            pnlMain.Controls.Add(welcomePanel);
+        }
+
         private async System.Threading.Tasks.Task LoadStatistics()
         {
             try
             {
-                // Bàn trống
-                var banTrong = await _context.BanBia
-                    .CountAsync(b => b.TrangThai == "Trống");
-                lblBanTrongValue.Text = banTrong.ToString();
+                // Get table stats using service
+                var stats = await _banBiaService.GetTableStatsAsync();
 
-                // Đang chơi
-                var dangChoi = await _context.BanBia
-                    .CountAsync(b => b.TrangThai == "Đang chơi");
-                lblDangChoiValue.Text = dangChoi.ToString();
-
-                // Đặt trước
-                var datTruoc = await _context.DatBans
-                    .CountAsync(d => d.TrangThai == "Đang chờ");
-                lblDatTruocValue.Text = datTruoc.ToString();
+                // Update UI on main thread
+                if (InvokeRequired)
+                {
+                    Invoke(new Action(() =>
+                    {
+                        lblBanTrongValue.Text = stats.trong.ToString();
+                        lblDangChoiValue.Text = stats.dangChoi.ToString();
+                        lblDatTruocValue.Text = stats.daDat.ToString();
+                    }));
+                }
+                else
+                {
+                    lblBanTrongValue.Text = stats.trong.ToString();
+                    lblDangChoiValue.Text = stats.dangChoi.ToString();
+                    lblDatTruocValue.Text = stats.daDat.ToString();
+                }
 
                 // Doanh thu hôm nay
                 var today = DateTime.Today;
@@ -96,16 +186,27 @@ namespace Billiard.WinForm
                     .Where(h => h.ThoiGianBatDau.HasValue &&
                                h.ThoiGianBatDau.Value.Date == today &&
                                h.TrangThai == "Đã thanh toán")
-                    .SumAsync(h => h.TongTien);
-                //lblDoanhThuValue.Text = FormatCurrency(doanhThu);
+                    .SumAsync(h => h.TongTien) ?? 0M;
 
                 // Tổng khách hàng
                 var tongKH = await _context.KhachHangs.CountAsync();
-                lblKhachHangValue.Text = tongKH.ToString();
+
+                if (InvokeRequired)
+                {
+                    Invoke(new Action(() =>
+                    {
+                        lblDoanhThuValue.Text = FormatCurrency(doanhThu);
+                        lblKhachHangValue.Text = tongKH.ToString();
+                    }));
+                }
+                else
+                {
+                    lblDoanhThuValue.Text = FormatCurrency(doanhThu);
+                    lblKhachHangValue.Text = tongKH.ToString();
+                }
             }
             catch (Exception ex)
             {
-                // Log error but don't show to user to avoid interruption
                 Console.WriteLine($"Error loading statistics: {ex.Message}");
             }
         }
@@ -120,60 +221,147 @@ namespace Billiard.WinForm
         private void SidebarButton_Click(object sender, EventArgs e)
         {
             var button = sender as Button;
+
+            // Activate button visual
             ActivateButton(button);
 
-            // Clear current form
+            // Close and dispose current form
             if (_activeForm != null)
             {
                 _activeForm.Close();
+                _activeForm.Dispose();
+                _activeForm = null;
             }
 
+            // Hide detail panel
+            pnlDetail.Visible = false;
+
             // Open corresponding form
-            switch (button.Name)
+            try
             {
-                case "btnQuanLyBan":
-                    OpenChildForm(new QLBanForm(_context, this));
-                    break;
-                case "btnDichVu":
-                    OpenChildForm(Program.GetService<DichVuForm>());
-                    break;
-                case "btnHoaDon":
-                    //OpenChildForm(new HoaDonForm(_context));
-                    break;
-                case "btnKhachHang":
-                    //OpenChildForm(new KhachHangForm(_context));
-                    break;
-                case "btnThongKe":
-                    //OpenChildForm(new ThongKeForm(_context));
-                    break;
-                case "btnNhanVien":
-                    //OpenChildForm(new NhanVienForm(_context));
-                    break;
-                case "btnCaiDat":
-                    //OpenChildForm(new CaiDatForm(_context));
-                    break;
+                switch (button.Name)
+                {
+                    case "btnQuanLyBan":
+                        var qlBanForm = Program.GetService<QLBanForm>();
+                        qlBanForm.SetMainForm(this);
+                        OpenChildForm(qlBanForm);
+                        break;
+                    case "btnDichVu":
+                        OpenChildForm(Program.GetService<DichVuForm>());
+                        break;
+                    case "btnHoaDon":
+                        ShowComingSoon("Hóa đơn");
+                        break;
+                    case "btnKhachHang":
+                        ShowComingSoon("Khách hàng");
+                        break;
+                    case "btnThongKe":
+                        ShowComingSoon("Thống kê");
+                        break;
+                    case "btnNhanVien":
+                        ShowComingSoon("Nhân viên");
+                        break;
+                    case "btnCaiDat":
+                        ShowComingSoon("Cài đặt");
+                        break;
+                }
             }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở form: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowWelcomePanel();
+            }
+        }
+
+        private void ShowComingSoon(string feature)
+        {
+            pnlMain.Controls.Clear();
+
+            var comingSoonPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.White
+            };
+
+            var lblIcon = new Label
+            {
+                Text = "🚧",
+                Font = new Font("Segoe UI", 72F),
+                AutoSize = true
+            };
+            lblIcon.Location = new Point(
+                (pnlMain.Width - lblIcon.Width) / 2,
+                (pnlMain.Height - lblIcon.Height) / 2 - 80
+            );
+
+            var lblTitle = new Label
+            {
+                Text = $"Chức năng {feature}",
+                Font = new Font("Segoe UI", 20F, FontStyle.Bold),
+                AutoSize = true,
+                ForeColor = Color.FromArgb(30, 41, 59)
+            };
+            lblTitle.Location = new Point(
+                (pnlMain.Width - lblTitle.Width) / 2,
+                lblIcon.Bottom + 20
+            );
+
+            var lblDesc = new Label
+            {
+                Text = "Đang trong quá trình phát triển",
+                Font = new Font("Segoe UI", 12F),
+                AutoSize = true,
+                ForeColor = Color.FromArgb(100, 116, 139)
+            };
+            lblDesc.Location = new Point(
+                (pnlMain.Width - lblDesc.Width) / 2,
+                lblTitle.Bottom + 15
+            );
+
+            comingSoonPanel.Controls.AddRange(new Control[] { lblIcon, lblTitle, lblDesc });
+            pnlMain.Controls.Add(comingSoonPanel);
         }
 
         private void OpenChildForm(Form childForm)
         {
+            if (childForm == null) return;
+
+            // Clear main panel
+            pnlMain.Controls.Clear();
+
+            // Store reference
             _activeForm = childForm;
+
+            // Configure child form
             childForm.TopLevel = false;
             childForm.FormBorderStyle = FormBorderStyle.None;
             childForm.Dock = DockStyle.Fill;
-            pnlMain.Controls.Clear();
+
+            // Add to panel
             pnlMain.Controls.Add(childForm);
+            pnlMain.Tag = childForm;
+
+            // Show and bring to front
             childForm.Show();
+            childForm.BringToFront();
         }
 
         private void ActivateButton(Button button)
         {
-            if (_activeButton != null)
+            // Reset all buttons
+            foreach (Control ctrl in pnlSidebar.Controls)
             {
-                _activeButton.BackColor = Color.Transparent;
+                if (ctrl is Button btn && btn != button)
+                {
+                    btn.BackColor = Color.Transparent;
+                    btn.ForeColor = Color.White;
+                }
             }
 
+            // Activate clicked button
             button.BackColor = Color.FromArgb(51, 65, 85);
+            button.ForeColor = Color.White;
             _activeButton = button;
         }
 
@@ -225,77 +413,101 @@ namespace Billiard.WinForm
 
             if (result == DialogResult.Yes)
             {
+                // Stop timer
+                _refreshTimer?.Stop();
+                _refreshTimer?.Dispose();
+
+                // Close active form
+                if (_activeForm != null)
+                {
+                    _activeForm.Close();
+                    _activeForm.Dispose();
+                    _activeForm = null;
+                }
+
                 // Clear session
                 MaNV = 0;
                 TenNV = null;
                 ChucVu = null;
 
                 // Show login form
-                var loginForm = Program.GetService<LoginForm>();
-                loginForm.Show();
-                this.Close();
+                try
+                {
+                    var loginForm = Program.GetService<LoginForm>();
+                    loginForm.Show();
+                    this.Hide();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Lỗi khi đăng xuất: {ex.Message}", "Lỗi",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
 
         #endregion
 
-        #region UI Enhancements
-
-        private void SetRoundedCorners()
-        {
-            // Add rounded corners to stat cards
-            foreach (Control ctrl in pnlStats.Controls)
-            {
-                if (ctrl is Panel panel)
-                {
-                    panel.Paint += (s, e) =>
-                    {
-                        e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                        var path = GetRoundedRectangle(panel.ClientRectangle, 8);
-                        panel.Region = new Region(path);
-                    };
-                }
-            }
-
-            // Rounded avatar
-            lblUserAvatar.Paint += (s, e) =>
-            {
-                e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                var path = GetRoundedRectangle(lblUserAvatar.ClientRectangle, 25);
-                lblUserAvatar.Region = new Region(path);
-            };
-        }
-
-        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectangle(Rectangle rect, int radius)
-        {
-            var path = new System.Drawing.Drawing2D.GraphicsPath();
-            path.AddArc(rect.X, rect.Y, radius, radius, 180, 90);
-            path.AddArc(rect.Right - radius, rect.Y, radius, radius, 270, 90);
-            path.AddArc(rect.Right - radius, rect.Bottom - radius, radius, radius, 0, 90);
-            path.AddArc(rect.X, rect.Bottom - radius, radius, radius, 90, 90);
-            path.CloseFigure();
-            return path;
-        }
+        #region Detail Panel Management
 
         public void UpdateDetailPanel(string title, Control content)
         {
+            // Clear existing controls except title label
             pnlDetail.Controls.Clear();
 
+            // Add title
             var lblTitle = new Label
             {
                 Text = title,
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(15, 15),
                 AutoSize = true
             };
-
             pnlDetail.Controls.Add(lblTitle);
 
-            content.Location = new Point(15, 50);
-            content.Width = pnlDetail.Width - 30;
-            pnlDetail.Controls.Add(content);
+            // Add separator
+            var separator = new Panel
+            {
+                Location = new Point(15, 50),
+                Size = new Size(pnlDetail.Width - 30, 2),
+                BackColor = Color.FromArgb(226, 232, 240)
+            };
+            pnlDetail.Controls.Add(separator);
+
+            // Add content
+            if (content != null)
+            {
+                content.Location = new Point(15, 65);
+                content.Size = new Size(pnlDetail.Width - 30, pnlDetail.Height - 80);
+                pnlDetail.Controls.Add(content);
+            }
+
+            // Show panel
+            pnlDetail.Visible = true;
+            pnlDetail.BringToFront();
+        }
+
+        public void HideDetailPanel()
+        {
+            pnlDetail.Visible = false;
         }
 
         #endregion
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            // Stop timer
+            _refreshTimer?.Stop();
+            _refreshTimer?.Dispose();
+
+            // Close active form
+            if (_activeForm != null)
+            {
+                _activeForm.Close();
+                _activeForm.Dispose();
+            }
+
+            base.OnFormClosing(e);
+        }
     }
 }
