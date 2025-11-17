@@ -1,11 +1,13 @@
-﻿using System;
+﻿using Billiard.DAL.Data;
+using Billiard.DAL.Entities;
+using Billiard.WinForm.Forms;
+using Billiard.WinForm.Forms.Menu;
+using Microsoft.EntityFrameworkCore;
+using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using Microsoft.EntityFrameworkCore;
-using Billiard.DAL.Data;
-using Billiard.DAL.Entities;
-using Billiard.WinForm.Forms.Menu;
+using Billiard.WinForm.Forms; // Nếu DichVuForm nằm trong namespace này
 namespace Billiard.WinForm
 {
     public partial class MainForm : Form
@@ -133,7 +135,7 @@ namespace Billiard.WinForm
                     OpenChildForm(new QLBanForm(_context, this));
                     break;
                 case "btnDichVu":
-                    //OpenChildForm(new DichVuForm(_context));
+                    OpenChildForm(Program.GetService<DichVuForm>());
                     break;
                 case "btnHoaDon":
                     //OpenChildForm(new HoaDonForm(_context));

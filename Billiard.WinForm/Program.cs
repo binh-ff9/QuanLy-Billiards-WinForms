@@ -1,8 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Billiard.BLL.Services;
+using Billiard.DAL.Data;
+using Billiard.WinForm.Forms;
+using Billiard.WinForm.Forms.Auth;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Billiard.DAL.Data;
-using Billiard.WinForm.Forms.Auth;
 using System;
 using System.IO;
 using System.Windows.Forms;
@@ -25,7 +27,6 @@ namespace Billiard.WinForm
             var builder = new ConfigurationBuilder()
                 .SetBasePath(Directory.GetCurrentDirectory())
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-
             Configuration = builder.Build();
 
             // Setup Dependency Injection
@@ -33,8 +34,8 @@ namespace Billiard.WinForm
             ConfigureServices(serviceCollection);
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            // Run login form first
-            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
+            // Chạy DichVuForm thay vì LoginForm
+            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -51,12 +52,20 @@ namespace Billiard.WinForm
                 )
             );
 
+            // Register Services
+            services.AddScoped<DichVuService>();
+            services.AddScoped<MatHangService>();
+
             // Register Forms
             services.AddTransient<MainForm>();
             services.AddTransient<LoginForm>();
             services.AddTransient<SignupForm>();
             services.AddTransient<ForgotPasswordForm>();
             services.AddTransient<ResetPasswordForm>();
+
+            // Register DichVu Forms
+            services.AddTransient<DichVuForm>();
+            services.AddTransient<DichVuEditForm>();
         }
 
         public static T GetService<T>() where T : class
