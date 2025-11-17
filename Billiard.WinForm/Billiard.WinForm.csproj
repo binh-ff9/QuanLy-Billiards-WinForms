@@ -14,6 +14,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.22" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Billiard.API\Billiard.API.csproj" />
+    <ProjectReference Include="..\Billiard.BLL\Billiard.BLL.csproj" />
+    <ProjectReference Include="..\Billiard.DAL\Billiard.DAL.csproj" />
     <ProjectReference Include="..\Billiards.Shared\Billiard.Shared.csproj" />
   </ItemGroup>
 
