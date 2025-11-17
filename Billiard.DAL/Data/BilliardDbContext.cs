@@ -7,10 +7,26 @@ namespace Billiard.DAL.Data;
 
 public partial class BilliardDbContext : DbContext
 {
+    // Constructor mặc định (cho Service)
+    public BilliardDbContext() : base()
+    {
+    }
+
+    // Constructor với options (cho Dependency Injection)
     public BilliardDbContext(DbContextOptions<BilliardDbContext> options)
         : base(options)
     {
     }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            // Connection string của bạn
+            optionsBuilder.UseSqlServer("your_connection_string_here");
+        }
+    }
+    
 
     public virtual DbSet<BanBium> BanBia { get; set; }
 
