@@ -1,8 +1,8 @@
 ﻿using Billiard.DAL.Data;
-using Billiard.WinForm.Forms.Auth;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Net;
 using System.Net.Mail;
 using System.Windows.Forms;
@@ -12,13 +12,36 @@ namespace Billiard.WinForm.Forms.Auth
     public partial class ForgotPasswordForm : Form
     {
         private readonly BilliardDbContext _context;
+        private readonly bool _isAdminMode;
         private string generatedOTP;
         private string userEmail;
 
-        public ForgotPasswordForm(BilliardDbContext context)
+        public ForgotPasswordForm(BilliardDbContext context, bool isAdminMode = false)
         {
             _context = context;
+            _isAdminMode = isAdminMode;
             InitializeComponent();
+            UpdateUIForMode();
+        }
+
+        private void UpdateUIForMode()
+        {
+            if (_isAdminMode)
+            {
+                lblTitle.Text = "🔑 QUÊN MẬT KHẨU ADMIN";
+                lblSubtitle.Text = "Nhập email đã đăng ký (Admin/Nhân viên)";
+                pnlDecoration.BackColor = Color.FromArgb(99, 102, 241);
+                lblDecoTitle.ForeColor = Color.FromArgb(99, 102, 241);
+                btnSendOTP.BackColor = Color.FromArgb(99, 102, 241);
+            }
+            else
+            {
+                lblTitle.Text = "🔑 QUÊN MẬT KHẨU";
+                lblSubtitle.Text = "Nhập email để nhận mã xác nhận";
+                pnlDecoration.BackColor = Color.FromArgb(16, 185, 129);
+                lblDecoTitle.ForeColor = Color.FromArgb(16, 185, 129);
+                btnSendOTP.BackColor = Color.FromArgb(16, 185, 129);
+            }
         }
 
         private void ForgotPasswordForm_Load(object sender, EventArgs e)
@@ -30,40 +53,37 @@ namespace Billiard.WinForm.Forms.Auth
         {
             try
             {
-                // Validate email
                 if (string.IsNullOrWhiteSpace(txtEmail.Text))
                 {
-                    MessageBox.Show("Vui lòng nhập email!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    txtEmail.Focus();
+                    ShowError("Vui lòng nhập email!", txtEmail);
                     return;
                 }
 
                 if (!IsValidEmail(txtEmail.Text))
                 {
-                    MessageBox.Show("Email không hợp lệ!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    txtEmail.Focus();
+                    ShowError("Email không hợp lệ!", txtEmail);
                     return;
                 }
 
-                // Show loading
-                btnSendOTP.Enabled = false;
-                btnSendOTP.Text = "Đang gửi...";
-                this.Cursor = Cursors.WaitCursor;
+                SetLoadingState(true);
 
-                // Check if email exists
-                var nhanVien = await _context.NhanViens
-                    .FirstOrDefaultAsync(nv => nv.Email == txtEmail.Text.Trim());
-
-                if (nhanVien == null)
+                // Check email based on mode
+                bool emailExists;
+                if (_isAdminMode)
                 {
-                    MessageBox.Show("Email không tồn tại trong hệ thống!",
-                        "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    emailExists = await _context.NhanViens
+                        .AnyAsync(nv => nv.Email == txtEmail.Text.Trim());
+                }
+                else
+                {
+                    emailExists = await _context.KhachHangs
+                        .AnyAsync(kh => kh.Email == txtEmail.Text.Trim());
+                }
 
-                    btnSendOTP.Enabled = true;
-                    btnSendOTP.Text = "Gửi mã xác nhận";
-                    this.Cursor = Cursors.Default;
+                if (!emailExists)
+                {
+                    SetLoadingState(false);
+                    ShowError($"Email không tồn tại trong hệ thống {(_isAdminMode ? "quản trị" : "khách hàng")}!", txtEmail);
                     return;
                 }
 
@@ -71,44 +91,35 @@ namespace Billiard.WinForm.Forms.Auth
                 generatedOTP = GenerateOTP();
                 userEmail = txtEmail.Text.Trim();
 
-                // Send OTP via email
+                // Send OTP
                 bool emailSent = await SendOTPEmail(userEmail, generatedOTP);
 
-                this.Cursor = Cursors.Default;
+                SetLoadingState(false);
 
                 if (emailSent)
                 {
                     MessageBox.Show(
-                        $"Mã OTP đã được gửi đến email {userEmail}\nVui lòng kiểm tra hộp thư của bạn!",
-                        "Thành công",
+                        $"✅ Mã OTP đã được gửi đến:\n{userEmail}\n\n" +
+                        $"Vui lòng kiểm tra hộp thư!\n" +
+                        $"(Kiểm tra cả Spam nếu không thấy)",
+                        "Gửi OTP thành công",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
 
-                    // Open ResetPassword form
-                    var resetForm = new ResetPasswordForm(_context, userEmail, generatedOTP);
+                    var resetForm = new ResetPasswordForm(_context, userEmail, generatedOTP, _isAdminMode);
                     resetForm.ShowDialog();
                     this.Close();
                 }
                 else
                 {
-                    MessageBox.Show(
-                        "Không thể gửi email. Vui lòng kiểm tra cấu hình email!",
-                        "Lỗi",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Error);
-
-                    btnSendOTP.Enabled = true;
-                    btnSendOTP.Text = "Gửi mã xác nhận";
+                    ShowError("Không thể gửi email!\nVui lòng kiểm tra cấu hình SMTP.", null);
                 }
             }
             catch (Exception ex)
             {
-                this.Cursor = Cursors.Default;
+                SetLoadingState(false);
                 MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-
-                btnSendOTP.Enabled = true;
-                btnSendOTP.Text = "Gửi mã xác nhận";
             }
         }
 
@@ -122,53 +133,79 @@ namespace Billiard.WinForm.Forms.Auth
         {
             try
             {
-                // Cấu hình SMTP - Thay đổi theo email server của bạn
-                string smtpServer = "smtp.gmail.com"; // Hoặc smtp của bạn
+                // TODO: Cấu hình SMTP từ appsettings hoặc config
+                string smtpServer = "smtp.gmail.com";
                 int smtpPort = 587;
-                string senderEmail = "your-email@gmail.com"; // Email gửi
-                string senderPassword = "your-app-password"; // App password
+                string senderEmail = "your-email@gmail.com"; // TODO: Thay đổi
+                string senderPassword = "your-app-password"; // TODO: Thay đổi
 
                 using (SmtpClient client = new SmtpClient(smtpServer, smtpPort))
                 {
                     client.EnableSsl = true;
                     client.Credentials = new NetworkCredential(senderEmail, senderPassword);
 
-                    MailMessage mailMessage = new MailMessage();
-                    mailMessage.From = new MailAddress(senderEmail, "Quản Lý Quán Bi-a Pro");
-                    mailMessage.To.Add(email);
-                    mailMessage.Subject = "Mã OTP xác nhận đặt lại mật khẩu";
-                    mailMessage.Body = $@"
-                        <html>
-                        <body style='font-family: Arial, sans-serif;'>
-                            <div style='max-width: 600px; margin: 0 auto; padding: 20px;'>
-                                <h2 style='color: #667eea;'>🎱 Quản Lý Quán Bi-a Pro</h2>
-                                <p>Xin chào,</p>
-                                <p>Bạn đã yêu cầu đặt lại mật khẩu. Mã OTP của bạn là:</p>
-                                <div style='background: #f0f0f0; padding: 20px; text-align: center; font-size: 32px; font-weight: bold; color: #667eea; margin: 20px 0;'>
-                                    {otp}
-                                </div>
-                                <p>Mã OTP có hiệu lực trong 5 phút.</p>
-                                <p>Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
-                                <hr style='margin: 20px 0;'>
-                                <p style='color: #666; font-size: 12px;'>
-                                    © 2025 Quản Lý Quán Bi-a Pro. All rights reserved.
-                                </p>
-                            </div>
-                        </body>
-                        </html>
-                    ";
-                    mailMessage.IsBodyHtml = true;
+                    MailMessage mail = new MailMessage();
+                    mail.From = new MailAddress(senderEmail, "Quán Bi-a Pro");
+                    mail.To.Add(email);
+                    mail.Subject = $"[Quán Bi-a Pro] Mã OTP khôi phục mật khẩu {(_isAdminMode ? "(Admin)" : "")}";
+                    mail.Body = GetEmailTemplate(otp);
+                    mail.IsBodyHtml = true;
 
-                    await client.SendMailAsync(mailMessage);
+                    await client.SendMailAsync(mail);
                     return true;
                 }
             }
             catch (Exception ex)
             {
-                // Log error
                 Console.WriteLine($"Email error: {ex.Message}");
                 return false;
             }
+        }
+
+        private string GetEmailTemplate(string otp)
+        {
+            string color = _isAdminMode ? "#6366F1" : "#10B981";
+            string type = _isAdminMode ? "Quản trị viên" : "Khách hàng";
+
+            return $@"
+                <html>
+                <body style='font-family: Arial, sans-serif; background: #f3f4f6; padding: 20px;'>
+                    <div style='max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>
+                        <div style='background: {color}; color: white; padding: 30px; text-align: center;'>
+                            <h1 style='margin: 0; font-size: 28px;'>🎱 Quán Bi-a Pro</h1>
+                            <p style='margin: 10px 0 0 0; font-size: 14px;'>Hệ thống quản lý chuyên nghiệp</p>
+                        </div>
+                        <div style='padding: 40px 30px;'>
+                            <h2 style='color: #1f2937; margin-top: 0;'>Xin chào!</h2>
+                            <p style='color: #4b5563; line-height: 1.6;'>
+                                Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản <strong>{type}</strong>.
+                            </p>
+                            <p style='color: #4b5563; line-height: 1.6;'>
+                                Mã OTP xác nhận của bạn là:
+                            </p>
+                            <div style='background: #f9fafb; border: 3px dashed {color}; padding: 25px; text-align: center; border-radius: 8px; margin: 25px 0;'>
+                                <div style='font-size: 48px; font-weight: bold; color: {color}; letter-spacing: 8px;'>
+                                    {otp}
+                                </div>
+                            </div>
+                            <div style='background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;'>
+                                <p style='margin: 0; color: #92400e;'>
+                                    ⚠️ <strong>Lưu ý quan trọng:</strong><br>
+                                    • Mã OTP có hiệu lực trong <strong>5 phút</strong><br>
+                                    • Không chia sẻ mã này với bất kỳ ai<br>
+                                    • Nếu không phải bạn yêu cầu, hãy bỏ qua email này
+                                </p>
+                            </div>
+                        </div>
+                        <div style='background: #f9fafb; padding: 20px 30px; text-align: center; border-top: 1px solid #e5e7eb;'>
+                            <p style='color: #6b7280; font-size: 12px; margin: 0;'>
+                                © 2024 Quán Bi-a Pro. All rights reserved.<br>
+                                📍 123 Đường ABC, TP.HCM | 📞 0909 123 456
+                            </p>
+                        </div>
+                    </div>
+                </body>
+                </html>";
         }
 
         private bool IsValidEmail(string email)
@@ -184,6 +221,20 @@ namespace Billiard.WinForm.Forms.Auth
             }
         }
 
+        private void SetLoadingState(bool isLoading)
+        {
+            btnSendOTP.Enabled = !isLoading;
+            btnSendOTP.Text = isLoading ? "⏳ Đang gửi..." : "📧 Gửi mã OTP";
+            this.Cursor = isLoading ? Cursors.WaitCursor : Cursors.Default;
+        }
+
+        private void ShowError(string message, Control focusControl)
+        {
+            MessageBox.Show(message, "Thông báo",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            focusControl?.Focus();
+        }
+
         private void BtnBack_Click(object sender, EventArgs e)
         {
             this.Close();
@@ -194,6 +245,16 @@ namespace Billiard.WinForm.Forms.Auth
             this.Close();
         }
 
+        private void TxtEmail_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (e.KeyChar == (char)Keys.Enter)
+            {
+                BtnSendOTP_Click(sender, e);
+                e.Handled = true;
+            }
+        }
+
+        #region UI Effects
         private void BtnClose_MouseEnter(object sender, EventArgs e)
         {
             btnClose.ForeColor = Color.Red;
@@ -206,31 +267,10 @@ namespace Billiard.WinForm.Forms.Auth
             btnClose.BackColor = Color.Transparent;
         }
 
-        private void TxtEmail_KeyPress(object sender, KeyPressEventArgs e)
-        {
-            if (e.KeyChar == (char)Keys.Enter)
-            {
-                BtnSendOTP_Click(sender, e);
-                e.Handled = true;
-            }
-        }
-
         private void PnlMain_Paint(object sender, PaintEventArgs e)
         {
-            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            var path = GetRoundedRectangle(pnlMain.ClientRectangle, 12);
-            pnlMain.Region = new Region(path);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         }
-
-        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectangle(Rectangle rect, int radius)
-        {
-            var path = new System.Drawing.Drawing2D.GraphicsPath();
-            path.AddArc(rect.X, rect.Y, radius, radius, 180, 90);
-            path.AddArc(rect.Right - radius, rect.Y, radius, radius, 270, 90);
-            path.AddArc(rect.Right - radius, rect.Bottom - radius, radius, radius, 0, 90);
-            path.AddArc(rect.X, rect.Bottom - radius, radius, radius, 90, 90);
-            path.CloseFigure();
-            return path;
-        }
+        #endregion
     }
 }
