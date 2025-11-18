@@ -2,6 +2,7 @@
 using Billiard.DAL.Data;
 using Billiard.DAL.Entities;
 using Billiard.WinForm.Forms;
+using Billiard.WinForm.Forms.HoaDon;
 using Billiard.WinForm.Forms.QLBan;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -250,7 +251,7 @@ namespace Billiard.WinForm
                         OpenChildForm(Program.GetService<DichVuForm>());
                         break;
                     case "btnHoaDon":
-                        ShowComingSoon("Hóa đơn");
+                        OpenChildForm(Program.GetService<HoaDonForm>());
                         break;
                     case "btnKhachHang":
                         ShowComingSoon("Khách hàng");
