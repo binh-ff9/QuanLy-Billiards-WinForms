@@ -1,30 +1,109 @@
-﻿using System;
-using System.Drawing;
-using System.Windows.Forms;
-using Microsoft.EntityFrameworkCore;
+﻿using Billiard.BLL.Services;
 using Billiard.DAL.Data;
+using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Windows.Forms;
 
 namespace Billiard.WinForm.Forms.Auth
 {
     public partial class ResetPasswordForm : Form
     {
         private readonly BilliardDbContext _context;
+        private readonly AuthService _authService;
         private readonly string _email;
         private readonly string _correctOTP;
+        private readonly bool _isAdminMode;
         private DateTime _otpExpiration;
+        private System.Windows.Forms.Timer _countdownTimer;
+        private int _remainingSeconds;
 
-        public ResetPasswordForm(BilliardDbContext context, string email, string otp)
+        public ResetPasswordForm(
+            BilliardDbContext context,
+            AuthService authService,
+            string email,
+            string otp,
+            bool isAdminMode = false)
         {
             _context = context;
+            _authService = authService;
             _email = email;
             _correctOTP = otp;
+            _isAdminMode = isAdminMode;
             _otpExpiration = DateTime.Now.AddMinutes(5); // OTP expires in 5 minutes
+            _remainingSeconds = 300; // 5 minutes = 300 seconds
+
             InitializeComponent();
+            InitializeTimer();
+            UpdateUIForMode();
+        }
+
+        private void UpdateUIForMode()
+        {
+            if (_isAdminMode)
+            {
+                lblTitle.Text = "🔐 ĐẶT LẠI MẬT KHẨU (Nhân viên)";
+                pnlDecoration.BackColor = Color.FromArgb(99, 102, 241);
+                btnResetPassword.BackColor = Color.FromArgb(99, 102, 241);
+            }
+            else
+            {
+                lblTitle.Text = "🔐 ĐẶT LẠI MẬT KHẨU";
+                pnlDecoration.BackColor = Color.FromArgb(16, 185, 129);
+                btnResetPassword.BackColor = Color.FromArgb(16, 185, 129);
+            }
+        }
+
+        private void InitializeTimer()
+        {
+            _countdownTimer = new System.Windows.Forms.Timer();
+            _countdownTimer.Interval = 1000; // 1 second
+            _countdownTimer.Tick += CountdownTimer_Tick;
+            _countdownTimer.Start();
+        }
+
+        private void CountdownTimer_Tick(object sender, EventArgs e)
+        {
+            _remainingSeconds--;
+            UpdateCountdownDisplay();
+
+            if (_remainingSeconds <= 0)
+            {
+                _countdownTimer.Stop();
+                MessageBox.Show(
+                    "⏰ Mã OTP đã hết hạn!\n\nVui lòng yêu cầu gửi lại mã mới.",
+                    "Hết thời gian",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                this.Close();
+            }
+        }
+
+        private void UpdateCountdownDisplay()
+        {
+            int minutes = _remainingSeconds / 60;
+            int seconds = _remainingSeconds % 60;
+            lblCountdown.Text = $"⏱️ Thời gian còn lại: {minutes:D2}:{seconds:D2}";
+
+            // Change color based on remaining time
+            if (_remainingSeconds <= 60)
+            {
+                lblCountdown.ForeColor = Color.FromArgb(239, 68, 68); // Red
+            }
+            else if (_remainingSeconds <= 120)
+            {
+                lblCountdown.ForeColor = Color.FromArgb(245, 158, 11); // Orange
+            }
+            else
+            {
+                lblCountdown.ForeColor = Color.FromArgb(100, 116, 139); // Gray
+            }
         }
 
         private void ResetPasswordForm_Load(object sender, EventArgs e)
         {
-            lblEmailDisplay.Text = $"Email: {_email}";
+            lblEmailDisplay.Text = $"📧 {_email}";
+            UpdateCountdownDisplay();
             txtOTP.Focus();
         }
 
@@ -35,26 +114,27 @@ namespace Billiard.WinForm.Forms.Auth
                 // Validate OTP
                 if (string.IsNullOrWhiteSpace(txtOTP.Text))
                 {
-                    MessageBox.Show("Vui lòng nhập mã OTP!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    txtOTP.Focus();
+                    ShowError("Vui lòng nhập mã OTP!", txtOTP);
+                    return;
+                }
+
+                if (txtOTP.Text.Length != 6)
+                {
+                    ShowError("Mã OTP phải có 6 chữ số!", txtOTP);
                     return;
                 }
 
                 // Check OTP expiration
                 if (DateTime.Now > _otpExpiration)
                 {
-                    MessageBox.Show("Mã OTP đã hết hạn!\nVui lòng yêu cầu gửi lại mã mới.",
-                        "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ShowError("Mã OTP đã hết hạn!\nVui lòng yêu cầu gửi lại mã mới.", txtOTP);
                     return;
                 }
 
                 // Verify OTP
                 if (txtOTP.Text.Trim() != _correctOTP)
                 {
-                    MessageBox.Show("Mã OTP không chính xác!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ShowError("❌ Mã OTP không chính xác!", txtOTP);
                     txtOTP.Clear();
                     txtOTP.Focus();
                     return;
@@ -63,55 +143,45 @@ namespace Billiard.WinForm.Forms.Auth
                 // Validate new password
                 if (string.IsNullOrWhiteSpace(txtNewPassword.Text))
                 {
-                    MessageBox.Show("Vui lòng nhập mật khẩu mới!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    txtNewPassword.Focus();
+                    ShowError("Vui lòng nhập mật khẩu mới!", txtNewPassword);
                     return;
                 }
 
                 if (txtNewPassword.Text.Length < 6)
                 {
-                    MessageBox.Show("Mật khẩu phải có ít nhất 6 ký tự!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    txtNewPassword.Focus();
+                    ShowError("Mật khẩu phải có ít nhất 6 ký tự!", txtNewPassword);
                     return;
                 }
 
                 if (string.IsNullOrWhiteSpace(txtConfirmPassword.Text))
                 {
-                    MessageBox.Show("Vui lòng xác nhận mật khẩu!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    txtConfirmPassword.Focus();
+                    ShowError("Vui lòng xác nhận mật khẩu!", txtConfirmPassword);
                     return;
                 }
 
                 if (txtNewPassword.Text != txtConfirmPassword.Text)
                 {
-                    MessageBox.Show("Mật khẩu xác nhận không khớp!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ShowError("Mật khẩu xác nhận không khớp!", txtConfirmPassword);
                     txtConfirmPassword.Clear();
                     txtConfirmPassword.Focus();
                     return;
                 }
 
                 // Show loading
-                btnResetPassword.Enabled = false;
-                btnResetPassword.Text = "Đang xử lý...";
-                this.Cursor = Cursors.WaitCursor;
+                SetLoadingState(true);
 
-                // Update password in database
-                var nhanVien = await _context.NhanViens
-                    .FirstOrDefaultAsync(nv => nv.Email == _email);
+                // Use AuthService to reset password (auto-detect user type)
+                bool success = await _authService.ResetPasswordAsync(_email, txtNewPassword.Text);
 
-                if (nhanVien != null)
+                SetLoadingState(false);
+
+                if (success)
                 {
-                    nhanVien.MatKhau = txtNewPassword.Text; // In production, hash this password!
-                    await _context.SaveChangesAsync();
-
-                    this.Cursor = Cursors.Default;
+                    _countdownTimer.Stop();
 
                     MessageBox.Show(
-                        "Đặt lại mật khẩu thành công!\nBạn có thể đăng nhập với mật khẩu mới.",
+                        "✅ Đặt lại mật khẩu thành công!\n\n" +
+                        "Bạn có thể đăng nhập ngay bây giờ với mật khẩu mới.",
                         "Thành công",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
@@ -121,36 +191,109 @@ namespace Billiard.WinForm.Forms.Auth
                 }
                 else
                 {
-                    this.Cursor = Cursors.Default;
-                    MessageBox.Show("Không tìm thấy tài khoản!", "Lỗi",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    ShowError("Không tìm thấy tài khoản!", null);
                 }
-
-                btnResetPassword.Enabled = true;
-                btnResetPassword.Text = "Đặt lại Mật khẩu";
             }
             catch (Exception ex)
             {
-                this.Cursor = Cursors.Default;
+                SetLoadingState(false);
                 MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-
-                btnResetPassword.Enabled = true;
-                btnResetPassword.Text = "Đặt lại Mật khẩu";
             }
+        }
+
+        private void SetLoadingState(bool isLoading)
+        {
+            btnResetPassword.Enabled = !isLoading;
+            btnResetPassword.Text = isLoading ? "⏳ Đang xử lý..." : "✅ Đặt lại mật khẩu";
+            this.Cursor = isLoading ? Cursors.WaitCursor : Cursors.Default;
+        }
+
+        private void ShowError(string message, Control focusControl)
+        {
+            MessageBox.Show(message, "Thông báo",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            focusControl?.Focus();
         }
 
         private void BtnCancel_Click(object sender, EventArgs e)
         {
-            this.DialogResult = DialogResult.Cancel;
-            this.Close();
+            var result = MessageBox.Show(
+                "Bạn có chắc muốn hủy?\nTiến trình sẽ không được lưu.",
+                "Xác nhận",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                _countdownTimer.Stop();
+                this.DialogResult = DialogResult.Cancel;
+                this.Close();
+            }
         }
 
         private void BtnClose_Click(object sender, EventArgs e)
         {
-            this.Close();
+            BtnCancel_Click(sender, e);
         }
 
+        private void ChkShowPassword_CheckedChanged(object sender, EventArgs e)
+        {
+            txtNewPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
+            txtConfirmPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
+        }
+
+        private void TxtOTP_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            // Only allow digits
+            if (!char.IsDigit(e.KeyChar) && e.KeyChar != (char)Keys.Back)
+            {
+                e.Handled = true;
+            }
+
+            if (e.KeyChar == (char)Keys.Enter)
+            {
+                txtNewPassword.Focus();
+                e.Handled = true;
+            }
+        }
+
+        private void TxtConfirmPassword_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (e.KeyChar == (char)Keys.Enter)
+            {
+                BtnResetPassword_Click(sender, e);
+                e.Handled = true;
+            }
+        }
+
+        private void LblResendOTP_Click(object sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                "Gửi lại mã OTP mới?\n\nMã OTP hiện tại sẽ không còn hiệu lực.",
+                "Xác nhận",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                _countdownTimer.Stop();
+                this.Close();
+
+                // Reopen ForgotPasswordForm
+                var forgotForm = new ForgotPasswordForm(_context, _authService);
+                forgotForm.ShowDialog();
+            }
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            _countdownTimer?.Stop();
+            _countdownTimer?.Dispose();
+            base.OnFormClosing(e);
+        }
+
+        #region UI Effects
         private void BtnClose_MouseEnter(object sender, EventArgs e)
         {
             btnClose.ForeColor = Color.Red;
@@ -163,37 +306,22 @@ namespace Billiard.WinForm.Forms.Auth
             btnClose.BackColor = Color.Transparent;
         }
 
-        private void ChkShowPassword_CheckedChanged(object sender, EventArgs e)
+        private void LblResendOTP_MouseEnter(object sender, EventArgs e)
         {
-            txtNewPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
-            txtConfirmPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
+            lblResendOTP.ForeColor = _isAdminMode ?
+                Color.FromArgb(79, 70, 229) : Color.FromArgb(5, 150, 105);
         }
 
-        private void TxtConfirmPassword_KeyPress(object sender, KeyPressEventArgs e)
+        private void LblResendOTP_MouseLeave(object sender, EventArgs e)
         {
-            if (e.KeyChar == (char)Keys.Enter)
-            {
-                BtnResetPassword_Click(sender, e);
-                e.Handled = true;
-            }
+            lblResendOTP.ForeColor = _isAdminMode ?
+                Color.FromArgb(99, 102, 241) : Color.FromArgb(16, 185, 129);
         }
 
         private void PnlMain_Paint(object sender, PaintEventArgs e)
         {
-            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            var path = GetRoundedRectangle(pnlMain.ClientRectangle, 12);
-            pnlMain.Region = new Region(path);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
         }
-
-        private System.Drawing.Drawing2D.GraphicsPath GetRoundedRectangle(Rectangle rect, int radius)
-        {
-            var path = new System.Drawing.Drawing2D.GraphicsPath();
-            path.AddArc(rect.X, rect.Y, radius, radius, 180, 90);
-            path.AddArc(rect.Right - radius, rect.Y, radius, radius, 270, 90);
-            path.AddArc(rect.Right - radius, rect.Bottom - radius, radius, radius, 0, 90);
-            path.AddArc(rect.X, rect.Bottom - radius, radius, radius, 90, 90);
-            path.CloseFigure();
-            return path;
-        }
+        #endregion
     }
 }

@@ -10,10 +10,13 @@
 
   <ItemGroup>
     <Folder Include="API_Integration\" />
+    <Folder Include="Forms\Resources\Images\Services\" />
+    <Folder Include="Forms\Resources\Images\Tables\" />
     <Folder Include="viewModels\" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.22" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
   </ItemGroup>

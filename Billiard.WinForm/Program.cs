@@ -1,13 +1,18 @@
 ﻿using Billiard.BLL.Services;
+using Billiard.BLL.Services.QLBan;
+using Billiard.BLL.Services.HoaDonServices;
 using Billiard.DAL.Data;
 using Billiard.WinForm.Forms;
 using Billiard.WinForm.Forms.Auth;
+using Billiard.WinForm.Forms.HoaDon;
+using Billiard.WinForm.Forms.QLBan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
 using System.Windows.Forms;
+using Billiard.BLL.Services.HoaDonServices;
 
 namespace Billiard.WinForm
 {
@@ -34,8 +39,8 @@ namespace Billiard.WinForm
             ConfigureServices(serviceCollection);
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            // Chạy DichVuForm thay vì LoginForm
-            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
+            // Run LoginForm
+            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -52,20 +57,34 @@ namespace Billiard.WinForm
                 )
             );
 
-            // Register Services
+            // Register BLL Services
+            services.AddScoped<AuthService>();
+            services.AddScoped<EmailService>();
             services.AddScoped<DichVuService>();
             services.AddScoped<MatHangService>();
 
-            // Register Forms
-            services.AddTransient<MainForm>();
+            // BanBia services
+            services.AddScoped<BanBiaService>();
+
+            // HoaDon services
+            services.AddScoped<HoaDonService>();
+
+            // Register Auth Forms
             services.AddTransient<LoginForm>();
             services.AddTransient<SignupForm>();
             services.AddTransient<ForgotPasswordForm>();
             services.AddTransient<ResetPasswordForm>();
 
-            // Register DichVu Forms
+            // Register Main Form
+            services.AddTransient<MainForm>();
+
+            // Register Feature Forms
             services.AddTransient<DichVuForm>();
             services.AddTransient<DichVuEditForm>();
+            services.AddTransient<QLBanForm>();
+
+            // ĐÂY LÀ DÒNG QUAN TRỌNG - THÊM VÀO
+            services.AddTransient<HoaDonForm>();
         }
 
         public static T GetService<T>() where T : class
