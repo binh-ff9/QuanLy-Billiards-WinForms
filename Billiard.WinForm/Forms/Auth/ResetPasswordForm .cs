@@ -1,5 +1,5 @@
-﻿using Billiard.DAL.Data;
-using Microsoft.EntityFrameworkCore;
+﻿using Billiard.BLL.Services;
+using Billiard.DAL.Data;
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -10,6 +10,7 @@ namespace Billiard.WinForm.Forms.Auth
     public partial class ResetPasswordForm : Form
     {
         private readonly BilliardDbContext _context;
+        private readonly AuthService _authService;
         private readonly string _email;
         private readonly string _correctOTP;
         private readonly bool _isAdminMode;
@@ -17,9 +18,15 @@ namespace Billiard.WinForm.Forms.Auth
         private System.Windows.Forms.Timer _countdownTimer;
         private int _remainingSeconds;
 
-        public ResetPasswordForm(BilliardDbContext context, string email, string otp, bool isAdminMode = false)
+        public ResetPasswordForm(
+            BilliardDbContext context,
+            AuthService authService,
+            string email,
+            string otp,
+            bool isAdminMode = false)
         {
             _context = context;
+            _authService = authService;
             _email = email;
             _correctOTP = otp;
             _isAdminMode = isAdminMode;
@@ -35,16 +42,14 @@ namespace Billiard.WinForm.Forms.Auth
         {
             if (_isAdminMode)
             {
-                lblTitle.Text = "🔐 ĐẶT LẠI MẬT KHẨU ADMIN";
+                lblTitle.Text = "🔐 ĐẶT LẠI MẬT KHẨU (Nhân viên)";
                 pnlDecoration.BackColor = Color.FromArgb(99, 102, 241);
-                lblDecoTitle.ForeColor = Color.FromArgb(99, 102, 241);
                 btnResetPassword.BackColor = Color.FromArgb(99, 102, 241);
             }
             else
             {
                 lblTitle.Text = "🔐 ĐẶT LẠI MẬT KHẨU";
                 pnlDecoration.BackColor = Color.FromArgb(16, 185, 129);
-                lblDecoTitle.ForeColor = Color.FromArgb(16, 185, 129);
                 btnResetPassword.BackColor = Color.FromArgb(16, 185, 129);
             }
         }
@@ -165,32 +170,8 @@ namespace Billiard.WinForm.Forms.Auth
                 // Show loading
                 SetLoadingState(true);
 
-                // Update password based on mode
-                bool success = false;
-                if (_isAdminMode)
-                {
-                    var nhanVien = await _context.NhanViens
-                        .FirstOrDefaultAsync(nv => nv.Email == _email);
-
-                    if (nhanVien != null)
-                    {
-                        nhanVien.MatKhau = txtNewPassword.Text; // TODO: Hash password
-                        await _context.SaveChangesAsync();
-                        success = true;
-                    }
-                }
-                else
-                {
-                    var khachHang = await _context.KhachHangs
-                        .FirstOrDefaultAsync(kh => kh.Email == _email);
-
-                    if (khachHang != null)
-                    {
-                        khachHang.MatKhau = txtNewPassword.Text; // TODO: Hash password
-                        await _context.SaveChangesAsync();
-                        success = true;
-                    }
-                }
+                // Use AuthService to reset password (auto-detect user type)
+                bool success = await _authService.ResetPasswordAsync(_email, txtNewPassword.Text);
 
                 SetLoadingState(false);
 
@@ -300,7 +281,7 @@ namespace Billiard.WinForm.Forms.Auth
                 this.Close();
 
                 // Reopen ForgotPasswordForm
-                var forgotForm = new ForgotPasswordForm(_context, _isAdminMode);
+                var forgotForm = new ForgotPasswordForm(_context, _authService);
                 forgotForm.ShowDialog();
             }
         }

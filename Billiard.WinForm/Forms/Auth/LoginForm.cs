@@ -1,10 +1,9 @@
-﻿using Billiard.DAL.Data;
-using Billiard.DAL.Entities;
-using Microsoft.EntityFrameworkCore;
+﻿using Billiard.BLL.Services;
+using Billiard.DAL.Data;
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -13,12 +12,13 @@ namespace Billiard.WinForm.Forms.Auth
     public partial class LoginForm : Form
     {
         private readonly BilliardDbContext _context;
-        private bool _isLoggingIn = false;
-        private bool _isAdminMode = false;
+        private readonly AuthService _authService;
+        private bool _isLoggingIn;
 
-        public LoginForm(BilliardDbContext context)
+        public LoginForm(BilliardDbContext context, AuthService authService)
         {
             _context = context;
+            _authService = authService;
             InitializeComponent();
             InitializeUI();
         }
@@ -26,36 +26,21 @@ namespace Billiard.WinForm.Forms.Auth
         private void InitializeUI()
         {
             this.StartPosition = FormStartPosition.CenterScreen;
-            UpdateUIForMode();
-        }
-
-        private void UpdateUIForMode()
-        {
-            if (_isAdminMode)
-            {
-                lblTitle.Text = "🎱 QUẢN TRỊ HỆ THỐNG";
-                lblSubtitle.Text = "Đăng nhập dành cho Admin & Nhân viên";
-                lblUsername.Text = "Số điện thoại *";
-                txtUsername.PlaceholderText = "Nhập số điện thoại";
-                btnSwitchMode.Text = "🎮 Đăng nhập Khách hàng";
-                lblSignup.Visible = false;
-                pnlDecoration.BackColor = Color.FromArgb(99, 102, 241);
-            }
-            else
-            {
-                lblTitle.Text = "🎱 CHÀO MỪNG ĐẾN BIA CLUB";
-                lblSubtitle.Text = "Đăng nhập để trải nghiệm dịch vụ tốt nhất";
-                lblUsername.Text = "Số điện thoại / Email *";
-                txtUsername.PlaceholderText = "Nhập SĐT hoặc Email";
-                btnSwitchMode.Text = "👨‍💼 Đăng nhập Quản trị";
-                lblSignup.Visible = true;
-                pnlDecoration.BackColor = Color.FromArgb(16, 185, 129);
-            }
+            lblTitle.Text = "🎱 CHÀO MỪNG ĐẾN BIA CLUB";
+            lblSubtitle.Text = "Đăng nhập để trải nghiệm dịch vụ tốt nhất";
+            lblUsername.Text = "📱 Số điện thoại / Email *";
+            txtUsername.PlaceholderText = "Nhập SĐT hoặc Email";
+            lblSignup.Visible = true;
         }
 
         private void LoginForm_Load(object sender, EventArgs e)
         {
             txtUsername.Select();
+
+            // Debug log
+            Debug.WriteLine("=== LoginForm Loaded ===");
+            Debug.WriteLine($"AuthService: {(_authService != null ? "OK" : "NULL")}");
+            Debug.WriteLine($"DbContext: {(_context != null ? "OK" : "NULL")}");
         }
 
         private async void BtnLogin_Click(object sender, EventArgs e)
@@ -66,128 +51,151 @@ namespace Billiard.WinForm.Forms.Auth
             {
                 _isLoggingIn = true;
 
-                if (string.IsNullOrWhiteSpace(txtUsername.Text))
+                string username = txtUsername.Text.Trim();
+                string password = txtPassword.Text;
+
+                Debug.WriteLine("\n=== LOGIN ATTEMPT ===");
+                Debug.WriteLine($"Username: {username}");
+                Debug.WriteLine($"Password Length: {password.Length}");
+                Debug.WriteLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+                // Validate inputs
+                if (string.IsNullOrWhiteSpace(username))
                 {
+                    Debug.WriteLine("ERROR: Username is empty");
                     ShowError("Vui lòng nhập thông tin đăng nhập!", txtUsername);
                     return;
                 }
 
-                if (string.IsNullOrWhiteSpace(txtPassword.Text))
+                if (string.IsNullOrWhiteSpace(password))
                 {
+                    Debug.WriteLine("ERROR: Password is empty");
                     ShowError("Vui lòng nhập mật khẩu!", txtPassword);
                     return;
                 }
 
                 SetLoadingState(true);
 
-                if (_isAdminMode)
+                // Debug: Test database connection
+                try
                 {
-                    await PerformAdminLogin();
+                    bool canConnect = await _context.Database.CanConnectAsync();
+                    Debug.WriteLine($"Database Connection: {(canConnect ? "SUCCESS" : "FAILED")}");
                 }
-                else
+                catch (Exception dbEx)
                 {
-                    await PerformCustomerLogin();
+                    Debug.WriteLine($"Database Connection Error: {dbEx.Message}");
+                }
+
+                
+                // Use AuthService to login
+                Debug.WriteLine("Calling AuthService.LoginAsync...");
+                var result = await _authService.LoginAsync(username, password);
+
+                Debug.WriteLine($"Login Result - Success: {result.Success}");
+                Debug.WriteLine($"Login Result - Message: {result.Message}");
+                Debug.WriteLine($"Login Result - UserType: {result.UserType}");
+
+                SetLoadingState(false);
+
+                if (!result.Success)
+                {
+                    Debug.WriteLine("LOGIN FAILED!");
+                    Debug.WriteLine($"Failure Reason: {result.Message}");
+
+                    MessageBox.Show(
+                        result.Message + "\n\n" +
+                        "🔍 Debug Info:\n" +
+                        $"• Username: {username}\n" +
+                        $"• Kiểm tra Console để xem chi tiết",
+                        "Đăng nhập thất bại",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+
+                    txtPassword.Clear();
+                    txtPassword.Focus();
+                    return;
+                }
+
+                Debug.WriteLine("LOGIN SUCCESS!");
+
+                // Check user type and open appropriate form
+                if (result.UserType == UserType.NhanVien)
+                {
+                    Debug.WriteLine("User Type: NHAN VIEN");
+                    var nhanVien = result.NhanVien;
+                    Debug.WriteLine($"NhanVien ID: {nhanVien.MaNv}");
+                    Debug.WriteLine($"NhanVien Name: {nhanVien.TenNv}");
+                    Debug.WriteLine($"NhanVien Role: {nhanVien.MaNhomNavigation?.TenNhom}");
+
+                    var mainForm = Program.GetService<MainForm>();
+                    mainForm.MaNV = nhanVien.MaNv;
+                    mainForm.TenNV = nhanVien.TenNv;
+                    mainForm.ChucVu = nhanVien.MaNhomNavigation?.TenNhom ?? "Nhân viên";
+
+                    Debug.WriteLine("Opening MainForm...");
+
+                    mainForm.Show();
+                    mainForm.FormClosed += (s, args) => {
+                        Debug.WriteLine("MainForm closed, showing LoginForm");
+                        this.Show();
+                        ResetForm();
+                    };
+                    this.Hide();
+                    Debug.WriteLine("LoginForm hidden");
+                }
+                else if (result.UserType == UserType.KhachHang)
+                {
+                    Debug.WriteLine("User Type: KHACH HANG");
+                    var khachHang = result.KhachHang;
+                    Debug.WriteLine($"KhachHang ID: {khachHang.MaKh}");
+                    Debug.WriteLine($"KhachHang Name: {khachHang.TenKh}");
+                    Debug.WriteLine($"KhachHang Rank: {khachHang.HangTv}");
+
+                    MessageBox.Show(
+                        $"✅ Chào mừng {khachHang.TenKh}!\n" +
+                        $"🏆 Hạng thành viên: {khachHang.HangTv}\n" +
+                        $"⭐ Điểm tích lũy: {khachHang.DiemTichLuy}",
+                        "Đăng nhập thành công",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+
+                    // TODO: Open CustomerMainForm when implemented
+                    Debug.WriteLine("WARNING: CustomerMainForm not implemented yet");
+                    MessageBox.Show(
+                        "Giao diện khách hàng đang được phát triển.\n" +
+                        "Vui lòng sử dụng tài khoản nhân viên để truy cập hệ thống.",
+                        "Thông báo",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+
+                    ResetForm();
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Debug.WriteLine("\n=== EXCEPTION ===");
+                Debug.WriteLine($"Message: {ex.Message}");
+                Debug.WriteLine($"StackTrace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Debug.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+                }
+
+                MessageBox.Show(
+                    $"Lỗi: {ex.Message}\n\n" +
+                    $"Chi tiết:\n{ex.StackTrace}\n\n" +
+                    $"Kiểm tra Output Window để xem log đầy đủ",
+                    "Lỗi",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
             finally
             {
                 _isLoggingIn = false;
                 SetLoadingState(false);
+                Debug.WriteLine("=== LOGIN PROCESS END ===\n");
             }
-        }
-
-        private async Task PerformAdminLogin()
-        {
-            var nhanVien = await _context.NhanViens
-                .Include(nv => nv.MaNhomNavigation)
-                .FirstOrDefaultAsync(nv =>
-                    nv.Sdt == txtUsername.Text.Trim() &&
-                    nv.MatKhau == txtPassword.Text &&
-                    nv.TrangThai == "Đang làm");
-
-            if (nhanVien == null)
-            {
-                MessageBox.Show(
-                    "Thông tin đăng nhập không chính xác!\nHoặc tài khoản đã bị vô hiệu hóa.",
-                    "Đăng nhập thất bại",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-                txtPassword.Clear();
-                txtPassword.Focus();
-                return;
-            }
-
-            // Log hoạt động
-            await LogActivity(nhanVien.MaNv, $"Đăng nhập hệ thống từ {Environment.MachineName}");
-
-            // Mở MainForm cho Admin/NV
-            var mainForm = Program.GetService<MainForm>();
-            mainForm.MaNV = nhanVien.MaNv;
-            mainForm.TenNV = nhanVien.TenNv;
-            mainForm.ChucVu = nhanVien.MaNhomNavigation?.TenNhom ?? "Nhân viên";
-
-            MessageBox.Show($"Chào mừng {nhanVien.TenNv}!\nChức vụ: {mainForm.ChucVu}",
-                "Đăng nhập thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-            mainForm.Show();
-            mainForm.FormClosed += (s, args) => { this.Show(); ResetForm(); };
-            this.Hide();
-        }
-
-        private async Task PerformCustomerLogin()
-        {
-            var khachHang = await _context.KhachHangs
-                .FirstOrDefaultAsync(kh =>
-                    (kh.Sdt == txtUsername.Text.Trim() || kh.Email == txtUsername.Text.Trim()) &&
-                    kh.MatKhau == txtPassword.Text);
-
-            if (khachHang == null)
-            {
-                MessageBox.Show(
-                    "Thông tin đăng nhập không chính xác!",
-                    "Đăng nhập thất bại",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-                txtPassword.Clear();
-                txtPassword.Focus();
-                return;
-            }
-
-            // Cập nhật thông tin khách hàng
-            khachHang.LanDenCuoi = DateTime.Now;
-            khachHang.HoatDong = true;
-            await _context.SaveChangesAsync();
-
-            // Mở CustomerMainForm
-            MessageBox.Show($"Chào mừng {khachHang.TenKh}!\nHạng thành viên: {khachHang.HangTv}\nĐiểm tích lũy: {khachHang.DiemTichLuy}",
-                "Đăng nhập thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-            // TODO: Mở form dành cho khách hàng
-            // var customerForm = new CustomerMainForm(_context, khachHang.MaKh);
-            // customerForm.Show();
-            // this.Hide();
-        }
-
-        private async Task LogActivity(int maNv, string chiTiet)
-        {
-            try
-            {
-                var log = new LichSuHoatDong
-                {
-                    MaNv = maNv,
-                    HanhDong = "Đăng nhập",
-                    ChiTiet = chiTiet,
-                    ThoiGian = DateTime.Now
-                };
-                _context.LichSuHoatDongs.Add(log);
-                await _context.SaveChangesAsync();
-            }
-            catch { }
         }
 
         private void SetLoadingState(bool isLoading)
@@ -195,7 +203,7 @@ namespace Billiard.WinForm.Forms.Auth
             btnLogin.Enabled = !isLoading;
             txtUsername.Enabled = !isLoading;
             txtPassword.Enabled = !isLoading;
-            btnLogin.Text = isLoading ? "Đang đăng nhập..." : "Đăng nhập";
+            btnLogin.Text = isLoading ? "⏳ Đang đăng nhập..." : "✅ Đăng nhập";
             this.Cursor = isLoading ? Cursors.WaitCursor : Cursors.Default;
         }
 
@@ -205,6 +213,7 @@ namespace Billiard.WinForm.Forms.Auth
             txtPassword.Clear();
             chkRemember.Checked = false;
             txtUsername.Focus();
+            Debug.WriteLine("Form reset");
         }
 
         private void ShowError(string message, Control focusControl)
@@ -214,29 +223,17 @@ namespace Billiard.WinForm.Forms.Auth
             focusControl?.Focus();
         }
 
-        private void BtnSwitchMode_Click(object sender, EventArgs e)
-        {
-            _isAdminMode = !_isAdminMode;
-            UpdateUIForMode();
-            ResetForm();
-        }
-
         private void LblForgotPassword_Click(object sender, EventArgs e)
         {
-            var forgotForm = new ForgotPasswordForm(_context, _isAdminMode);
+            Debug.WriteLine("Opening ForgotPasswordForm");
+            var forgotForm = new ForgotPasswordForm(_context, _authService);
             forgotForm.ShowDialog();
         }
 
         private void LblSignup_Click(object sender, EventArgs e)
         {
-            if (_isAdminMode)
-            {
-                MessageBox.Show("Tài khoản quản trị chỉ được tạo bởi Admin!",
-                    "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-
-            var signupForm = new SignupForm(_context);
+            Debug.WriteLine("Opening SignupForm");
+            var signupForm = new SignupForm(_context, _authService);
             if (signupForm.ShowDialog() == DialogResult.OK)
             {
                 txtUsername.Focus();
@@ -248,7 +245,10 @@ namespace Billiard.WinForm.Forms.Auth
             var result = MessageBox.Show("Bạn có chắc muốn thoát?",
                 "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (result == DialogResult.Yes)
+            {
+                Debug.WriteLine("Application Exit");
                 Application.Exit();
+            }
         }
 
         private void TxtPassword_KeyPress(object sender, KeyPressEventArgs e)
@@ -278,15 +278,13 @@ namespace Billiard.WinForm.Forms.Auth
         private void BtnLogin_MouseEnter(object sender, EventArgs e)
         {
             if (btnLogin.Enabled)
-                btnLogin.BackColor = _isAdminMode ?
-                    Color.FromArgb(79, 70, 229) : Color.FromArgb(5, 150, 105);
+                btnLogin.BackColor = Color.FromArgb(5, 150, 105);
         }
 
         private void BtnLogin_MouseLeave(object sender, EventArgs e)
         {
             if (btnLogin.Enabled)
-                btnLogin.BackColor = _isAdminMode ?
-                    Color.FromArgb(99, 102, 241) : Color.FromArgb(16, 185, 129);
+                btnLogin.BackColor = Color.SeaGreen;
         }
 
         private void BtnClose_MouseEnter(object sender, EventArgs e)

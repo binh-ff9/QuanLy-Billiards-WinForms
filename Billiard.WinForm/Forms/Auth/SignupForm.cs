@@ -1,6 +1,5 @@
-﻿using Billiard.DAL.Data;
-using Billiard.DAL.Entities;
-using Microsoft.EntityFrameworkCore;
+﻿using Billiard.BLL.Services;
+using Billiard.DAL.Data;
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -11,10 +10,12 @@ namespace Billiard.WinForm.Forms.Auth
     public partial class SignupForm : Form
     {
         private readonly BilliardDbContext _context;
+        private readonly AuthService _authService;
 
-        public SignupForm(BilliardDbContext context)
+        public SignupForm(BilliardDbContext context, AuthService authService)
         {
             _context = context;
+            _authService = authService;
             InitializeComponent();
         }
 
@@ -46,9 +47,15 @@ namespace Billiard.WinForm.Forms.Auth
                     return;
                 }
 
-                if (string.IsNullOrWhiteSpace(txtEmail.Text) || !IsValidEmail(txtEmail.Text))
+                if (string.IsNullOrWhiteSpace(txtEmail.Text))
                 {
-                    ShowError("Vui lòng nhập email hợp lệ!", txtEmail);
+                    ShowError("Vui lòng nhập email!", txtEmail);
+                    return;
+                }
+
+                if (!_authService.IsValidEmail(txtEmail.Text))
+                {
+                    ShowError("Email không hợp lệ!", txtEmail);
                     return;
                 }
 
@@ -75,55 +82,34 @@ namespace Billiard.WinForm.Forms.Auth
                 // Show loading
                 SetLoadingState(true);
 
-                // Check existing phone
-                var existingPhone = await _context.KhachHangs
-                    .AnyAsync(kh => kh.Sdt == txtSDT.Text.Trim());
+                // Use AuthService to register customer
+                var ngaySinh = dtpNgaySinh.Value.Date > DateTime.Now.Date
+                    ? (DateOnly?)null
+                    : DateOnly.FromDateTime(dtpNgaySinh.Value);
 
-                if (existingPhone)
-                {
-                    SetLoadingState(false);
-                    ShowError("Số điện thoại này đã được đăng ký!", txtSDT);
-                    return;
-                }
-
-                // Check existing email
-                var existingEmail = await _context.KhachHangs
-                    .AnyAsync(kh => kh.Email == txtEmail.Text.Trim());
-
-                if (existingEmail)
-                {
-                    SetLoadingState(false);
-                    ShowError("Email này đã được đăng ký!", txtEmail);
-                    return;
-                }
-
-                // Create new customer
-                var khachHang = new KhachHang
-                {
-                    TenKh = txtTenKH.Text.Trim(),
-                    Sdt = txtSDT.Text.Trim(),
-                    Email = txtEmail.Text.Trim(),
-                    MatKhau = txtMatKhau.Text, // TODO: Hash password
-                    NgaySinh = dtpNgaySinh.Value.Date > DateTime.Now.Date ? null : DateOnly.FromDateTime(dtpNgaySinh.Value),
-                    HangTv = "Đồng",
-                    DiemTichLuy = 0,
-                    TongChiTieu = 0,
-                    NgayDangKy = DateTime.Now,
-                    HoatDong = true
-                };
-
-                _context.KhachHangs.Add(khachHang);
-                await _context.SaveChangesAsync();
+                var (success, message, customer) = await _authService.RegisterCustomerAsync(
+                    txtTenKH.Text.Trim(),
+                    txtSDT.Text.Trim(),
+                    txtEmail.Text.Trim(),
+                    txtMatKhau.Text,
+                    ngaySinh
+                );
 
                 SetLoadingState(false);
 
+                if (!success)
+                {
+                    ShowError(message, null);
+                    return;
+                }
+
                 MessageBox.Show(
-                    $"🎉 Chào mừng {khachHang.TenKh}!\n\n" +
+                    $"🎉 Chào mừng {customer.TenKh}!\n\n" +
                     $"Đăng ký thành công với thông tin:\n" +
-                    $"📱 SĐT: {khachHang.Sdt}\n" +
-                    $"📧 Email: {khachHang.Email}\n" +
-                    $"🏆 Hạng: {khachHang.HangTv}\n" +
-                    $"⭐ Điểm: {khachHang.DiemTichLuy}\n\n" +
+                    $"📱 SĐT: {customer.Sdt}\n" +
+                    $"📧 Email: {customer.Email}\n" +
+                    $"🏆 Hạng: {customer.HangTv}\n" +
+                    $"⭐ Điểm: {customer.DiemTichLuy}\n\n" +
                     $"Bạn có thể đăng nhập ngay bây giờ!",
                     "Đăng ký thành công",
                     MessageBoxButtons.OK,
@@ -152,19 +138,6 @@ namespace Billiard.WinForm.Forms.Auth
             MessageBox.Show(message, "Thông báo",
                 MessageBoxButtons.OK, MessageBoxIcon.Warning);
             focusControl?.Focus();
-        }
-
-        private bool IsValidEmail(string email)
-        {
-            try
-            {
-                var addr = new System.Net.Mail.MailAddress(email);
-                return addr.Address == email;
-            }
-            catch
-            {
-                return false;
-            }
         }
 
         private void BtnBackToLogin_Click(object sender, EventArgs e)

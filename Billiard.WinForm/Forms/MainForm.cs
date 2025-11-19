@@ -1,5 +1,4 @@
-﻿using Billiard.BLL.Services;
-using Billiard.DAL.Data;
+﻿using Billiard.DAL.Data;
 using Billiard.DAL.Entities;
 using Billiard.WinForm.Forms;
 using Billiard.WinForm.Forms.QLBan;
@@ -8,7 +7,8 @@ using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-
+using Billiard.WinForm.Forms.Auth;
+using Billiard.BLL.Services.QLBan;
 namespace Billiard.WinForm
 {
     public partial class MainForm : Form

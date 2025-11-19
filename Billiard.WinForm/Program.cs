@@ -1,4 +1,5 @@
 ﻿using Billiard.BLL.Services;
+using Billiard.BLL.Services.QLBan;
 using Billiard.DAL.Data;
 using Billiard.WinForm.Forms;
 using Billiard.WinForm.Forms.Auth;
@@ -53,22 +54,30 @@ namespace Billiard.WinForm
                 )
             );
 
-            // Register Services (BLL Layer)
+            // Register BLL Services
+            services.AddScoped<AuthService>();
+            services.AddScoped<EmailService>();
             services.AddScoped<DichVuService>();
             services.AddScoped<MatHangService>();
+            // banbia
             services.AddScoped<BanBiaService>();
+            services.AddScoped<LoaiBanService>();
+            services.AddScoped<KhuVucService>();
+            services.AddScoped<HoaDonService>();
 
-            // Register Forms (GUI Layer)
-            services.AddTransient<MainForm>();
+            // Register Auth Forms
             services.AddTransient<LoginForm>();
             services.AddTransient<SignupForm>();
             services.AddTransient<ForgotPasswordForm>();
             services.AddTransient<ResetPasswordForm>();
 
+            // Register Main Form
+            services.AddTransient<MainForm>();
+
             // Register Feature Forms
             services.AddTransient<DichVuForm>();
             services.AddTransient<DichVuEditForm>();
-            services.AddTransient<QLBanForm>(); 
+            services.AddTransient<QLBanForm>();
         }
 
         public static T GetService<T>() where T : class

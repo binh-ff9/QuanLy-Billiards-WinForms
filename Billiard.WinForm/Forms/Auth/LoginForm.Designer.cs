@@ -43,7 +43,6 @@
             // 
             // pnlLeft
             // 
-            pnlLeft.BackColor = Color.FromArgb(248, 250, 252);
             pnlLeft.Controls.Add(pnlDecoration);
             pnlLeft.Dock = DockStyle.Left;
             pnlLeft.Location = new Point(0, 0);
