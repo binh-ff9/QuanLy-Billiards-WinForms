@@ -532,18 +532,19 @@ namespace Billiard.WinForm.Forms.QLBan
             var detailPanel = new Panel
             {
                 AutoScroll = true,
-                Width = 450,
+                Dock = DockStyle.Fill,
                 Padding = new Padding(20),
                 BackColor = Color.White
             };
 
             int yPos = 10;
+            int panelWidth = _mainForm.pnlDetail.Width - 40; // Trừ padding
 
-            // ===== HEADER: TÊN BÀN VỚI ICON EDIT VÀ XÓA =====
+            // ===== HEADER: TÊN BÀN VỚI TRẠNG THÁI =====
             var pnlHeader = new Panel
             {
                 Location = new Point(0, yPos),
-                Size = new Size(410, 50),
+                Size = new Size(panelWidth, 60),
                 BackColor = Color.Transparent
             };
 
@@ -557,75 +558,157 @@ namespace Billiard.WinForm.Forms.QLBan
             };
             pnlHeader.Controls.Add(lblTableName);
 
-            // Icon chỉnh sửa
-            var btnEdit = new Button
+            // Badge trạng thái
+            var lblStatus = new Label
             {
-                Text = "✏️",
-                Font = new Font("Segoe UI", 16F),
-                Size = new Size(45, 45),
-                Location = new Point(320, 5),
-                BackColor = Color.Transparent,
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
+                Text = ban.TrangThai,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = ban.TrangThai switch
+                {
+                    "Trống" => Color.FromArgb(34, 197, 94),
+                    "Đang chơi" => Color.FromArgb(239, 68, 68),
+                    "Đã đặt" => Color.FromArgb(234, 179, 8),
+                    _ => Color.Gray
+                },
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(100, 30),
+                Location = new Point(0, 43)
             };
-            btnEdit.FlatAppearance.BorderSize = 0;
-            btnEdit.Click += async (s, e) => await ChinhSuaBan(ban);
-            pnlHeader.Controls.Add(btnEdit);
+            pnlHeader.Controls.Add(lblStatus);
 
-            // Icon xóa
-            var btnDelete = new Button
+            // Icon chỉnh sửa (chỉ hiện cho quản lý)
+            if (_mainForm.ChucVu == "Quản lý" || _mainForm.ChucVu == "Admin")
             {
-                Text = "🗑️",
-                Font = new Font("Segoe UI", 16F),
-                Size = new Size(45, 45),
-                Location = new Point(365, 5),
-                BackColor = Color.Transparent,
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
-            };
-            btnDelete.FlatAppearance.BorderSize = 0;
-            btnDelete.Click += async (s, e) => await XoaBan(ban);
-            pnlHeader.Controls.Add(btnDelete);
+                var btnEdit = new Button
+                {
+                    Text = "✏️",
+                    Font = new Font("Segoe UI", 16F),
+                    Size = new Size(45, 45),
+                    Location = new Point(panelWidth - 100, 5),
+                    BackColor = Color.Transparent,
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand
+                };
+                btnEdit.FlatAppearance.BorderSize = 0;
+                btnEdit.Click += async (s, e) => await ChinhSuaBan(ban);
+                pnlHeader.Controls.Add(btnEdit);
+
+                // Icon xóa
+                var btnDelete = new Button
+                {
+                    Text = "🗑️",
+                    Font = new Font("Segoe UI", 16F),
+                    Size = new Size(45, 45),
+                    Location = new Point(panelWidth - 50, 5),
+                    BackColor = Color.Transparent,
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand
+                };
+                btnDelete.FlatAppearance.BorderSize = 0;
+                btnDelete.Click += async (s, e) => await XoaBan(ban);
+                pnlHeader.Controls.Add(btnDelete);
+            }
 
             detailPanel.Controls.Add(pnlHeader);
+            yPos += 80;
+
+            // ===== NỘI DUNG THEO TRẠNG THÁI =====
+            if (ban.TrangThai == "Đang chơi" && ban.GioBatDau.HasValue)
+            {
+                await ShowPlayingTableDetail(detailPanel, ban,  yPos, panelWidth);
+            }
+            else if (ban.TrangThai == "Đã đặt")
+            {
+                ShowReservedTableDetail(detailPanel, ban, ref yPos, panelWidth);
+            }
+            else if (ban.TrangThai == "Trống")
+            {
+                ShowAvailableTableDetail(detailPanel, ban, ref yPos, panelWidth);
+            }
+
+            _mainForm.UpdateDetailPanel("Chi tiết", detailPanel);
+        }
+        private async Task ShowPlayingTableDetail(Panel detailPanel, BanBium ban,  int yPos, int panelWidth)
+        {
+            // Header section
+            var pnlPlayingHeader = new Panel
+            {
+                Location = new Point(0, yPos),
+                Size = new Size(panelWidth, 50),
+                BackColor = Color.FromArgb(248, 250, 252),
+                Padding = new Padding(15, 10, 15, 10)
+            };
+
+            var lblPlayingIcon = new Label
+            {
+                Text = "🎮",
+                Font = new Font("Segoe UI", 20F),
+                Location = new Point(5, 10),
+                AutoSize = true
+            };
+            pnlPlayingHeader.Controls.Add(lblPlayingIcon);
+
+            var lblPlayingTitle = new Label
+            {
+                Text = "Đang chơi",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(30, 41, 59),
+                Location = new Point(45, 13),
+                AutoSize = true
+            };
+            pnlPlayingHeader.Controls.Add(lblPlayingTitle);
+
+            detailPanel.Controls.Add(pnlPlayingHeader);
             yPos += 60;
 
-            // ===== THÔNG TIN KHÁCH HÀNG =====
+            // Thông tin khách hàng
             var pnlCustomer = new Panel
             {
                 Location = new Point(0, yPos),
-                Size = new Size(410, 200),
+                Size = new Size(panelWidth, 230),
                 BackColor = Color.FromArgb(248, 250, 252),
                 Padding = new Padding(15)
             };
 
             int customerYPos = 15;
 
-            AddDetailRow(pnlCustomer, "Khách hàng:", ban.MaKhNavigation?.TenKh ?? "Khách lẻ", ref customerYPos);
-            AddDetailRow(pnlCustomer, "SĐT:", ban.MaKhNavigation?.Sdt ?? "-", ref customerYPos);
+            AddDetailRow(pnlCustomer, "👤 Khách hàng:", ban.MaKhNavigation?.TenKh ?? "Khách lẻ", ref customerYPos, true, panelWidth);
 
-            if (ban.TrangThai == "Đang chơi" && ban.GioBatDau.HasValue)
+            if (ban.MaKhNavigation != null)
             {
-                AddDetailRow(pnlCustomer, "Bắt đầu:", ban.GioBatDau.Value.ToString("HH:mm dd/MM/yyyy"), ref customerYPos);
-
-                var duration = DateTime.Now - ban.GioBatDau.Value;
-                var thoiGian = $"{(int)duration.TotalMinutes} giờ {duration.Minutes} phút";
-                AddDetailRow(pnlCustomer, "Thời gian:", thoiGian, ref customerYPos);
+                AddDetailRow(pnlCustomer, "📞 SĐT:", ban.MaKhNavigation.Sdt ?? "-", ref customerYPos, false, panelWidth);
             }
 
+            AddDetailRow(pnlCustomer, "🕐 Bắt đầu:", ban.GioBatDau.Value.ToString("HH:mm dd/MM/yyyy"), ref customerYPos, false, panelWidth);
+
+            var duration = DateTime.Now - ban.GioBatDau.Value;
+            var thoiGian = $"{(int)duration.TotalHours} giờ {duration.Minutes} phút";
+            AddDetailRow(pnlCustomer, "⏱️ Thời gian:", thoiGian, ref customerYPos, false, panelWidth, Color.FromArgb(239, 68, 68));
+
             var giaGio = ban.MaLoaiNavigation?.GiaGio.ToString("N0") ?? "0";
-            AddDetailRow(pnlCustomer, "Giá giờ:", $"{giaGio} đ/giờ", ref customerYPos);
+            AddDetailRow(pnlCustomer, "💵 Giá giờ:", $"{giaGio} đ/giờ", ref customerYPos, false, panelWidth);
 
             detailPanel.Controls.Add(pnlCustomer);
-            yPos += 220;
+            yPos += 245;
 
-            // ===== THÔNG TIN THANH TOÁN =====
-            if (ban.TrangThai == "Đang chơi" && ban.GioBatDau.HasValue)
+            // Thông tin thanh toán
+            var hoaDon = await _banBiaService.GetActiveInvoiceAsync(ban.MaBan);
+
+            if (hoaDon != null)
             {
+                var soGio = (decimal)duration.TotalMinutes / 60;
+                var giaGioDecimal = ban.MaLoaiNavigation?.GiaGio ?? 0;
+                var tienBan = giaGioDecimal * soGio;
+                var tienDichVu = hoaDon.TienDichVu ?? 0;
+                var tamTinh = tienBan + tienDichVu;
+                var tongCong = Math.Ceiling(tamTinh / 1000) * 1000;
+
                 var pnlPayment = new Panel
                 {
                     Location = new Point(0, yPos),
-                    Size = new Size(410, 200),
+                    Size = new Size(panelWidth, 180),
                     BackColor = Color.White,
                     Padding = new Padding(15),
                     BorderStyle = BorderStyle.FixedSingle
@@ -633,104 +716,306 @@ namespace Billiard.WinForm.Forms.QLBan
 
                 int paymentYPos = 15;
 
-                // Tính tiền bàn
-                var duration = DateTime.Now - ban.GioBatDau.Value;
-                var soGio = (decimal)duration.TotalMinutes / 60;
-                var giaGioDecimal = ban.MaLoaiNavigation?.GiaGio ?? 0;
-                var tienBan = Math.Ceiling((soGio * giaGioDecimal) / 1000) * 1000;
+                AddPaymentRow(pnlPayment, "Tiền bàn:", $"{tienBan:N0} đ", ref paymentYPos, panelWidth);
+                AddPaymentRow(pnlPayment, "Dịch vụ:", $"{tienDichVu:N0} đ", ref paymentYPos, panelWidth);
 
-                decimal tienDichVu = 0;
-                var hoaDon = await _banBiaService.GetActiveInvoiceAsync(ban.MaBan);
-
-                if (hoaDon != null)
+                if (tongCong != tamTinh)
                 {
-                    tienDichVu = hoaDon.TienDichVu ?? 0;
+                    AddPaymentRow(pnlPayment, "Tạm tính:", $"{tamTinh:N0} đ", ref paymentYPos, panelWidth, true, Color.FromArgb(100, 116, 139));
                 }
-
-                var tamTinh = tienBan + tienDichVu;
-                var tongCong = Math.Ceiling(tamTinh / 1000) * 1000;
-
-                AddPaymentRow(pnlPayment, "Tiền bàn:", $"{tienBan:N0} đ", ref paymentYPos);
-                AddPaymentRow(pnlPayment, "Dịch vụ:", $"{tienDichVu:N0} đ", ref paymentYPos);
-                AddPaymentRow(pnlPayment, "Tạm tính:", $"{tamTinh:N0} đ", ref paymentYPos);
 
                 paymentYPos += 10;
                 var separator = new Panel
                 {
                     Location = new Point(0, paymentYPos),
-                    Size = new Size(380, 2),
+                    Size = new Size(panelWidth - 30, 2),
                     BackColor = Color.FromArgb(226, 232, 240)
                 };
                 pnlPayment.Controls.Add(separator);
                 paymentYPos += 15;
 
-                AddTotalRow(pnlPayment, "Tổng cộng:", $"{tongCong:N0} đ", ref paymentYPos);
+                AddTotalRow(pnlPayment, "Tổng cộng:", $"{tongCong:N0} đ", ref paymentYPos, panelWidth);
 
                 detailPanel.Controls.Add(pnlPayment);
-                yPos += 220;
-            }
+                yPos += 195;
 
-            // ===== DỊCH VỤ ĐÃ ORDER =====
-            if (ban.TrangThai == "Đang chơi")
-            {
-                var hoaDon = await _banBiaService.GetActiveInvoiceAsync(ban.MaBan);
+                // Dịch vụ đã order
+                var chiTietList = await _banBiaService.GetInvoiceDetailsAsync(hoaDon.MaHd);
 
-                if (hoaDon != null)
+                if (chiTietList.Any())
                 {
-                    var chiTietList = await _banBiaService.GetInvoiceDetailsAsync(hoaDon.MaHd);
-
-                    if (chiTietList.Any())
+                    var lblDichVu = new Label
                     {
-                        var lblDichVu = new Label
-                        {
-                            Text = $"Dịch vụ đã order ({chiTietList.Count} món):",
-                            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                            ForeColor = Color.FromArgb(30, 41, 59),
-                            Location = new Point(0, yPos),
-                            AutoSize = true
-                        };
-                        detailPanel.Controls.Add(lblDichVu);
-                        yPos += 35;
+                        Text = $"🍴 Dịch vụ đã order ({chiTietList.Count} món):",
+                        Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                        ForeColor = Color.FromArgb(30, 41, 59),
+                        Location = new Point(0, yPos),
+                        AutoSize = true
+                    };
+                    detailPanel.Controls.Add(lblDichVu);
+                    yPos += 35;
 
-                        foreach (var item in chiTietList)
-                        {
-                            var pnlService = CreateServiceItem(item, ban.MaBan);
-                            pnlService.Location = new Point(0, yPos);
-                            detailPanel.Controls.Add(pnlService);
-                            yPos += 75;
-                        }
+                    foreach (var item in chiTietList)
+                    {
+                        var pnlService = CreateServiceItem(item, ban.MaBan, panelWidth);
+                        pnlService.Location = new Point(0, yPos);
+                        detailPanel.Controls.Add(pnlService);
+                        yPos += 75;
                     }
+                }
+                else
+                {
+                    var lblNoService = new Label
+                    {
+                        Text = "Chưa có dịch vụ nào",
+                        Font = new Font("Segoe UI", 10F, FontStyle.Italic),
+                        ForeColor = Color.Gray,
+                        Location = new Point(0, yPos),
+                        AutoSize = false,
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        Size = new Size(panelWidth, 40)
+                    };
+                    detailPanel.Controls.Add(lblNoService);
+                    yPos += 50;
                 }
             }
 
-            // ===== BUTTONS =====
+            // Buttons
             yPos += 20;
 
-            if (ban.TrangThai == "Trống")
-            {
-                var btnBatDau = CreateActionButton("▶️ Bắt đầu chơi", Color.FromArgb(34, 197, 94));
-                btnBatDau.Location = new Point(0, yPos);
-                btnBatDau.Click += async (s, e) => await BatDauChoiBan(ban);
-                detailPanel.Controls.Add(btnBatDau);
-                yPos += 55;
-            }
-            else if (ban.TrangThai == "Đang chơi")
-            {
-                var btnThemDV = CreateActionButton("➕ Thêm dịch vụ", Color.FromArgb(99, 102, 241));
-                btnThemDV.Location = new Point(0, yPos);
-                btnThemDV.Click += (s, e) => ThemDichVu(ban);
-                detailPanel.Controls.Add(btnThemDV);
-                yPos += 55;
+            var btnThemDV = CreateActionButton("➕ Thêm dịch vụ", Color.FromArgb(99, 102, 241), panelWidth);
+            btnThemDV.Location = new Point(0, yPos);
+            btnThemDV.Click += (s, e) => ThemDichVu(ban);
+            detailPanel.Controls.Add(btnThemDV);
+            yPos += 55;
 
-                var btnThanhToan = CreateActionButton("💰 Kết thúc & Thanh toán", Color.FromArgb(34, 197, 94));
-                btnThanhToan.Location = new Point(0, yPos);
-                btnThanhToan.Click += (s, e) => ThanhToanBan(ban);
-                detailPanel.Controls.Add(btnThanhToan);
-            }
-
-            _mainForm.UpdateDetailPanel("Chi tiết", detailPanel);
+            var btnThanhToan = CreateActionButton("💰 Kết thúc & Thanh toán", Color.FromArgb(34, 197, 94), panelWidth);
+            btnThanhToan.Location = new Point(0, yPos);
+            btnThanhToan.Click += (s, e) => ThanhToanBan(ban);
+            detailPanel.Controls.Add(btnThanhToan);
         }
-        private void AddDetailRow(Panel panel, string label, string value, ref int yPos)
+        // ===== CHI TIẾT BÀN ĐÃ ĐẶT =====
+        private void ShowReservedTableDetail(Panel detailPanel, BanBium ban, ref int yPos, int panelWidth)
+        {
+            // Header section
+            var pnlReservedHeader = new Panel
+            {
+                Location = new Point(0, yPos),
+                Size = new Size(panelWidth, 50),
+                BackColor = Color.FromArgb(255, 251, 235),
+                Padding = new Padding(15, 10, 15, 10)
+            };
+
+            var lblReservedIcon = new Label
+            {
+                Text = "📅",
+                Font = new Font("Segoe UI", 20F),
+                Location = new Point(5, 10),
+                AutoSize = true
+            };
+            pnlReservedHeader.Controls.Add(lblReservedIcon);
+
+            var lblReservedTitle = new Label
+            {
+                Text = "Thông tin đặt bàn",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(30, 41, 59),
+                Location = new Point(45, 13),
+                AutoSize = true
+            };
+            pnlReservedHeader.Controls.Add(lblReservedTitle);
+
+            detailPanel.Controls.Add(pnlReservedHeader);
+            yPos += 60;
+
+            // Thông tin đặt bàn
+            var pnlReserved = new Panel
+            {
+                Location = new Point(0, yPos),
+                Size = new Size(panelWidth, 230),
+                BackColor = Color.FromArgb(255, 251, 235),
+                Padding = new Padding(15)
+            };
+
+            int reservedYPos = 15;
+
+            if (ban.MaKhNavigation != null)
+            {
+                AddDetailRow(pnlReserved, "👤 Khách hàng:", ban.MaKhNavigation.TenKh, ref reservedYPos, true, panelWidth);
+                AddDetailRow(pnlReserved, "📞 SĐT:", ban.MaKhNavigation.Sdt, ref reservedYPos, true, panelWidth);
+            }
+            else
+            {
+                AddDetailRow(pnlReserved, "👤 Khách hàng:", "Khách vãng lai", ref reservedYPos, false, panelWidth);
+            }
+
+            if (!string.IsNullOrEmpty(ban.GhiChu))
+            {
+                AddDetailRow(pnlReserved, "📝 Ghi chú:", ban.GhiChu, ref reservedYPos, false, panelWidth);
+            }
+
+            if (ban.GioBatDau.HasValue)
+            {
+                AddDetailRow(pnlReserved, "🕐 Thời gian đặt:", ban.GioBatDau.Value.ToString("HH:mm dd/MM/yyyy"), ref reservedYPos, false, panelWidth);
+            }
+
+            var giaGio = ban.MaLoaiNavigation?.GiaGio.ToString("N0") ?? "0";
+            AddDetailRow(pnlReserved, "💰 Giá giờ:", $"{giaGio} đ/giờ", ref reservedYPos, false, panelWidth);
+
+            detailPanel.Controls.Add(pnlReserved);
+            yPos += 245;
+
+            // Buttons
+            yPos += 20;
+
+            var btnConfirm = CreateActionButton("✅ Xác nhận khách đã đến", Color.FromArgb(34, 197, 94), panelWidth);
+            btnConfirm.Location = new Point(0, yPos);
+            btnConfirm.Click += async (s, e) => await XacNhanDatBan(ban);
+            detailPanel.Controls.Add(btnConfirm);
+            yPos += 55;
+
+            var btnCancel = CreateActionButton("❌ Hủy đặt bàn", Color.FromArgb(239, 68, 68), panelWidth);
+            btnCancel.Location = new Point(0, yPos);
+            btnCancel.Click += async (s, e) => await HuyDatBan(ban);
+            detailPanel.Controls.Add(btnCancel);
+        }
+
+        private async Task HuyDatBan(BanBium ban)
+        {
+            var result = MessageBox.Show("Bạn có chắc muốn hủy đặt bàn này?", "Xác nhận",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                try
+                {
+                    var success = await _banBiaService.CancelReservationAsync(ban.MaBan);
+                    if (success)
+                    {
+                        MessageBox.Show("Đã hủy đặt bàn!", "Thành công",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        _mainForm.HideDetailPanel();
+                        await LoadBanBia();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Không thể hủy đặt bàn!", "Lỗi",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+        private async Task XacNhanDatBan(BanBium ban)
+        {
+            var result = MessageBox.Show("Xác nhận khách đã đến và bắt đầu chơi?", "Xác nhận",
+                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+            if (result == DialogResult.Yes)
+            {
+                try
+                {
+                    var success = await _banBiaService.StartTableAsync(ban.MaBan, _mainForm.MaNV);
+                    if (success)
+                    {
+                        MessageBox.Show("Đã xác nhận và bắt đầu chơi!", "Thành công",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        await LoadBanBia();
+
+                        // Reload detail
+                        var updatedBan = await _banBiaService.GetTableByIdAsync(ban.MaBan);
+                        if (updatedBan != null)
+                        {
+                            ShowTableDetail(updatedBan);
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Không thể xác nhận!", "Lỗi",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
+        // ===== CHI TIẾT BÀN TRỐNG =====
+        private void ShowAvailableTableDetail(Panel detailPanel, BanBium ban, ref int yPos, int panelWidth)
+        {
+            // Header section
+            var pnlAvailableHeader = new Panel
+            {
+                Location = new Point(0, yPos),
+                Size = new Size(panelWidth, 50),
+                BackColor = Color.FromArgb(240, 253, 244),
+                Padding = new Padding(15, 10, 15, 10)
+            };
+
+            var lblAvailableIcon = new Label
+            {
+                Text = "🎱",
+                Font = new Font("Segoe UI", 20F),
+                Location = new Point(5, 10),
+                AutoSize = true
+            };
+            pnlAvailableHeader.Controls.Add(lblAvailableIcon);
+
+            var lblAvailableTitle = new Label
+            {
+                Text = "Bàn đang trống",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(30, 41, 59),
+                Location = new Point(45, 13),
+                AutoSize = true
+            };
+            pnlAvailableHeader.Controls.Add(lblAvailableTitle);
+
+            detailPanel.Controls.Add(pnlAvailableHeader);
+            yPos += 60;
+
+            // Thông tin bàn
+            var pnlAvailable = new Panel
+            {
+                Location = new Point(0, yPos),
+                Size = new Size(panelWidth, 180),
+                BackColor = Color.FromArgb(240, 253, 244),
+                Padding = new Padding(15)
+            };
+
+            int availableYPos = 15;
+
+            AddDetailRow(pnlAvailable, "🎯 Loại bàn:", ban.MaLoaiNavigation?.TenLoai ?? "Không rõ", ref availableYPos, true, panelWidth);
+            AddDetailRow(pnlAvailable, "📍 Khu vực:", ban.MaKhuVucNavigation?.TenKhuVuc ?? "Không rõ", ref availableYPos, true, panelWidth);
+
+            var giaGio = ban.MaLoaiNavigation?.GiaGio.ToString("N0") ?? "0";
+            AddDetailRow(pnlAvailable, "💵 Giá giờ:", $"{giaGio} đ/giờ", ref availableYPos, false, panelWidth, Color.FromArgb(34, 197, 94));
+
+            if (!string.IsNullOrEmpty(ban.GhiChu))
+            {
+                AddDetailRow(pnlAvailable, "📝 Ghi chú:", ban.GhiChu, ref availableYPos, false, panelWidth);
+            }
+
+            detailPanel.Controls.Add(pnlAvailable);
+            yPos += 195;
+
+            // Button
+            yPos += 20;
+
+            var btnBatDau = CreateActionButton("▶️ Bắt đầu chơi", Color.FromArgb(34, 197, 94), panelWidth);
+            btnBatDau.Location = new Point(0, yPos);
+            btnBatDau.Click += async (s, e) => await BatDauChoiBan(ban);
+            detailPanel.Controls.Add(btnBatDau);
+        }
+
+        // ===== HELPER METHODS =====
+        private void AddDetailRow(Panel panel, string label, string value, ref int yPos, bool bold = false, int panelWidth = 410, Color? valueColor = null)
         {
             var lblLabel = new Label
             {
@@ -745,24 +1030,27 @@ namespace Billiard.WinForm.Forms.QLBan
             var lblValue = new Label
             {
                 Text = value,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(230, yPos),
+                Font = new Font("Segoe UI", 10F, bold ? FontStyle.Bold : FontStyle.Regular),
+                ForeColor = valueColor ?? Color.FromArgb(30, 41, 59),
+                Location = new Point(180, yPos),
                 AutoSize = true,
-                TextAlign = ContentAlignment.MiddleRight
+                MaximumSize = new Size(panelWidth - 200, 0)
             };
             panel.Controls.Add(lblValue);
 
             yPos += 35;
         }
 
-        private void AddPaymentRow(Panel panel, string label, string value, ref int yPos)
+        private void AddPaymentRow(Panel panel, string label, string value, ref int yPos, int panelWidth = 410, bool small = false, Color? color = null)
         {
+            var fontSize = small ? 9F : 10F;
+            var textColor = color ?? Color.FromArgb(71, 85, 105);
+
             var lblLabel = new Label
             {
                 Text = label,
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = Color.FromArgb(71, 85, 105),
+                Font = new Font("Segoe UI", fontSize),
+                ForeColor = textColor,
                 Location = new Point(0, yPos),
                 AutoSize = true
             };
@@ -771,9 +1059,9 @@ namespace Billiard.WinForm.Forms.QLBan
             var lblValue = new Label
             {
                 Text = value,
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = Color.FromArgb(71, 85, 105),
-                Location = new Point(230, yPos),
+                Font = new Font("Segoe UI", fontSize),
+                ForeColor = textColor,
+                Location = new Point(panelWidth - 150, yPos),
                 AutoSize = true,
                 TextAlign = ContentAlignment.MiddleRight
             };
@@ -782,7 +1070,7 @@ namespace Billiard.WinForm.Forms.QLBan
             yPos += 30;
         }
 
-        private void AddTotalRow(Panel panel, string label, string value, ref int yPos)
+        private void AddTotalRow(Panel panel, string label, string value, ref int yPos, int panelWidth = 410)
         {
             var lblLabel = new Label
             {
@@ -799,7 +1087,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 Text = value,
                 Font = new Font("Segoe UI", 12F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(239, 68, 68),
-                Location = new Point(230, yPos),
+                Location = new Point(panelWidth - 150, yPos),
                 AutoSize = true,
                 TextAlign = ContentAlignment.MiddleRight
             };
@@ -808,13 +1096,14 @@ namespace Billiard.WinForm.Forms.QLBan
             yPos += 35;
         }
 
-        private Panel CreateServiceItem(ChiTietHoaDon item, int maBan)
+        private Panel CreateServiceItem(ChiTietHoaDon item, int maBan, int panelWidth)
         {
             var panel = new Panel
             {
-                Size = new Size(410, 65),
-                BackColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle
+                Size = new Size(panelWidth, 65),
+                BackColor = Color.FromArgb(248, 250, 252),
+                BorderStyle = BorderStyle.FixedSingle,
+                Padding = new Padding(12)
             };
 
             var lblName = new Label
@@ -822,7 +1111,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 Text = item.MaDvNavigation?.TenDv ?? "Dịch vụ",
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(15, 10),
+                Location = new Point(12, 10),
                 AutoSize = true
             };
             panel.Controls.Add(lblName);
@@ -832,7 +1121,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 Text = $"{item.SoLuong} x {item.MaDvNavigation?.Gia:N0} đ",
                 Font = new Font("Segoe UI", 9F),
                 ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(15, 35),
+                Location = new Point(12, 35),
                 AutoSize = true
             };
             panel.Controls.Add(lblQuantity);
@@ -842,7 +1131,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 Text = $"{item.ThanhTien:N0} đ",
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(239, 68, 68),
-                Location = new Point(250, 20),
+                Location = new Point(panelWidth - 150, 20),
                 AutoSize = true
             };
             panel.Controls.Add(lblPrice);
@@ -852,12 +1141,11 @@ namespace Billiard.WinForm.Forms.QLBan
                 Text = "✕",
                 Font = new Font("Segoe UI", 14F, FontStyle.Bold),
                 Size = new Size(35, 35),
-                Location = new Point(360, 15),
+                Location = new Point(panelWidth - 60, 15),
                 BackColor = Color.Transparent,
                 ForeColor = Color.FromArgb(239, 68, 68),
                 FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand,
-                Tag = new { ChiTietId = item.Id, MaBan = maBan }
+                Cursor = Cursors.Hand
             };
             btnDelete.FlatAppearance.BorderSize = 0;
             btnDelete.Click += async (s, e) => await XoaDichVu(item.Id, maBan);
@@ -865,7 +1153,6 @@ namespace Billiard.WinForm.Forms.QLBan
 
             return panel;
         }
-
         private async Task XoaDichVu(int chiTietId, int maBan)
         {
             var result = MessageBox.Show("Bạn có chắc muốn xóa dịch vụ này?", "Xác nhận",
@@ -951,12 +1238,12 @@ namespace Billiard.WinForm.Forms.QLBan
             yPos += 28;
         }
 
-        private Button CreateActionButton(string text, Color backColor)
+        private Button CreateActionButton(string text, Color backColor, int panelWidth)
         {
             var btn = new Button
             {
                 Text = text,
-                Width = 240,
+                Width = panelWidth,
                 Height = 45,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = backColor,

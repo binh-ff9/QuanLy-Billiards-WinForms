@@ -547,10 +547,10 @@
             pnlDetail.BackColor = Color.White;
             pnlDetail.BorderStyle = BorderStyle.FixedSingle;
             pnlDetail.Dock = DockStyle.Right;
-            pnlDetail.Location = new Point(967, 257);
+            pnlDetail.Location = new Point(800, 257);
             pnlDetail.MinimumSize = new Size(300, 0);
             pnlDetail.Name = "pnlDetail";
-            pnlDetail.Size = new Size(433, 641);
+            pnlDetail.Size = new Size(600, 641);
             pnlDetail.TabIndex = 4;
             pnlDetail.Visible = false;
             // 
@@ -622,6 +622,6 @@
         private System.Windows.Forms.Button btnNhanVien;
         private System.Windows.Forms.Button btnCaiDat;
         private System.Windows.Forms.Panel pnlMain;
-        private System.Windows.Forms.Panel pnlDetail;
+        public System.Windows.Forms.Panel pnlDetail;
     }
 }
