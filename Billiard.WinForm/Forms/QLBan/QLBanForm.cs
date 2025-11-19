@@ -1114,7 +1114,19 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private void BtnXemSoDo_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Chức năng xem sơ đồ bàn đang được phát triển", "Thông báo");
+            try
+            {
+                using (var soDoBanForm = new SoDoBanForm(_banBiaService))
+                {
+                    soDoBanForm.SetMainForm(_mainForm);
+                    soDoBanForm.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở sơ đồ bàn: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void BtnXemBanDat_Click(object sender, EventArgs e)
