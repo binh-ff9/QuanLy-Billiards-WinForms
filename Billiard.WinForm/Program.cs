@@ -1,7 +1,9 @@
 ﻿using Billiard.BLL.Services;
+using Billiard.BLL.Services.HoaDonServices;
 using Billiard.DAL.Data;
 using Billiard.WinForm.Forms;
 using Billiard.WinForm.Forms.Auth;
+using Billiard.WinForm.Forms.HoaDon;
 using Billiard.WinForm.Forms.QLBan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -36,7 +38,7 @@ namespace Billiard.WinForm
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
             // Run LoginForm
-            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
+            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -57,6 +59,7 @@ namespace Billiard.WinForm
             services.AddScoped<DichVuService>();
             services.AddScoped<MatHangService>();
             services.AddScoped<BanBiaService>();
+            services.AddScoped<HoaDonService>();
 
             // Register Forms (GUI Layer)
             services.AddTransient<MainForm>();
@@ -69,6 +72,7 @@ namespace Billiard.WinForm
             services.AddTransient<DichVuForm>();
             services.AddTransient<DichVuEditForm>();
             services.AddTransient<QLBanForm>(); 
+            services.AddTransient<HoaDonForm>();
         }
 
         public static T GetService<T>() where T : class

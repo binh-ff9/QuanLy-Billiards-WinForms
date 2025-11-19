@@ -113,7 +113,7 @@
             lblUserRole.ForeColor = Color.FromArgb(173, 181, 189);
             lblUserRole.Location = new Point(91, 50);
             lblUserRole.Name = "lblUserRole";
-            lblUserRole.Size = new Size(91, 25);
+            lblUserRole.Size = new Size(75, 20);
             lblUserRole.TabIndex = 2;
             lblUserRole.Text = "Nhân viên";
             // 
@@ -125,7 +125,7 @@
             lblUserName.ForeColor = Color.White;
             lblUserName.Location = new Point(91, 20);
             lblUserName.Name = "lblUserName";
-            lblUserName.Size = new Size(117, 30);
+            lblUserName.Size = new Size(102, 25);
             lblUserName.TabIndex = 1;
             lblUserName.Text = "Nhân viên";
             // 
@@ -149,7 +149,7 @@
             lblTitle.ForeColor = Color.FromArgb(220, 240, 230);
             lblTitle.Location = new Point(20, 25);
             lblTitle.Name = "lblTitle";
-            lblTitle.Size = new Size(461, 48);
+            lblTitle.Size = new Size(384, 41);
             lblTitle.TabIndex = 0;
             lblTitle.Text = "🎱 Quản Lý Quán Bi-a Pro";
             // 
@@ -544,19 +544,19 @@
             // 
             // pnlDetail
             // 
-            pnlDetail.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Right;
             pnlDetail.BackColor = Color.White;
             pnlDetail.BorderStyle = BorderStyle.FixedSingle;
-            pnlDetail.Location = new Point(950, 260);
+            pnlDetail.Dock = DockStyle.Right;
+            pnlDetail.Location = new Point(1100, 257);
             pnlDetail.MinimumSize = new Size(300, 0);
             pnlDetail.Name = "pnlDetail";
-            pnlDetail.Size = new Size(450, 638);
+            pnlDetail.Size = new Size(300, 641);
             pnlDetail.TabIndex = 4;
             pnlDetail.Visible = false;
             // 
             // MainForm
             // 
-            AutoScaleDimensions = new SizeF(10F, 25F);
+            AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1400, 898);
             Controls.Add(pnlDetail);
