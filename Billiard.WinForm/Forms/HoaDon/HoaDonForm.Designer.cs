@@ -51,11 +51,12 @@
             dataGridViewHoaDon.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dataGridViewHoaDon.Dock = DockStyle.Fill;
             dataGridViewHoaDon.GridColor = SystemColors.InactiveCaption;
-            dataGridViewHoaDon.Location = new Point(0, 133);
+            dataGridViewHoaDon.Location = new Point(0, 127);
             dataGridViewHoaDon.Name = "dataGridViewHoaDon";
             dataGridViewHoaDon.RowHeadersWidth = 51;
-            dataGridViewHoaDon.Size = new Size(800, 317);
+            dataGridViewHoaDon.Size = new Size(800, 323);
             dataGridViewHoaDon.TabIndex = 0;
+            dataGridViewHoaDon.CellClick += dataGridViewHoaDon_CellClick;
             // 
             // pnlFilters
             // 
@@ -70,12 +71,12 @@
             pnlFilters.Dock = DockStyle.Top;
             pnlFilters.Location = new Point(0, 0);
             pnlFilters.Name = "pnlFilters";
-            pnlFilters.Size = new Size(800, 133);
+            pnlFilters.Size = new Size(800, 127);
             pnlFilters.TabIndex = 1;
             // 
             // dtpDenNgay
             // 
-            dtpDenNgay.Location = new Point(327, 58);
+            dtpDenNgay.Location = new Point(327, 55);
             dtpDenNgay.Name = "dtpDenNgay";
             dtpDenNgay.Size = new Size(170, 27);
             dtpDenNgay.TabIndex = 12;
@@ -127,7 +128,7 @@
             // txtSearch
             // 
             txtSearch.Font = new Font("Segoe UI", 11F);
-            txtSearch.Location = new Point(12, 95);
+            txtSearch.Location = new Point(12, 88);
             txtSearch.Margin = new Padding(3, 4, 3, 4);
             txtSearch.Name = "txtSearch";
             txtSearch.PlaceholderText = "🔍 Tìm kiếm hóa đơn...(Tên Khách hàng, mã hóa đơn, số điện thoại)";

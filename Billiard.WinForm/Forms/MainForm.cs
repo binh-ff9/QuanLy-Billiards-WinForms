@@ -251,7 +251,9 @@ namespace Billiard.WinForm
                         OpenChildForm(Program.GetService<DichVuForm>());
                         break;
                     case "btnHoaDon":
-                        OpenChildForm(Program.GetService<HoaDonForm>());
+                        var hoaDonForm = Program.GetService<HoaDonForm>();
+                        hoaDonForm.SetMainForm(this);
+                        OpenChildForm(hoaDonForm);
                         break;
                     case "btnKhachHang":
                         ShowComingSoon("Khách hàng");

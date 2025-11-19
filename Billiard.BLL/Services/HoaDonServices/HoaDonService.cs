@@ -18,6 +18,7 @@ namespace Billiard.BLL.Services.HoaDonServices
             _context = context;
         }
 
+        // GET: Tất cả hóa đơn
         public async Task<List<HoaDon>> GetTatCaHoaDonAsync()
         {
             return await _context.HoaDons
@@ -28,6 +29,17 @@ namespace Billiard.BLL.Services.HoaDonServices
                 .ToListAsync();
         }
 
+        // Lấy chi tiết hoa đơn
+        public async Task<HoaDon> GetChiTietHoaDon(int maHoaDon)
+        {
+            return await _context.HoaDons
+                .Include(h => h.MaBanNavigation)
+                .Include(h => h.MaNvNavigation)
+                .Include(h=> h.MaKhNavigation)
+                .Include(h=> h.ChiTietHoaDons)
+                    .ThenInclude(ct=> ct.MaDvNavigation)
+                .FirstOrDefaultAsync(h => h.MaHd == maHoaDon);
+        }
 
 
 

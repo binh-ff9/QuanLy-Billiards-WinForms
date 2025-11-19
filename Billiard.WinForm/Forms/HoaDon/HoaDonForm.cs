@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using ClosedXML.Excel;
 
+
 namespace Billiard.WinForm.Forms.HoaDon
 {
     public partial class HoaDonForm : Form
@@ -20,6 +21,9 @@ namespace Billiard.WinForm.Forms.HoaDon
         private List<dynamic> _originalData = new List<dynamic>();
 
         private string _currentStatusFilter = "Tất cả";
+
+        private MainForm _mainForm;
+
         public HoaDonForm(HoaDonService hoaDonService)
         {
             InitializeComponent();
@@ -44,19 +48,10 @@ namespace Billiard.WinForm.Forms.HoaDon
             HighlightButton(btnTatCa);
         }
 
-        private void SetupDateTimePickers()
+
+        public void SetMainForm(MainForm main)
         {
-            // Format: 19/11/2025
-            dtpTuNgay.Format = DateTimePickerFormat.Custom;
-            dtpTuNgay.CustomFormat = "dd/MM/yyyy";
-
-            dtpDenNgay.Format = DateTimePickerFormat.Custom;
-            dtpDenNgay.CustomFormat = "dd/MM/yyyy";
-
-            // Set mặc định: Từ đầu tháng đến hiện tại
-            var today = DateTime.Now;
-            dtpTuNgay.Value = new DateTime(today.Year, 1, 1);
-            dtpDenNgay.Value = today;
+            _mainForm = main;
         }
 
         private async Task LoadDataAsync()
@@ -73,7 +68,7 @@ namespace Billiard.WinForm.Forms.HoaDon
                     NhanVien = h.MaNvNavigation?.TenNv ?? "N/A",
                     KhachHang = h.MaKhNavigation?.TenKh ?? "Vãng lai",
                     SDT = h.MaKhNavigation?.Sdt ?? "",
-                    NgayTao = h.ThoiGianBatDau,         
+                    NgayTao = h.ThoiGianBatDau,
                     BatDau = h.ThoiGianBatDau,
                     KetThuc = h.ThoiGianKetThuc,
                     TongTien = h.TongTien,
@@ -97,12 +92,26 @@ namespace Billiard.WinForm.Forms.HoaDon
             }
         }
 
-
+        #region Filters
         private void SetStatusFilter(string status, Button activeBtn)
         {
             _currentStatusFilter = status;
             HighlightButton(activeBtn);
             ApplyFilters();
+        }
+        private void SetupDateTimePickers()
+        {
+            // Format: 19/11/2025
+            dtpTuNgay.Format = DateTimePickerFormat.Custom;
+            dtpTuNgay.CustomFormat = "dd/MM/yyyy";
+
+            dtpDenNgay.Format = DateTimePickerFormat.Custom;
+            dtpDenNgay.CustomFormat = "dd/MM/yyyy";
+
+            // Set mặc định: Từ đầu tháng đến hiện tại
+            var today = DateTime.Now;
+            dtpTuNgay.Value = new DateTime(today.Year, 1, 1);
+            dtpDenNgay.Value = today;
         }
 
         private void HighlightButton(Button btn)
@@ -170,6 +179,9 @@ namespace Billiard.WinForm.Forms.HoaDon
             ConfigureDataGridView();
 
         }
+
+        #endregion
+
         // Cấu hình bảng
         #region CSS bảng
         private void ConfigureDataGridView()
@@ -350,5 +362,33 @@ namespace Billiard.WinForm.Forms.HoaDon
                 }
             }
         }
+
+        private async void dataGridViewHoaDon_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            try
+            {
+                if (dataGridViewHoaDon.Rows[e.RowIndex].Cells["MaHoaDon"].Value == null) return;
+
+                int maHd = Convert.ToInt32(dataGridViewHoaDon.Rows[e.RowIndex].Cells["MaHoaDon"].Value);
+
+                var fullInfo = await _hoaDonService.GetChiTietHoaDon(maHd);
+
+                if (fullInfo != null && _mainForm != null)
+                {
+                    var detailControl = new ChiTietHoaDonControl();
+                    detailControl.LoadData(fullInfo);
+
+                    _mainForm.UpdateDetailPanel("Chi Tiết hóa đơn", detailControl);
+
+                }
+
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Loiox xem chi tietse: " + ex.Message);
+            }
+         }           
     }
 }
