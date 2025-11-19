@@ -10,15 +10,11 @@ namespace Billiard.BLL.Services
     {
         private readonly BilliardDbContext _context;
 
-        public MatHangService()
+        // QUAN TRỌNG: Chỉ dùng constructor có tham số để nhận DbContext từ DI
+        public MatHangService(BilliardDbContext context)
         {
-            _context = new BilliardDbContext();
+            _context = context;
         }
-
-        //public MatHangService(BilliardDbContext context)
-        //{
-        //    _context = context;
-        //}
 
         // Lấy tất cả mặt hàng
         public List<MatHang> GetAllMatHang()
