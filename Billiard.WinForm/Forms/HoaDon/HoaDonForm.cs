@@ -9,22 +9,54 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Drawing;
+using ClosedXML.Excel;
 
 namespace Billiard.WinForm.Forms.HoaDon
 {
     public partial class HoaDonForm : Form
     {
         private readonly HoaDonService _hoaDonService;
+
+        private List<dynamic> _originalData = new List<dynamic>();
+
+        private string _currentStatusFilter = "Tất cả";
         public HoaDonForm(HoaDonService hoaDonService)
         {
             InitializeComponent();
             _hoaDonService = hoaDonService;
+
+            dataGridViewHoaDon.CellFormatting += DataGridViewHoaDon_CellFormatting;
+
+            txtSearch.TextChanged += SearchInput_Changed;
+            dtpTuNgay.ValueChanged += Filter_Changed;
+            dtpDenNgay.ValueChanged += Filter_Changed;
+            btnTatCa.Click += (s, e) => SetStatusFilter("Tất cả", btnTatCa);
+            btnChuaThanhToan.Click += (s, e) => SetStatusFilter("Chưa thanh toán", btnChuaThanhToan);
+            btnDaThanhToan.Click += (s, e) => SetStatusFilter("Đã thanh toán", btnDaThanhToan);
+            btnXuatBaoCao.Click += btnXuatBaoCao_Click;
         }
 
         private async void HoaDonForm_Load(object sender, EventArgs e)
         {
+            SetupDateTimePickers();
             await LoadDataAsync();
+
+            HighlightButton(btnTatCa);
+        }
+
+        private void SetupDateTimePickers()
+        {
+            // Format: 19/11/2025
+            dtpTuNgay.Format = DateTimePickerFormat.Custom;
+            dtpTuNgay.CustomFormat = "dd/MM/yyyy";
+
+            dtpDenNgay.Format = DateTimePickerFormat.Custom;
+            dtpDenNgay.CustomFormat = "dd/MM/yyyy";
+
+            // Set mặc định: Từ đầu tháng đến hiện tại
+            var today = DateTime.Now;
+            dtpTuNgay.Value = new DateTime(today.Year, 1, 1);
+            dtpDenNgay.Value = today;
         }
 
         private async Task LoadDataAsync()
@@ -32,22 +64,25 @@ namespace Billiard.WinForm.Forms.HoaDon
             try
             {
                 this.Cursor = Cursors.WaitCursor;
-                var danhSachHoaDon = await _hoaDonService.GetTatCaHoaDonAsync();
+                var rawData = await _hoaDonService.GetTatCaHoaDonAsync();
 
-                var displayData = danhSachHoaDon.Select(h => new
+                _originalData = rawData.Select(h => new
                 {
-                    h.MaHd,
+                    MaHoaDon = h.MaHd,
                     Ban = h.MaBanNavigation?.TenBan ?? "N/A",
-                    MaNvNavigation = h.MaNvNavigation?.TenNv ?? "N/A",
-                    MaKhNavigation = h.MaKhNavigation?.TenKh ?? "Vãng lai",
+                    NhanVien = h.MaNvNavigation?.TenNv ?? "N/A",
+                    KhachHang = h.MaKhNavigation?.TenKh ?? "Vãng lai",
+                    SDT = h.MaKhNavigation?.Sdt ?? "",
+                    NgayTao = h.ThoiGianBatDau,         
                     BatDau = h.ThoiGianBatDau,
                     KetThuc = h.ThoiGianKetThuc,
                     TongTien = h.TongTien,
                     TrangThai = h.TrangThai
 
-                }).ToList();
+                }).ToList<dynamic>();
 
-                dataGridViewHoaDon.DataSource = displayData;
+                ApplyFilters();
+
 
                 ConfigureDataGridView();
             }
@@ -63,7 +98,80 @@ namespace Billiard.WinForm.Forms.HoaDon
         }
 
 
+        private void SetStatusFilter(string status, Button activeBtn)
+        {
+            _currentStatusFilter = status;
+            HighlightButton(activeBtn);
+            ApplyFilters();
+        }
+
+        private void HighlightButton(Button btn)
+        {
+            // Reset màu các nút (Giả sử màu gốc là White, màu chọn là Blueviolet)
+            btnTatCa.BackColor = Color.White;
+            btnTatCa.ForeColor = Color.Black;
+            btnChuaThanhToan.BackColor = Color.White;
+            btnChuaThanhToan.ForeColor = Color.Black;
+            btnDaThanhToan.BackColor = Color.White;
+            btnDaThanhToan.ForeColor = Color.Black;
+
+            // Set màu nút đang chọn
+            btn.BackColor = Color.MediumSlateBlue; // Màu tím giống trong hình
+            btn.ForeColor = Color.White;
+        }
+        private void SearchInput_Changed(object sender, EventArgs e) => ApplyFilters();
+        private void Filter_Changed(object sender, EventArgs e) => ApplyFilters();
+
+
+        private void ApplyFilters()
+        {
+            if (_originalData == null || !_originalData.Any()) return;
+
+            var keyword = txtSearch.Text.ToLower().Trim();
+            var fromDate = dtpTuNgay.Value.Date; // Lấy 00:00:00
+            var toDate = dtpDenNgay.Value.Date.AddDays(1).AddSeconds(-1); // Lấy 23:59:59
+
+            var filteredList = _originalData.Where(item =>
+            {
+                // A. Lọc theo Trạng thái
+                bool matchStatus = _currentStatusFilter == "Tất cả" || item.TrangThai == _currentStatusFilter;
+
+                // B. Lọc theo Ngày (Dựa trên NgayTao/BatDau)
+                bool matchDate = false;
+                if (item.NgayTao != null)
+                {
+                    DateTime date = (DateTime)item.NgayTao;
+                    matchDate = date >= fromDate && date <= toDate;
+                }
+
+                // C. Lọc theo Từ khóa (Tên KH, Mã HĐ, SĐT)
+                bool matchSearch = true;
+                if (!string.IsNullOrEmpty(keyword))
+                {
+                    string tenKH = item.KhachHang.ToString().ToLower();
+                    string sdt = item.SDT.ToString().ToLower();
+                    string maHD = item.MaHoaDon.ToString();
+
+                    matchSearch = tenKH.Contains(keyword) ||
+                                  sdt.Contains(keyword) ||
+                                  maHD.Contains(keyword);
+                }
+
+                return matchStatus && matchDate && matchSearch;
+            }).ToList();
+
+            // Đổ dữ liệu đã lọc vào Grid
+            dataGridViewHoaDon.DataSource = filteredList;
+
+            // Ẩn các cột phụ không cần thiết (như SDT, NgayTao nếu không muốn hiện)
+            if (dataGridViewHoaDon.Columns["SDT"] != null) dataGridViewHoaDon.Columns["SDT"].Visible = false;
+            if (dataGridViewHoaDon.Columns["NgayTao"] != null) dataGridViewHoaDon.Columns["NgayTao"].Visible = false;
+
+            ConfigureDataGridView();
+
+        }
         // Cấu hình bảng
+        #region CSS bảng
         private void ConfigureDataGridView()
         {
             // --- 1. Cài đặt tổng quan ---
@@ -107,7 +215,6 @@ namespace Billiard.WinForm.Forms.HoaDon
                 dataGridViewHoaDon.Columns["MaHoaDon"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 dataGridViewHoaDon.Columns["MaHoaDon"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
             }
-
             if (dataGridViewHoaDon.Columns["Ban"] != null)
             {
                 dataGridViewHoaDon.Columns["Ban"].HeaderText = "Bàn";
@@ -153,6 +260,94 @@ namespace Billiard.WinForm.Forms.HoaDon
                 dataGridViewHoaDon.Columns["TrangThai"].HeaderText = "Trạng thái";
                 dataGridViewHoaDon.Columns["TrangThai"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
                 dataGridViewHoaDon.Columns["TrangThai"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            }
+        }
+
+        private void DataGridViewHoaDon_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (dataGridViewHoaDon.Columns[e.ColumnIndex].Name == "TrangThai" && e.Value != null)
+            {
+                string status = e.Value.ToString();
+
+                // 2. Xử lý logic màu sắc
+                if (status == "Đang chơi") // Hoặc trạng thái chưa thanh toán của bạn
+                {
+                    e.CellStyle.ForeColor = Color.FromArgb(220, 38, 38); // Màu Đỏ (Red)
+                    e.CellStyle.Font = new Font(e.CellStyle.Font, FontStyle.Bold); // In đậm cho chú ý
+                }
+                else if (status == "Đã thanh toán")
+                {
+                    e.CellStyle.ForeColor = Color.FromArgb(22, 163, 74); // Màu Xanh lá (Green)
+                    e.CellStyle.Font = new Font(e.CellStyle.Font, FontStyle.Bold);
+                }
+                // Các trạng thái khác (nếu có) sẽ dùng màu mặc định
+            }
+        }
+        #endregion
+
+        private void btnXuatBaoCao_Click(object sender, EventArgs e)
+        {
+            if (dataGridViewHoaDon.Rows.Count == 0)
+            {
+                MessageBox.Show("Không có dữ liệu để xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            using (SaveFileDialog sfd = new SaveFileDialog() { Filter = "Excel Workbook|*.xlsx" })
+            {
+                if (sfd.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        using (var workbook = new XLWorkbook())
+                        {
+                            var worksheet = workbook.Worksheets.Add("BaoCaoHoaDon");
+
+                            // Cách 1: Xuất thô từ DataGridView (Nhanh)
+                            // worksheet.Cell(1, 1).Value = "Báo Cáo Hóa Đơn";
+
+                            // Cách 2: Lấy từ DataSource để chuẩn dữ liệu hơn (Khuyên dùng)
+                            var data = dataGridViewHoaDon.DataSource as System.Collections.IList;
+
+                            // Tạo Header
+                            worksheet.Cell(1, 1).Value = "Mã HĐ";
+                            worksheet.Cell(1, 2).Value = "Bàn";
+                            worksheet.Cell(1, 3).Value = "Khách hàng";
+                            worksheet.Cell(1, 4).Value = "Tổng tiền";
+                            worksheet.Cell(1, 5).Value = "Trạng thái";
+                            worksheet.Cell(1, 6).Value = "Thời gian";
+
+                            // Style Header
+                            var headerRange = worksheet.Range("A1:F1");
+                            headerRange.Style.Font.Bold = true;
+                            headerRange.Style.Fill.BackgroundColor = XLColor.CornflowerBlue;
+                            headerRange.Style.Font.FontColor = XLColor.White;
+
+                            // Đổ dữ liệu
+                            int row = 2;
+                            foreach (dynamic item in data)
+                            {
+                                worksheet.Cell(row, 1).Value = item.MaHoaDon;
+                                worksheet.Cell(row, 2).Value = item.Ban;
+                                worksheet.Cell(row, 3).Value = item.KhachHang;
+                                worksheet.Cell(row, 4).Value = item.TongTien;
+                                worksheet.Cell(row, 5).Value = item.TrangThai;
+                                worksheet.Cell(row, 6).Value = item.BatDau;
+                                row++;
+                            }
+
+                            // Tự động chỉnh độ rộng cột
+                            worksheet.Columns().AdjustToContents();
+
+                            workbook.SaveAs(sfd.FileName);
+                        }
+                        MessageBox.Show("Xuất báo cáo thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Lỗi khi xuất file: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
             }
         }
     }
