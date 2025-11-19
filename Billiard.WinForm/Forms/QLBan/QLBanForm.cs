@@ -1122,9 +1122,46 @@ namespace Billiard.WinForm.Forms.QLBan
             MessageBox.Show("Chức năng xem danh sách bàn đặt đang được phát triển", "Thông báo");
         }
 
-        private void BtnDatBan_Click(object sender, EventArgs e)
+        // Trong QLBanForm.cs
+
+        private async void BtnDatBan_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Chức năng đặt bàn trước đang được phát triển", "Thông báo");
+            try
+            {
+                // Kiểm tra quyền (đã được SetupPermissions xử lý, nhưng nên kiểm tra lại nếu cần)
+                if (!btnDatBan.Visible)
+                {
+                    MessageBox.Show("Bạn không có quyền thực hiện chức năng này.", "Cảnh báo",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Lấy các Service cần thiết từ Program (cần có lớp Program với GetService<T>)
+                var datBanService = Program.GetService<DatBanService>();
+
+                // Khởi tạo và hiển thị DatBanForm
+                using (var datBanForm = new DatBanForm(_banBiaService, datBanService))
+                {
+                    var result = datBanForm.ShowDialog(this);
+
+                    if (result == DialogResult.OK)
+                    {
+                        // Nếu việc đặt bàn thành công, tải lại danh sách bàn để cập nhật trạng thái
+                        this.Cursor = Cursors.WaitCursor;
+                        await LoadBanBia();
+                        this.Cursor = Cursors.Default;
+
+                        MessageBox.Show("Đã đặt bàn thành công!", "Thông báo",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                this.Cursor = Cursors.Default;
+                MessageBox.Show($"Lỗi khi mở form đặt bàn: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private async void BtnThemBan_Click(object sender, EventArgs e)

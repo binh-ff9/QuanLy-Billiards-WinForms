@@ -65,7 +65,9 @@ namespace Billiard.WinForm
 
             // BanBia services
             services.AddScoped<BanBiaService>();
-
+            services.AddScoped<DatBanService>();
+            services.AddScoped<LoaiBanService>();
+            services.AddScoped<KhuVucService>();
             // HoaDon services
             services.AddScoped<HoaDonService>();
 
