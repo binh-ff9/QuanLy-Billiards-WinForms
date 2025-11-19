@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Billiard.BLL.Services.QLBan
 {
@@ -17,7 +18,6 @@ namespace Billiard.BLL.Services.QLBan
             _context = context;
         }
 
-        // Lấy tất cả đặt bàn đang chờ
         public async Task<List<DatBan>> GetAllActiveAsync()
         {
             return await _context.DatBans
@@ -26,8 +26,8 @@ namespace Billiard.BLL.Services.QLBan
                 .Include(d => d.MaBanNavigation)
                     .ThenInclude(b => b.MaLoaiNavigation)
                 .Include(d => d.MaKhNavigation)
-                .Where(d => d.TrangThai == "Đang chờ")
-                .OrderBy(d => d.ThoiGianDat)
+                .Where(d => d.TrangThai == "Đang chờ" || d.TrangThai == "Đã đặt") // CẬP NHẬT: Lấy cả "Đã đặt"
+                .OrderBy(d => d.ThoiGianBatDau)
                 .ToListAsync();
         }
 
@@ -89,7 +89,98 @@ namespace Billiard.BLL.Services.QLBan
                     && d.ThoiGianBatDau < thoiGianKetThuc
                     && d.ThoiGianKetThuc > thoiGianBatDau);
         }
+        public async Task<KhachHang> GetCustomerByPhoneNumberAsync(string sdt)
+        {
+            return await _context.KhachHangs
+                .FirstOrDefaultAsync(k => k.Sdt == sdt);
+        }
+        public async Task<bool> ReserveTableAsync(
+            int maBan,
+            int? maKhachHang,
+            string tenKhach,
+            string sdt,
+            DateTime thoiGianBatDau,
+            DateTime thoiGianKetThuc, // Thêm giờ kết thúc (Đã có trong file gốc, nhưng xác nhận lại)
+            string ghiChu
+        )
+        {
+            try
+            {
+                // 1. Nếu maKhachHang là null và chưa có khách hàng, tạo khách hàng mới tạm thời
+                int maKh = maKhachHang ?? 0;
+                if (!maKhachHang.HasValue)
+                {
+                    // Kiểm tra lại lần cuối xem có khách hàng này chưa
+                    var existingCustomer = await GetCustomerByPhoneNumberAsync(sdt);
+                    if (existingCustomer != null)
+                    {
+                        maKh = existingCustomer.MaKh;
+                    }
+                    else
+                    {
+                        // Tạo khách hàng mới (vãng lai/tạm thời)
+                        var newCustomer = new KhachHang
+                        {
+                            TenKh = tenKhach,
+                            Sdt = sdt,
+                            NgayDangKy = DateTime.Now,
+                            // Các trường khác sẽ là giá trị mặc định (HoatDong = false, HangTv = "Đồng", ...)
+                        };
+                        _context.KhachHangs.Add(newCustomer);
+                        await _context.SaveChangesAsync(); // Lưu để lấy MaKh
+                        maKh = newCustomer.MaKh;
+                    }
+                }
 
+                // 2. Tạo đối tượng đặt bàn mới
+                var datBan = new DatBan
+                {
+                    MaBan = maBan,
+                    MaKh = maKh,
+                    TenKhach = tenKhach, // Tên khách hàng (cho dù là khách TV hay vãng lai)
+                    Sdt = sdt,
+                    ThoiGianBatDau = thoiGianBatDau,
+                    ThoiGianKetThuc = thoiGianKetThuc, // Sử dụng giờ kết thúc
+                    GhiChu = ghiChu,
+                    ThoiGianDat = DateTime.Now,
+                    TrangThai = "Đang chờ", // Mặc định là Đang chờ
+                    SoNguoi = 1 // Giả sử mặc định là 1 người, cần thêm trường này vào Form nếu muốn nhập
+                };
+
+                _context.DatBans.Add(datBan);
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                // Log the exception (tùy chọn)
+                Console.WriteLine(ex.Message);
+                return false;
+            }
+        }
+        public async Task<List<BanBium>> GetAvailableTablesForReservationAsync(DateTime thoiGianBatDau, DateTime thoiGianKetThuc)
+        {
+            // 1. Lấy danh sách MaBan đã được đặt và đang "Đang chờ" trong khoảng thời gian
+            // Điều kiện xung đột: (d.ThoiGianBatDau < thoiGianKetThuc) VÀ (d.ThoiGianKetThuc > thoiGianBatDau)
+            var reservedTableIds = await _context.DatBans
+                .Where(d => d.TrangThai == "Đang chờ"
+                    && d.ThoiGianBatDau < thoiGianKetThuc
+                    && d.ThoiGianKetThuc > thoiGianBatDau)
+                .Select(d => d.MaBan)
+                .Distinct()
+                .ToListAsync();
+
+            // 2. Lấy danh sách BanBia có trạng thái "Trống" VÀ không nằm trong danh sách MaBan đã đặt
+            var availableTables = await _context.BanBia
+                .Include(b => b.MaKhuVucNavigation)
+                .Include(b => b.MaLoaiNavigation)
+                .Where(b => b.TrangThai == "Trống" // Trạng thái phải là Trống (hoặc không phải Đang chơi/Bảo trì/Đã đặt)
+                    && !reservedTableIds.Contains(b.MaBan))
+                .OrderBy(b => b.TenBan)
+                .ToListAsync();
+
+            return availableTables;
+        }
         // Cập nhật trạng thái đặt bàn
         public async Task<bool> UpdateStatusAsync(int maDat, string trangThai)
         {

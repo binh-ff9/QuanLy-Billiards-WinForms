@@ -1119,7 +1119,27 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private void BtnXemBanDat_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Chức năng xem danh sách bàn đặt đang được phát triển", "Thông báo");
+            try
+            {
+                if (!btnXemBanDat.Visible)
+                {
+                    MessageBox.Show("Bạn không có quyền truy cập chức năng này.", "Cảnh báo",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var datBanService = Program.GetService<DatBanService>();
+
+                using (var datBanForm = new DanhSachBanDatForm(datBanService, _banBiaService, _mainForm))
+                {
+                    datBanForm.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở form Danh sách bàn đặt: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         // Trong QLBanForm.cs

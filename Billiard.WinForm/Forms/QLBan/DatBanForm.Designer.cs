@@ -4,15 +4,6 @@
     {
         private System.ComponentModel.IContainer components = null;
 
-        //protected override void Dispose(bool disposing)
-        //{
-        //    if (disposing && (components != null))
-        //    {
-        //        components.Dispose();
-        //    }
-        //    base.Dispose(disposing);
-        //}
-
         #region Windows Form Designer generated code
 
         private void InitializeComponent()
@@ -36,8 +27,7 @@
             txtTenKhach = new TextBox();
             lblTenKhach = new Label();
             groupBoxBan = new GroupBox();
-            lblThongTinBan = new Label();
-            cboChonBan = new ComboBox();
+            flpBanTrong = new FlowLayoutPanel();
             lblChonBan = new Label();
             pnlButtons = new Panel();
             btnHuy = new Button();
@@ -59,7 +49,7 @@
             pnlHeader.Location = new Point(0, 0);
             pnlHeader.Name = "pnlHeader";
             pnlHeader.Padding = new Padding(20);
-            pnlHeader.Size = new Size(700, 70);
+            pnlHeader.Size = new Size(900, 70);
             pnlHeader.TabIndex = 0;
             // 
             // lblTitle
@@ -85,7 +75,7 @@
             pnlContent.Location = new Point(0, 70);
             pnlContent.Name = "pnlContent";
             pnlContent.Padding = new Padding(20);
-            pnlContent.Size = new Size(700, 654);
+            pnlContent.Size = new Size(900, 883);
             pnlContent.TabIndex = 1;
             // 
             // groupBoxGhiChu
@@ -93,10 +83,10 @@
             groupBoxGhiChu.Controls.Add(txtGhiChu);
             groupBoxGhiChu.Dock = DockStyle.Top;
             groupBoxGhiChu.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-            groupBoxGhiChu.Location = new Point(20, 515);
+            groupBoxGhiChu.Location = new Point(20, 739);
             groupBoxGhiChu.Name = "groupBoxGhiChu";
             groupBoxGhiChu.Padding = new Padding(15);
-            groupBoxGhiChu.Size = new Size(660, 120);
+            groupBoxGhiChu.Size = new Size(860, 120);
             groupBoxGhiChu.TabIndex = 3;
             groupBoxGhiChu.TabStop = false;
             groupBoxGhiChu.Text = "Ghi chú";
@@ -109,7 +99,7 @@
             txtGhiChu.Multiline = true;
             txtGhiChu.Name = "txtGhiChu";
             txtGhiChu.PlaceholderText = "Nhập ghi chú (không bắt buộc)";
-            txtGhiChu.Size = new Size(630, 60);
+            txtGhiChu.Size = new Size(830, 60);
             txtGhiChu.TabIndex = 0;
             // 
             // groupBoxThoiGian
@@ -122,10 +112,10 @@
             groupBoxThoiGian.Controls.Add(lblNgayDat);
             groupBoxThoiGian.Dock = DockStyle.Top;
             groupBoxThoiGian.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-            groupBoxThoiGian.Location = new Point(20, 291);
+            groupBoxThoiGian.Location = new Point(20, 515);
             groupBoxThoiGian.Name = "groupBoxThoiGian";
             groupBoxThoiGian.Padding = new Padding(15);
-            groupBoxThoiGian.Size = new Size(660, 224);
+            groupBoxThoiGian.Size = new Size(860, 224);
             groupBoxThoiGian.TabIndex = 2;
             groupBoxThoiGian.TabStop = false;
             groupBoxThoiGian.Text = "Thời gian đặt bàn";
@@ -196,10 +186,10 @@
             groupBoxKhach.Controls.Add(lblTenKhach);
             groupBoxKhach.Dock = DockStyle.Top;
             groupBoxKhach.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-            groupBoxKhach.Location = new Point(20, 160);
+            groupBoxKhach.Location = new Point(20, 384);
             groupBoxKhach.Name = "groupBoxKhach";
             groupBoxKhach.Padding = new Padding(15);
-            groupBoxKhach.Size = new Size(660, 131);
+            groupBoxKhach.Size = new Size(860, 131);
             groupBoxKhach.TabIndex = 1;
             groupBoxKhach.TabStop = false;
             groupBoxKhach.Text = "Thông tin khách hàng";
@@ -260,49 +250,40 @@
             // 
             // groupBoxBan
             // 
-            groupBoxBan.Controls.Add(lblThongTinBan);
-            groupBoxBan.Controls.Add(cboChonBan);
+            groupBoxBan.Controls.Add(flpBanTrong);
             groupBoxBan.Controls.Add(lblChonBan);
             groupBoxBan.Dock = DockStyle.Top;
             groupBoxBan.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
             groupBoxBan.Location = new Point(20, 20);
             groupBoxBan.Name = "groupBoxBan";
             groupBoxBan.Padding = new Padding(15);
-            groupBoxBan.Size = new Size(660, 140);
+            groupBoxBan.Size = new Size(860, 364);
             groupBoxBan.TabIndex = 0;
             groupBoxBan.TabStop = false;
-            groupBoxBan.Text = "Thông tin bàn";
+            groupBoxBan.Text = "Chọn bàn trống";
             // 
-            // lblThongTinBan
+            // flpBanTrong
             // 
-            lblThongTinBan.Font = new Font("Segoe UI", 10F);
-            lblThongTinBan.ForeColor = Color.FromArgb(100, 116, 139);
-            lblThongTinBan.Location = new Point(18, 80);
-            lblThongTinBan.Name = "lblThongTinBan";
-            lblThongTinBan.Size = new Size(620, 45);
-            lblThongTinBan.TabIndex = 2;
-            lblThongTinBan.Text = "Chọn bàn để xem thông tin";
-            // 
-            // cboChonBan
-            // 
-            cboChonBan.DropDownStyle = ComboBoxStyle.DropDownList;
-            cboChonBan.Font = new Font("Segoe UI", 11F);
-            cboChonBan.FormattingEnabled = true;
-            cboChonBan.Location = new Point(130, 35);
-            cboChonBan.Name = "cboChonBan";
-            cboChonBan.Size = new Size(508, 38);
-            cboChonBan.TabIndex = 1;
-            cboChonBan.SelectedIndexChanged += CboChonBan_SelectedIndexChanged;
+            flpBanTrong.AutoScroll = true;
+            flpBanTrong.BackColor = Color.FromArgb(248, 250, 252);
+            flpBanTrong.Dock = DockStyle.Fill;
+            flpBanTrong.Location = new Point(15, 75);
+            flpBanTrong.Name = "flpBanTrong";
+            flpBanTrong.Padding = new Padding(5);
+            flpBanTrong.Size = new Size(830, 274);
+            flpBanTrong.TabIndex = 1;
             // 
             // lblChonBan
             // 
-            lblChonBan.AutoSize = true;
-            lblChonBan.Font = new Font("Segoe UI", 11F);
-            lblChonBan.Location = new Point(18, 38);
+            lblChonBan.Dock = DockStyle.Top;
+            lblChonBan.Font = new Font("Segoe UI", 10F);
+            lblChonBan.ForeColor = Color.FromArgb(100, 116, 139);
+            lblChonBan.Location = new Point(15, 45);
             lblChonBan.Name = "lblChonBan";
-            lblChonBan.Size = new Size(111, 30);
+            lblChonBan.Size = new Size(830, 30);
             lblChonBan.TabIndex = 0;
-            lblChonBan.Text = "Chọn bàn:";
+            lblChonBan.Text = "Nhấp vào bàn để chọn";
+            lblChonBan.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // pnlButtons
             // 
@@ -310,10 +291,10 @@
             pnlButtons.Controls.Add(btnHuy);
             pnlButtons.Controls.Add(btnXacNhan);
             pnlButtons.Dock = DockStyle.Bottom;
-            pnlButtons.Location = new Point(0, 724);
+            pnlButtons.Location = new Point(0, 953);
             pnlButtons.Name = "pnlButtons";
             pnlButtons.Padding = new Padding(20);
-            pnlButtons.Size = new Size(700, 80);
+            pnlButtons.Size = new Size(900, 80);
             pnlButtons.TabIndex = 2;
             // 
             // btnHuy
@@ -324,7 +305,7 @@
             btnHuy.FlatStyle = FlatStyle.Flat;
             btnHuy.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
             btnHuy.ForeColor = Color.FromArgb(51, 65, 85);
-            btnHuy.Location = new Point(360, 20);
+            btnHuy.Location = new Point(560, 20);
             btnHuy.Name = "btnHuy";
             btnHuy.Size = new Size(150, 45);
             btnHuy.TabIndex = 1;
@@ -340,7 +321,7 @@
             btnXacNhan.FlatStyle = FlatStyle.Flat;
             btnXacNhan.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
             btnXacNhan.ForeColor = Color.White;
-            btnXacNhan.Location = new Point(530, 20);
+            btnXacNhan.Location = new Point(730, 20);
             btnXacNhan.Name = "btnXacNhan";
             btnXacNhan.Size = new Size(150, 45);
             btnXacNhan.TabIndex = 0;
@@ -352,7 +333,7 @@
             // 
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(700, 804);
+            ClientSize = new Size(900, 1033);
             Controls.Add(pnlContent);
             Controls.Add(pnlButtons);
             Controls.Add(pnlHeader);
@@ -374,7 +355,6 @@
             groupBoxKhach.ResumeLayout(false);
             groupBoxKhach.PerformLayout();
             groupBoxBan.ResumeLayout(false);
-            groupBoxBan.PerformLayout();
             pnlButtons.ResumeLayout(false);
             ResumeLayout(false);
         }
@@ -385,9 +365,8 @@
         private System.Windows.Forms.Label lblTitle;
         private System.Windows.Forms.Panel pnlContent;
         private System.Windows.Forms.GroupBox groupBoxBan;
-        private System.Windows.Forms.ComboBox cboChonBan;
+        private System.Windows.Forms.FlowLayoutPanel flpBanTrong;
         private System.Windows.Forms.Label lblChonBan;
-        private System.Windows.Forms.Label lblThongTinBan;
         private System.Windows.Forms.GroupBox groupBoxKhach;
         private System.Windows.Forms.TextBox txtTenKhach;
         private System.Windows.Forms.Label lblTenKhach;
