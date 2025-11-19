@@ -16,20 +16,6 @@ namespace Billiard.WinForm.Forms
         private DichVu _currentService;
         private string _selectedImagePath;
 
-        // Form Controls
-        private TextBox txtTenDV;
-        private ComboBox cboLoai;
-        private ComboBox cboTrangThai;
-        private NumericUpDown numGia;
-        private TextBox txtDonVi;
-        private ComboBox cboMatHang;
-        private TextBox txtMoTa;
-        private PictureBox picPreview;
-        private Button btnChooseImage;
-        private Button btnRemoveImage;
-        private Button btnSave;
-        private Button btnCancel;
-
         // Constructor nhận DI
         public DichVuEditForm(DichVuService dichVuService, MatHangService matHangService)
         {
@@ -39,7 +25,7 @@ namespace Billiard.WinForm.Forms
             InitializeComponent();
         }
 
-        // THÊM METHOD NÀY - Quan trọng!
+        // Method để set ServiceId từ bên ngoài
         public void SetServiceId(int? maDV)
         {
             _maDV = maDV;
@@ -48,15 +34,26 @@ namespace Billiard.WinForm.Forms
             if (_maDV.HasValue)
             {
                 this.Text = "✏️ Chỉnh sửa dịch vụ";
+                lblTitle.Text = "✏️ Chỉnh sửa dịch vụ";
+                btnSave.Text = "✅ Cập nhật";
             }
             else
             {
                 this.Text = "➕ Thêm dịch vụ mới";
+                lblTitle.Text = "➕ Thêm dịch vụ mới";
+                btnSave.Text = "✅ Thêm dịch vụ";
             }
         }
 
         private void DichVuEditForm_Load(object sender, EventArgs e)
         {
+            // Set giá trị mặc định cho ComboBox
+            if (cboLoai.SelectedIndex == -1)
+                cboLoai.SelectedIndex = 2; // Mặc định chọn "Khác"
+
+            if (cboTrangThai.SelectedIndex == -1)
+                cboTrangThai.SelectedIndex = 0; // Mặc định chọn "Còn hàng"
+
             LoadMatHangs();
 
             if (_maDV.HasValue)
@@ -65,254 +62,18 @@ namespace Billiard.WinForm.Forms
             }
         }
 
-        private void InitializeCustomComponents()
-        {
-            // Header Panel
-            Panel headerPanel = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 60,
-                BackColor = Color.FromArgb(102, 126, 234)
-            };
-
-            Label lblTitle = new Label
-            {
-                Text = _maDV.HasValue ? "✏️ Chỉnh sửa dịch vụ" : "➕ Thêm dịch vụ mới",
-                Font = new Font("Segoe UI", 16, FontStyle.Bold),
-                ForeColor = Color.White,
-                Location = new Point(20, 15),
-                AutoSize = true
-            };
-
-            headerPanel.Controls.Add(lblTitle);
-            this.Controls.Add(headerPanel);
-
-            // Scrollable content panel
-            Panel contentPanel = new Panel
-            {
-                Location = new Point(0, 60),
-                Size = new Size(700, 630),
-                AutoScroll = true,
-                BackColor = Color.FromArgb(248, 249, 250)
-            };
-
-            int yPos = 20;
-
-            // Basic Info Group
-            GroupBox grpBasicInfo = CreateGroupBox("📋 Thông tin cơ bản", yPos, 580);
-            yPos += 30;
-
-            // Tên dịch vụ
-            CreateLabel("Tên dịch vụ *", 20, yPos, grpBasicInfo);
-            txtTenDV = new TextBox
-            {
-                Location = new Point(20, yPos + 25),
-                Size = new Size(540, 30),
-                Font = new Font("Segoe UI", 11)
-            };
-            grpBasicInfo.Controls.Add(txtTenDV);
-            yPos += 70;
-
-            // Loại dịch vụ và Trạng thái
-            CreateLabel("Loại dịch vụ *", 20, yPos, grpBasicInfo);
-            cboLoai = new ComboBox
-            {
-                Location = new Point(20, yPos + 25),
-                Size = new Size(260, 30),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 11)
-            };
-            cboLoai.Items.AddRange(new object[] { "Đồ uống", "Đồ ăn", "Khác" });
-            cboLoai.SelectedIndex = 2;
-            grpBasicInfo.Controls.Add(cboLoai);
-
-            CreateLabel("Trạng thái *", 300, yPos, grpBasicInfo);
-            cboTrangThai = new ComboBox
-            {
-                Location = new Point(300, yPos + 25),
-                Size = new Size(260, 30),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 11)
-            };
-            cboTrangThai.Items.AddRange(new object[] { "Còn hàng", "Hết hàng", "Ngừng kinh doanh" });
-            cboTrangThai.SelectedIndex = 0;
-            grpBasicInfo.Controls.Add(cboTrangThai);
-            yPos += 70;
-
-            // Giá và Đơn vị
-            CreateLabel("Giá *", 20, yPos, grpBasicInfo);
-            numGia = new NumericUpDown
-            {
-                Location = new Point(20, yPos + 25),
-                Size = new Size(260, 30),
-                Maximum = 9999999999,
-                Minimum = 0,
-                Increment = 1000,
-                ThousandsSeparator = true,
-                Font = new Font("Segoe UI", 11)
-            };
-            grpBasicInfo.Controls.Add(numGia);
-
-            CreateLabel("Đơn vị", 300, yPos, grpBasicInfo);
-            txtDonVi = new TextBox
-            {
-                Location = new Point(300, yPos + 25),
-                Size = new Size(260, 30),
-                Text = "phần",
-                Font = new Font("Segoe UI", 11)
-            };
-            grpBasicInfo.Controls.Add(txtDonVi);
-            yPos += 70;
-
-            // Mặt hàng liên quan
-            CreateLabel("Mặt hàng liên quan", 20, yPos, grpBasicInfo);
-            cboMatHang = new ComboBox
-            {
-                Location = new Point(20, yPos + 25),
-                Size = new Size(540, 30),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 11)
-            };
-            grpBasicInfo.Controls.Add(cboMatHang);
-            yPos += 70;
-
-            // Mô tả
-            CreateLabel("Mô tả", 20, yPos, grpBasicInfo);
-            txtMoTa = new TextBox
-            {
-                Location = new Point(20, yPos + 25),
-                Size = new Size(540, 80),
-                Multiline = true,
-                Font = new Font("Segoe UI", 11),
-                ScrollBars = ScrollBars.Vertical
-            };
-            grpBasicInfo.Controls.Add(txtMoTa);
-
-            grpBasicInfo.Height = 430;
-            contentPanel.Controls.Add(grpBasicInfo);
-
-            // Image Group
-            GroupBox grpImage = CreateGroupBox("🖼️ Hình ảnh dịch vụ", 460, 300);
-
-            picPreview = new PictureBox
-            {
-                Location = new Point(20, 30),
-                Size = new Size(540, 200),
-                SizeMode = PictureBoxSizeMode.Zoom,
-                BorderStyle = BorderStyle.FixedSingle,
-                BackColor = Color.White
-            };
-            grpImage.Controls.Add(picPreview);
-
-            btnChooseImage = new Button
-            {
-                Text = "📷 Chọn hình ảnh",
-                Location = new Point(20, 240),
-                Size = new Size(260, 40),
-                BackColor = Color.FromArgb(102, 126, 234),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnChooseImage.FlatAppearance.BorderSize = 0;
-            btnChooseImage.Click += BtnChooseImage_Click;
-            grpImage.Controls.Add(btnChooseImage);
-
-            btnRemoveImage = new Button
-            {
-                Text = "🗑️ Xóa ảnh",
-                Location = new Point(300, 240),
-                Size = new Size(260, 40),
-                BackColor = Color.FromArgb(220, 53, 69),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnRemoveImage.FlatAppearance.BorderSize = 0;
-            btnRemoveImage.Click += BtnRemoveImage_Click;
-            grpImage.Controls.Add(btnRemoveImage);
-
-            contentPanel.Controls.Add(grpImage);
-
-            this.Controls.Add(contentPanel);
-
-            // Footer Panel
-            Panel footerPanel = new Panel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 70,
-                BackColor = Color.White
-            };
-
-            btnCancel = new Button
-            {
-                Text = "❌ Hủy",
-                Location = new Point(420, 15),
-                Size = new Size(120, 40),
-                BackColor = Color.FromArgb(108, 117, 125),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                DialogResult = DialogResult.Cancel,
-                Cursor = Cursors.Hand
-            };
-            btnCancel.FlatAppearance.BorderSize = 0;
-            footerPanel.Controls.Add(btnCancel);
-
-            btnSave = new Button
-            {
-                Text = _maDV.HasValue ? "✅ Cập nhật" : "✅ Thêm dịch vụ",
-                Location = new Point(560, 15),
-                Size = new Size(120, 40),
-                BackColor = Color.FromArgb(40, 167, 69),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnSave.FlatAppearance.BorderSize = 0;
-            btnSave.Click += BtnSave_Click;
-            footerPanel.Controls.Add(btnSave);
-
-            this.Controls.Add(footerPanel);
-        }
-
-        private GroupBox CreateGroupBox(string title, int yPos, int height)
-        {
-            return new GroupBox
-            {
-                Text = title,
-                Location = new Point(20, yPos),
-                Size = new Size(640, height),
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                ForeColor = Color.FromArgb(44, 62, 80)
-            };
-        }
-
-        private void CreateLabel(string text, int x, int y, Control parent)
-        {
-            Label label = new Label
-            {
-                Text = text,
-                Location = new Point(x, y),
-                AutoSize = true,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                ForeColor = Color.FromArgb(44, 62, 80)
-            };
-            parent.Controls.Add(label);
-        }
-
         private void LoadMatHangs()
         {
             var matHangs = _matHangService.GetMatHangConHang();
 
+            cboMatHang.Items.Clear();
             cboMatHang.Items.Add(new { MaHang = 0, Display = "-- Không liên kết --" });
+
             foreach (var item in matHangs)
             {
                 cboMatHang.Items.Add(new { item.MaHang, Display = $"{item.TenHang} (Tồn: {item.SoLuongTon})" });
             }
+
             cboMatHang.DisplayMember = "Display";
             cboMatHang.ValueMember = "MaHang";
             cboMatHang.SelectedIndex = 0;
@@ -396,7 +157,11 @@ namespace Billiard.WinForm.Forms
         private void BtnRemoveImage_Click(object sender, EventArgs e)
         {
             _selectedImagePath = null;
-            picPreview.Image = null;
+            if (picPreview.Image != null)
+            {
+                picPreview.Image.Dispose();
+                picPreview.Image = null;
+            }
         }
 
         private void BtnSave_Click(object sender, EventArgs e)
@@ -407,6 +172,22 @@ namespace Billiard.WinForm.Forms
                 MessageBox.Show("Vui lòng nhập tên dịch vụ!", "Thông báo",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txtTenDV.Focus();
+                return;
+            }
+
+            if (cboLoai.SelectedIndex == -1)
+            {
+                MessageBox.Show("Vui lòng chọn loại dịch vụ!", "Thông báo",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                cboLoai.Focus();
+                return;
+            }
+
+            if (cboTrangThai.SelectedIndex == -1)
+            {
+                MessageBox.Show("Vui lòng chọn trạng thái!", "Thông báo",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                cboTrangThai.Focus();
                 return;
             }
 
@@ -532,15 +313,5 @@ namespace Billiard.WinForm.Forms
                 Console.WriteLine($"Error deleting image: {ex.Message}");
             }
         }
-
-        // XÓA hoặc COMMENT phần Dispose này nếu có lỗi
-        // protected override void Dispose(bool disposing)
-        // {
-        //     if (disposing)
-        //     {
-        //         picPreview?.Image?.Dispose();
-        //     }
-        //     base.Dispose(disposing);
-        // }
     }
 }

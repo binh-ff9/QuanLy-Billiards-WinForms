@@ -10,118 +10,19 @@ namespace Billiard.WinForm.Forms
     public partial class DichVuForm : Form
     {
         private readonly DichVuService _dichVuService;
-        private FlowLayoutPanel flpServices;
-        private TextBox txtSearch;
-        private ComboBox cboFilter;
-        private Button btnAdd;
 
         public DichVuForm(DichVuService dichVuService)
         {
             InitializeComponent();
             _dichVuService = dichVuService;
+
+            // Set default combo box value
+            cboFilter.SelectedIndex = 0;
         }
 
         private void DichVuForm_Load(object sender, EventArgs e)
         {
             LoadServices();
-        }
-
-        private void InitializeCustomComponents()
-        {
-            // Header Panel
-            Panel headerPanel = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 80,
-                BackColor = Color.FromArgb(102, 126, 234),
-                Padding = new Padding(20)
-            };
-
-            Label lblTitle = new Label
-            {
-                Text = "Dịch vụ & Menu",
-                Font = new Font("Segoe UI", 18, FontStyle.Bold),
-                ForeColor = Color.White,
-                AutoSize = true,
-                Location = new Point(20, 25)
-            };
-
-            btnAdd = new Button
-            {
-                Text = "➕ Thêm dịch vụ mới",
-                Size = new Size(180, 40),
-                Location = new Point(1000, 20),
-                BackColor = Color.White,
-                ForeColor = Color.FromArgb(102, 126, 234),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnAdd.FlatAppearance.BorderSize = 0;
-            btnAdd.Click += BtnAdd_Click;
-
-            headerPanel.Controls.AddRange(new Control[] { lblTitle, btnAdd });
-            this.Controls.Add(headerPanel);
-
-            // Filter Panel
-            Panel filterPanel = new Panel
-            {
-                Dock = DockStyle.Top,
-                Height = 120,
-                BackColor = Color.White,
-                Padding = new Padding(20, 15, 20, 15)
-            };
-
-            Label lblFilter = new Label
-            {
-                Text = "Loại dịch vụ:",
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(20, 20)
-            };
-
-            cboFilter = new ComboBox
-            {
-                Location = new Point(120, 17),
-                Size = new Size(200, 30),
-                DropDownStyle = ComboBoxStyle.DropDownList,
-                Font = new Font("Segoe UI", 10)
-            };
-            cboFilter.Items.AddRange(new object[] { "Tất cả", "Đồ uống", "Đồ ăn", "Khác" });
-            cboFilter.SelectedIndex = 0;
-            cboFilter.SelectedIndexChanged += CboFilter_SelectedIndexChanged;
-
-            txtSearch = new TextBox
-            {
-                Location = new Point(20, 60),
-                Size = new Size(1140, 35),
-                Font = new Font("Segoe UI", 11),
-                PlaceholderText = "🔍 Tìm kiếm dịch vụ..."
-            };
-            txtSearch.TextChanged += TxtSearch_TextChanged;
-
-            filterPanel.Controls.AddRange(new Control[] { lblFilter, cboFilter, txtSearch });
-            this.Controls.Add(filterPanel);
-
-            // Services Panel with ScrollBar
-            Panel servicesContainer = new Panel
-            {
-                Dock = DockStyle.Fill,
-                AutoScroll = true,
-                BackColor = Color.FromArgb(240, 242, 245),
-                Padding = new Padding(20)
-            };
-
-            flpServices = new FlowLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                AutoScroll = true,
-                WrapContents = true,
-                BackColor = Color.FromArgb(240, 242, 245)
-            };
-
-            servicesContainer.Controls.Add(flpServices);
-            this.Controls.Add(servicesContainer);
         }
 
         private void LoadServices(string filter = "Tất cả", string search = "")
@@ -370,19 +271,9 @@ namespace Billiard.WinForm.Forms
             LoadServices(cboFilter.SelectedItem.ToString(), txtSearch.Text);
         }
 
-        //protected override void Dispose(bool disposing)
-        //{
-        //    if (disposing)
-        //    {
-        //        // Dispose managed resources
-        //        _dichVuService?.Dispose();
+        private void flpServices_Paint(object sender, PaintEventArgs e)
+        {
 
-        //        // Dispose components nếu có
-        //        components?.Dispose();
-        //    }
-
-        //    // Gọi base.Dispose cuối cùng
-        //    base.Dispose(disposing);
-        //}
+        }
     }
 }
