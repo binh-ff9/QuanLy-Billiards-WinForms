@@ -12,6 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
 using System.Windows.Forms;
+using Billiard.BLL.Services.HoaDonServices;
 
 namespace Billiard.WinForm
 {
@@ -39,7 +40,7 @@ namespace Billiard.WinForm
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
             // Run LoginForm
-            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
+            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -61,8 +62,12 @@ namespace Billiard.WinForm
             services.AddScoped<EmailService>();
             services.AddScoped<DichVuService>();
             services.AddScoped<MatHangService>();
-            // banbia
+
+            // BanBia services
             services.AddScoped<BanBiaService>();
+
+            // HoaDon services
+            services.AddScoped<HoaDonService>();
 
             // Register Auth Forms
             services.AddTransient<LoginForm>();
@@ -76,7 +81,10 @@ namespace Billiard.WinForm
             // Register Feature Forms
             services.AddTransient<DichVuForm>();
             services.AddTransient<DichVuEditForm>();
-            services.AddTransient<QLBanForm>(); 
+            services.AddTransient<QLBanForm>();
+
+            // ĐÂY LÀ DÒNG QUAN TRỌNG - THÊM VÀO
+            services.AddTransient<HoaDonForm>();
         }
 
         public static T GetService<T>() where T : class
