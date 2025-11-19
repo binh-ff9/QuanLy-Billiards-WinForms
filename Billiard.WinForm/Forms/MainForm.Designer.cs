@@ -65,7 +65,7 @@
             // 
             // pnlHeader
             // 
-            pnlHeader.BackColor = Color.FromArgb(26, 33, 46);
+            pnlHeader.BackColor = Color.MidnightBlue;
             pnlHeader.Controls.Add(pnlUserInfo);
             pnlHeader.Controls.Add(lblTitle);
             pnlHeader.Dock = DockStyle.Top;
@@ -146,7 +146,7 @@
             // 
             lblTitle.AutoSize = true;
             lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
-            lblTitle.ForeColor = Color.FromArgb(220, 240, 230);
+            lblTitle.ForeColor = Color.White;
             lblTitle.Location = new Point(20, 25);
             lblTitle.Name = "lblTitle";
             lblTitle.Size = new Size(384, 41);
@@ -155,7 +155,7 @@
             // 
             // pnlStats
             // 
-            pnlStats.BackColor = Color.FromArgb(240, 244, 250);
+            pnlStats.BackColor = Color.MidnightBlue;
             pnlStats.Controls.Add(tableLayoutStats);
             pnlStats.Dock = DockStyle.Top;
             pnlStats.Location = new Point(0, 96);
@@ -371,7 +371,7 @@
             // 
             // pnlSidebar
             // 
-            pnlSidebar.BackColor = Color.FromArgb(28, 37, 54);
+            pnlSidebar.BackColor = Color.MidnightBlue;
             pnlSidebar.Controls.Add(btnQuanLyBan);
             pnlSidebar.Controls.Add(btnDichVu);
             pnlSidebar.Controls.Add(btnHoaDon);
@@ -394,7 +394,7 @@
             btnQuanLyBan.FlatAppearance.BorderSize = 0;
             btnQuanLyBan.FlatStyle = FlatStyle.Flat;
             btnQuanLyBan.Font = new Font("Segoe UI", 11F);
-            btnQuanLyBan.ForeColor = Color.FromArgb(220, 240, 230);
+            btnQuanLyBan.ForeColor = Color.White;
             btnQuanLyBan.Location = new Point(10, 10);
             btnQuanLyBan.Name = "btnQuanLyBan";
             btnQuanLyBan.Padding = new Padding(10, 0, 0, 0);
@@ -415,7 +415,7 @@
             btnDichVu.FlatAppearance.BorderSize = 0;
             btnDichVu.FlatStyle = FlatStyle.Flat;
             btnDichVu.Font = new Font("Segoe UI", 11F);
-            btnDichVu.ForeColor = Color.FromArgb(220, 240, 230);
+            btnDichVu.ForeColor = Color.White;
             btnDichVu.Location = new Point(10, 70);
             btnDichVu.Name = "btnDichVu";
             btnDichVu.Padding = new Padding(10, 0, 0, 0);
@@ -436,7 +436,7 @@
             btnHoaDon.FlatAppearance.BorderSize = 0;
             btnHoaDon.FlatStyle = FlatStyle.Flat;
             btnHoaDon.Font = new Font("Segoe UI", 11F);
-            btnHoaDon.ForeColor = Color.FromArgb(220, 240, 230);
+            btnHoaDon.ForeColor = Color.White;
             btnHoaDon.Location = new Point(10, 130);
             btnHoaDon.Name = "btnHoaDon";
             btnHoaDon.Padding = new Padding(10, 0, 0, 0);
@@ -457,7 +457,7 @@
             btnKhachHang.FlatAppearance.BorderSize = 0;
             btnKhachHang.FlatStyle = FlatStyle.Flat;
             btnKhachHang.Font = new Font("Segoe UI", 11F);
-            btnKhachHang.ForeColor = Color.FromArgb(220, 240, 230);
+            btnKhachHang.ForeColor = Color.White;
             btnKhachHang.Location = new Point(10, 190);
             btnKhachHang.Name = "btnKhachHang";
             btnKhachHang.Padding = new Padding(10, 0, 0, 0);
@@ -478,7 +478,7 @@
             btnThongKe.FlatAppearance.BorderSize = 0;
             btnThongKe.FlatStyle = FlatStyle.Flat;
             btnThongKe.Font = new Font("Segoe UI", 11F);
-            btnThongKe.ForeColor = Color.FromArgb(220, 240, 230);
+            btnThongKe.ForeColor = Color.White;
             btnThongKe.Location = new Point(10, 250);
             btnThongKe.Name = "btnThongKe";
             btnThongKe.Padding = new Padding(10, 0, 0, 0);
@@ -499,7 +499,7 @@
             btnNhanVien.FlatAppearance.BorderSize = 0;
             btnNhanVien.FlatStyle = FlatStyle.Flat;
             btnNhanVien.Font = new Font("Segoe UI", 11F);
-            btnNhanVien.ForeColor = Color.FromArgb(220, 240, 230);
+            btnNhanVien.ForeColor = Color.White;
             btnNhanVien.Location = new Point(10, 310);
             btnNhanVien.Name = "btnNhanVien";
             btnNhanVien.Padding = new Padding(10, 0, 0, 0);
@@ -520,7 +520,7 @@
             btnCaiDat.FlatAppearance.BorderSize = 0;
             btnCaiDat.FlatStyle = FlatStyle.Flat;
             btnCaiDat.Font = new Font("Segoe UI", 11F);
-            btnCaiDat.ForeColor = Color.FromArgb(220, 240, 230);
+            btnCaiDat.ForeColor = Color.White;
             btnCaiDat.Location = new Point(10, 581);
             btnCaiDat.Name = "btnCaiDat";
             btnCaiDat.Padding = new Padding(10, 0, 0, 0);
@@ -535,7 +535,7 @@
             // 
             // pnlMain
             // 
-            pnlMain.BackColor = Color.FromArgb(240, 248, 244);
+            pnlMain.BackColor = Color.White;
             pnlMain.Dock = DockStyle.Fill;
             pnlMain.Location = new Point(250, 257);
             pnlMain.Name = "pnlMain";

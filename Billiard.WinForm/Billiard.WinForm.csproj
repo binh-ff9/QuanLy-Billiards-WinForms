@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <Folder Include="API_Integration\" />
+    <Folder Include="Forms\Resources\Images\Services\" />
+    <Folder Include="Forms\Resources\Images\Tables\" />
     <Folder Include="viewModels\" />
   </ItemGroup>
 
