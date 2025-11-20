@@ -529,500 +529,27 @@ namespace Billiard.WinForm.Forms.QLBan
         {
             if (_mainForm == null) return;
 
-            var detailPanel = new Panel
-            {
-                AutoScroll = true,
-                Width = 450,
-                Padding = new Padding(20),
-                BackColor = Color.White
-            };
-
-            int yPos = 10;
-
-            // ===== HEADER: TÊN BÀN VỚI ICON EDIT VÀ XÓA =====
-            var pnlHeader = new Panel
-            {
-                Location = new Point(0, yPos),
-                Size = new Size(410, 50),
-                BackColor = Color.Transparent
-            };
-
-            var lblTableName = new Label
-            {
-                Text = ban.TenBan,
-                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(0, 10),
-                AutoSize = true
-            };
-            pnlHeader.Controls.Add(lblTableName);
-
-            // Icon chỉnh sửa
-            var btnEdit = new Button
-            {
-                Text = "✏️",
-                Font = new Font("Segoe UI", 16F),
-                Size = new Size(45, 45),
-                Location = new Point(320, 5),
-                BackColor = Color.Transparent,
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
-            };
-            btnEdit.FlatAppearance.BorderSize = 0;
-            btnEdit.Click += async (s, e) => await ChinhSuaBan(ban);
-            pnlHeader.Controls.Add(btnEdit);
-
-            // Icon xóa
-            var btnDelete = new Button
-            {
-                Text = "🗑️",
-                Font = new Font("Segoe UI", 16F),
-                Size = new Size(45, 45),
-                Location = new Point(365, 5),
-                BackColor = Color.Transparent,
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
-            };
-            btnDelete.FlatAppearance.BorderSize = 0;
-            btnDelete.Click += async (s, e) => await XoaBan(ban);
-            pnlHeader.Controls.Add(btnDelete);
-
-            detailPanel.Controls.Add(pnlHeader);
-            yPos += 60;
-
-            // ===== THÔNG TIN KHÁCH HÀNG =====
-            var pnlCustomer = new Panel
-            {
-                Location = new Point(0, yPos),
-                Size = new Size(410, 200),
-                BackColor = Color.FromArgb(248, 250, 252),
-                Padding = new Padding(15)
-            };
-
-            int customerYPos = 15;
-
-            AddDetailRow(pnlCustomer, "Khách hàng:", ban.MaKhNavigation?.TenKh ?? "Khách lẻ", ref customerYPos);
-            AddDetailRow(pnlCustomer, "SĐT:", ban.MaKhNavigation?.Sdt ?? "-", ref customerYPos);
-
-            if (ban.TrangThai == "Đang chơi" && ban.GioBatDau.HasValue)
-            {
-                AddDetailRow(pnlCustomer, "Bắt đầu:", ban.GioBatDau.Value.ToString("HH:mm dd/MM/yyyy"), ref customerYPos);
-
-                var duration = DateTime.Now - ban.GioBatDau.Value;
-                var thoiGian = $"{(int)duration.TotalMinutes} giờ {duration.Minutes} phút";
-                AddDetailRow(pnlCustomer, "Thời gian:", thoiGian, ref customerYPos);
-            }
-
-            var giaGio = ban.MaLoaiNavigation?.GiaGio.ToString("N0") ?? "0";
-            AddDetailRow(pnlCustomer, "Giá giờ:", $"{giaGio} đ/giờ", ref customerYPos);
-
-            detailPanel.Controls.Add(pnlCustomer);
-            yPos += 220;
-
-            // ===== THÔNG TIN THANH TOÁN =====
-            if (ban.TrangThai == "Đang chơi" && ban.GioBatDau.HasValue)
-            {
-                var pnlPayment = new Panel
-                {
-                    Location = new Point(0, yPos),
-                    Size = new Size(410, 200),
-                    BackColor = Color.White,
-                    Padding = new Padding(15),
-                    BorderStyle = BorderStyle.FixedSingle
-                };
-
-                int paymentYPos = 15;
-
-                // Tính tiền bàn
-                var duration = DateTime.Now - ban.GioBatDau.Value;
-                var soGio = (decimal)duration.TotalMinutes / 60;
-                var giaGioDecimal = ban.MaLoaiNavigation?.GiaGio ?? 0;
-                var tienBan = Math.Ceiling((soGio * giaGioDecimal) / 1000) * 1000;
-
-                decimal tienDichVu = 0;
-                var hoaDon = await _banBiaService.GetActiveInvoiceAsync(ban.MaBan);
-
-                if (hoaDon != null)
-                {
-                    tienDichVu = hoaDon.TienDichVu ?? 0;
-                }
-
-                var tamTinh = tienBan + tienDichVu;
-                var tongCong = Math.Ceiling(tamTinh / 1000) * 1000;
-
-                AddPaymentRow(pnlPayment, "Tiền bàn:", $"{tienBan:N0} đ", ref paymentYPos);
-                AddPaymentRow(pnlPayment, "Dịch vụ:", $"{tienDichVu:N0} đ", ref paymentYPos);
-                AddPaymentRow(pnlPayment, "Tạm tính:", $"{tamTinh:N0} đ", ref paymentYPos);
-
-                paymentYPos += 10;
-                var separator = new Panel
-                {
-                    Location = new Point(0, paymentYPos),
-                    Size = new Size(380, 2),
-                    BackColor = Color.FromArgb(226, 232, 240)
-                };
-                pnlPayment.Controls.Add(separator);
-                paymentYPos += 15;
-
-                AddTotalRow(pnlPayment, "Tổng cộng:", $"{tongCong:N0} đ", ref paymentYPos);
-
-                detailPanel.Controls.Add(pnlPayment);
-                yPos += 220;
-            }
-
-            // ===== DỊCH VỤ ĐÃ ORDER =====
-            if (ban.TrangThai == "Đang chơi")
-            {
-                var hoaDon = await _banBiaService.GetActiveInvoiceAsync(ban.MaBan);
-
-                if (hoaDon != null)
-                {
-                    var chiTietList = await _banBiaService.GetInvoiceDetailsAsync(hoaDon.MaHd);
-
-                    if (chiTietList.Any())
-                    {
-                        var lblDichVu = new Label
-                        {
-                            Text = $"Dịch vụ đã order ({chiTietList.Count} món):",
-                            Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                            ForeColor = Color.FromArgb(30, 41, 59),
-                            Location = new Point(0, yPos),
-                            AutoSize = true
-                        };
-                        detailPanel.Controls.Add(lblDichVu);
-                        yPos += 35;
-
-                        foreach (var item in chiTietList)
-                        {
-                            var pnlService = CreateServiceItem(item, ban.MaBan);
-                            pnlService.Location = new Point(0, yPos);
-                            detailPanel.Controls.Add(pnlService);
-                            yPos += 75;
-                        }
-                    }
-                }
-            }
-
-            // ===== BUTTONS =====
-            yPos += 20;
-
-            if (ban.TrangThai == "Trống")
-            {
-                var btnBatDau = CreateActionButton("▶️ Bắt đầu chơi", Color.FromArgb(34, 197, 94));
-                btnBatDau.Location = new Point(0, yPos);
-                btnBatDau.Click += async (s, e) => await BatDauChoiBan(ban);
-                detailPanel.Controls.Add(btnBatDau);
-                yPos += 55;
-            }
-            else if (ban.TrangThai == "Đang chơi")
-            {
-                var btnThemDV = CreateActionButton("➕ Thêm dịch vụ", Color.FromArgb(99, 102, 241));
-                btnThemDV.Location = new Point(0, yPos);
-                btnThemDV.Click += (s, e) => ThemDichVu(ban);
-                detailPanel.Controls.Add(btnThemDV);
-                yPos += 55;
-
-                var btnThanhToan = CreateActionButton("💰 Kết thúc & Thanh toán", Color.FromArgb(34, 197, 94));
-                btnThanhToan.Location = new Point(0, yPos);
-                btnThanhToan.Click += (s, e) => ThanhToanBan(ban);
-                detailPanel.Controls.Add(btnThanhToan);
-            }
-
-            _mainForm.UpdateDetailPanel("Chi tiết", detailPanel);
-        }
-        private void AddDetailRow(Panel panel, string label, string value, ref int yPos)
-        {
-            var lblLabel = new Label
-            {
-                Text = label,
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(0, yPos),
-                AutoSize = true
-            };
-            panel.Controls.Add(lblLabel);
-
-            var lblValue = new Label
-            {
-                Text = value,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(230, yPos),
-                AutoSize = true,
-                TextAlign = ContentAlignment.MiddleRight
-            };
-            panel.Controls.Add(lblValue);
-
-            yPos += 35;
-        }
-
-        private void AddPaymentRow(Panel panel, string label, string value, ref int yPos)
-        {
-            var lblLabel = new Label
-            {
-                Text = label,
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = Color.FromArgb(71, 85, 105),
-                Location = new Point(0, yPos),
-                AutoSize = true
-            };
-            panel.Controls.Add(lblLabel);
-
-            var lblValue = new Label
-            {
-                Text = value,
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = Color.FromArgb(71, 85, 105),
-                Location = new Point(230, yPos),
-                AutoSize = true,
-                TextAlign = ContentAlignment.MiddleRight
-            };
-            panel.Controls.Add(lblValue);
-
-            yPos += 30;
-        }
-
-        private void AddTotalRow(Panel panel, string label, string value, ref int yPos)
-        {
-            var lblLabel = new Label
-            {
-                Text = label,
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(0, yPos),
-                AutoSize = true
-            };
-            panel.Controls.Add(lblLabel);
-
-            var lblValue = new Label
-            {
-                Text = value,
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(239, 68, 68),
-                Location = new Point(230, yPos),
-                AutoSize = true,
-                TextAlign = ContentAlignment.MiddleRight
-            };
-            panel.Controls.Add(lblValue);
-
-            yPos += 35;
-        }
-
-        private Panel CreateServiceItem(ChiTietHoaDon item, int maBan)
-        {
-            var panel = new Panel
-            {
-                Size = new Size(410, 65),
-                BackColor = Color.White,
-                BorderStyle = BorderStyle.FixedSingle
-            };
-
-            var lblName = new Label
-            {
-                Text = item.MaDvNavigation?.TenDv ?? "Dịch vụ",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(15, 10),
-                AutoSize = true
-            };
-            panel.Controls.Add(lblName);
-
-            var lblQuantity = new Label
-            {
-                Text = $"{item.SoLuong} x {item.MaDvNavigation?.Gia:N0} đ",
-                Font = new Font("Segoe UI", 9F),
-                ForeColor = Color.FromArgb(100, 116, 139),
-                Location = new Point(15, 35),
-                AutoSize = true
-            };
-            panel.Controls.Add(lblQuantity);
-
-            var lblPrice = new Label
-            {
-                Text = $"{item.ThanhTien:N0} đ",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(239, 68, 68),
-                Location = new Point(250, 20),
-                AutoSize = true
-            };
-            panel.Controls.Add(lblPrice);
-
-            var btnDelete = new Button
-            {
-                Text = "✕",
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
-                Size = new Size(35, 35),
-                Location = new Point(360, 15),
-                BackColor = Color.Transparent,
-                ForeColor = Color.FromArgb(239, 68, 68),
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand,
-                Tag = new { ChiTietId = item.Id, MaBan = maBan }
-            };
-            btnDelete.FlatAppearance.BorderSize = 0;
-            btnDelete.Click += async (s, e) => await XoaDichVu(item.Id, maBan);
-            panel.Controls.Add(btnDelete);
-
-            return panel;
-        }
-
-        private async Task XoaDichVu(int chiTietId, int maBan)
-        {
-            var result = MessageBox.Show("Bạn có chắc muốn xóa dịch vụ này?", "Xác nhận",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-            if (result == DialogResult.Yes)
-            {
-                try
-                {
-                    // Sử dụng HoaDonService để xóa dịch vụ
-                    var hoaDonService = Program.GetService<HoaDonService>();
-                    var success = await hoaDonService.RemoveServiceFromInvoiceAsync(chiTietId);
-
-                    if (success)
-                    {
-                        MessageBox.Show("Đã xóa dịch vụ thành công!", "Thông báo",
-                            MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                        // Reload detail panel
-                        var ban = await _banBiaService.GetTableByIdAsync(maBan);
-                        if (ban != null)
-                        {
-                            ShowTableDetail(ban);
-                        }
-
-                        await LoadBanBia();
-                    }
-                    else
-                    {
-                        MessageBox.Show("Không thể xóa dịch vụ này!", "Lỗi",
-                            MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Lỗi khi xóa dịch vụ: {ex.Message}", "Lỗi",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-        }
-
-        private async Task XoaBan(BanBium ban)
-        {
-            if (ban.TrangThai != "Trống")
-            {
-                MessageBox.Show("Chỉ có thể xóa bàn đang trống!", "Thông báo",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            var result = MessageBox.Show($"Bạn có chắc muốn xóa {ban.TenBan}?", "Xác nhận",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-            if (result == DialogResult.Yes)
-            {
-                var success = await _banBiaService.DeleteTableAsync(ban.MaBan);
-                if (success)
-                {
-                    MessageBox.Show("Đã xóa bàn thành công!", "Thành công",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    _mainForm.HideDetailPanel();
-                    await LoadBanBia();
-                }
-                else
-                {
-                    MessageBox.Show("Không thể xóa bàn này!", "Lỗi",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
-        }
-        private void AddDetailLabel(Panel panel, string text, ref int yPos)
-        {
-            var lbl = new Label
-            {
-                Text = text,
-                Font = new Font("Segoe UI", 10F),
-                AutoSize = true,
-                Location = new Point(10, yPos),
-                MaximumSize = new Size(250, 0),
-                ForeColor = Color.FromArgb(71, 85, 105)
-            };
-            panel.Controls.Add(lbl);
-            yPos += 28;
-        }
-
-        private Button CreateActionButton(string text, Color backColor)
-        {
-            var btn = new Button
-            {
-                Text = text,
-                Width = 240,
-                Height = 45,
-                FlatStyle = FlatStyle.Flat,
-                BackColor = backColor,
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                Margin = new Padding(0, 5, 0, 5)
-            };
-            btn.FlatAppearance.BorderSize = 0;
-            return btn;
-        }
-
-        private async Task BatDauChoiBan(BanBium ban)
-        {
             try
             {
-                var result = await _banBiaService.StartTableAsync(ban.MaBan, _mainForm.MaNV);
+                // Lấy HoaDonService từ DI container
+                var hoaDonService = Program.GetService<HoaDonService>();
 
-                if (result)
+                // Tạo BanChiTietControl (UserControl thay vì Form)
+                var chiTietControl = new BanChiTietControl(_banBiaService, hoaDonService, ban, _mainForm.MaNV);
+
+                // Đăng ký event để reload data khi có thay đổi
+                chiTietControl.OnDataChanged += async (s, e) =>
                 {
-                    MessageBox.Show($"Đã bắt đầu chơi bàn {ban.TenBan}", "Thành công",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
                     await LoadBanBia();
-                }
-                else
-                {
-                    MessageBox.Show("Không thể bắt đầu chơi bàn này!", "Lỗi",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                };
+
+                // Hiển thị control trong detail panel
+                _mainForm.UpdateDetailPanel($"Chi tiết {ban.TenBan}", chiTietControl);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi",
+                MessageBox.Show($"Lỗi khi hiển thị chi tiết bàn: {ex.Message}", "Lỗi",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void ThanhToanBan(BanBium ban)
-        {
-            MessageBox.Show($"Chức năng thanh toán bàn {ban.TenBan} đang được phát triển", "Thông báo");
-        }
-
-        private void ThemDichVu(BanBium ban)
-        {
-            MessageBox.Show($"Chức năng thêm dịch vụ cho bàn {ban.TenBan} đang được phát triển", "Thông báo");
-        }
-
-        private async Task TamDungBan(BanBium ban)
-        {
-            var result = MessageBox.Show($"Tạm dừng bàn {ban.TenBan}?", "Xác nhận",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-            if (result == DialogResult.Yes)
-            {
-                var success = await _banBiaService.PauseTableAsync(ban.MaBan);
-                if (success)
-                {
-                    MessageBox.Show("Đã tạm dừng bàn", "Thành công",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    await LoadBanBia();
-                }
-                else
-                {
-                    MessageBox.Show("Không thể tạm dừng bàn!", "Lỗi",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
             }
         }
 
@@ -1114,17 +641,86 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private void BtnXemSoDo_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Chức năng xem sơ đồ bàn đang được phát triển", "Thông báo");
+            try
+            {
+                using (var soDoBanForm = new SoDoBanForm(_banBiaService))
+                {
+                    soDoBanForm.SetMainForm(_mainForm);
+                    soDoBanForm.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở sơ đồ bàn: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void BtnXemBanDat_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Chức năng xem danh sách bàn đặt đang được phát triển", "Thông báo");
+            try
+            {
+                if (!btnXemBanDat.Visible)
+                {
+                    MessageBox.Show("Bạn không có quyền truy cập chức năng này.", "Cảnh báo",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var datBanService = Program.GetService<DatBanService>();
+
+                using (var datBanForm = new DanhSachBanDatForm(datBanService, _banBiaService, _mainForm))
+                {
+                    datBanForm.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở form Danh sách bàn đặt: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
-        private void BtnDatBan_Click(object sender, EventArgs e)
+        // Trong QLBanForm.cs
+
+        private async void BtnDatBan_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Chức năng đặt bàn trước đang được phát triển", "Thông báo");
+            try
+            {
+                // Kiểm tra quyền (đã được SetupPermissions xử lý, nhưng nên kiểm tra lại nếu cần)
+                if (!btnDatBan.Visible)
+                {
+                    MessageBox.Show("Bạn không có quyền thực hiện chức năng này.", "Cảnh báo",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Lấy các Service cần thiết từ Program (cần có lớp Program với GetService<T>)
+                var datBanService = Program.GetService<DatBanService>();
+
+                // Khởi tạo và hiển thị DatBanForm
+                using (var datBanForm = new DatBanForm(_banBiaService, datBanService))
+                {
+                    var result = datBanForm.ShowDialog(this);
+
+                    if (result == DialogResult.OK)
+                    {
+                        // Nếu việc đặt bàn thành công, tải lại danh sách bàn để cập nhật trạng thái
+                        this.Cursor = Cursors.WaitCursor;
+                        await LoadBanBia();
+                        this.Cursor = Cursors.Default;
+
+                        MessageBox.Show("Đã đặt bàn thành công!", "Thông báo",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                this.Cursor = Cursors.Default;
+                MessageBox.Show($"Lỗi khi mở form đặt bàn: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private async void BtnThemBan_Click(object sender, EventArgs e)

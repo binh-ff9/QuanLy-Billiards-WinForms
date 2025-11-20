@@ -30,7 +30,6 @@ namespace Billiard.WinForm.Forms.QLBan
             {
                 this.Cursor = Cursors.WaitCursor;
 
-                // DEBUG: Log bắt đầu load
                 System.Diagnostics.Debug.WriteLine("=== BẮT ĐẦU LOAD FORM THÊM BÀN ===");
 
                 // Load loại bàn
@@ -136,7 +135,7 @@ namespace Billiard.WinForm.Forms.QLBan
             }
             _selectedImagePath = null;
             btnXoaAnh.Enabled = false;
-            System.Diagnostics.Debug.WriteLine("Đã xóa ảnh");
+            System.Diagnostics.Debug.WriteLine("Đã xóa ảnh preview");
         }
 
         private async void BtnLuu_Click(object sender, EventArgs e)
@@ -192,11 +191,8 @@ namespace Billiard.WinForm.Forms.QLBan
                     imageName = $"table_{DateTime.Now:yyyyMMddHHmmss}{Path.GetExtension(_selectedImagePath)}";
                     System.Diagnostics.Debug.WriteLine($"Tên file ảnh: {imageName}");
 
-                    // Tìm thư mục project root
-                    var startupPath = Application.StartupPath;
-                    System.Diagnostics.Debug.WriteLine($"Startup Path: {startupPath}");
-
-                    var projectRoot = Directory.GetParent(Directory.GetParent(Directory.GetParent(Directory.GetParent(startupPath).FullName).FullName).FullName).FullName;
+                    var projectRoot = Directory.GetParent(Directory.GetParent(Directory.GetParent(
+                        Directory.GetParent(Application.StartupPath).FullName).FullName).FullName).FullName;
                     System.Diagnostics.Debug.WriteLine($"Project Root: {projectRoot}");
 
                     var destFolder = Path.Combine(projectRoot, "Forms", "Resources", "img", "tables");
@@ -267,26 +263,11 @@ namespace Billiard.WinForm.Forms.QLBan
                     btnLuu.Enabled = true;
                     btnHuy.Enabled = true;
 
-                    // Delete uploaded image if save failed
+                    // ===== SỬA: KHÔNG XÓA ẢNH KHI LƯU THẤT BẠI =====
+                    // Giữ ảnh trong folder, chỉ thông báo
                     if (!string.IsNullOrEmpty(imageName))
                     {
-                        System.Diagnostics.Debug.WriteLine("Xóa ảnh đã upload do lưu thất bại...");
-                        var startupPath = Application.StartupPath;
-                        var projectRoot = Directory.GetParent(Directory.GetParent(Directory.GetParent(Directory.GetParent(startupPath).FullName).FullName).FullName).FullName;
-                        var failedImagePath = Path.Combine(projectRoot, "Forms", "Resources", "img", "tables", imageName);
-
-                        if (File.Exists(failedImagePath))
-                        {
-                            try
-                            {
-                                File.Delete(failedImagePath);
-                                System.Diagnostics.Debug.WriteLine("✓ Đã xóa ảnh");
-                            }
-                            catch (Exception delEx)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"⚠ Không xóa được ảnh: {delEx.Message}");
-                            }
-                        }
+                        System.Diagnostics.Debug.WriteLine($"⚠ Lưu thất bại nhưng ảnh {imageName} vẫn được giữ lại trong folder");
                     }
                 }
             }
