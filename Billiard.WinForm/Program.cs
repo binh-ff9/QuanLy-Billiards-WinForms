@@ -12,7 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
-using System.Windows.Forms;
+
 using Billiard.BLL.Services.HoaDonServices;
 using Billiard.BLL.Services.KhachHangServices;
 using Billiard.WinForm.Forms.KhachHang;
@@ -48,7 +48,7 @@ namespace Billiard.WinForm
 
         private static void ConfigureServices(IServiceCollection services)
         {
-            // ===== THAY ĐỔI: DbContext sang TRANSIENT =====
+            // DbContext - GIỮ NGUYÊN TRANSIENT
             services.AddTransient<BilliardDbContext>(provider =>
             {
                 var optionsBuilder = new DbContextOptionsBuilder<BilliardDbContext>();

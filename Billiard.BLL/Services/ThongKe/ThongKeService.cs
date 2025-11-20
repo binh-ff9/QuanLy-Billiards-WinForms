@@ -202,18 +202,26 @@ namespace Billiard.BLL.Services
         #region Doanh thu theo loại dịch vụ
         public async Task<List<DoanhThuTheoLoaiDichVuDto>> GetDoanhThuTheoLoaiDichVuAsync(DateTime tuNgay, DateTime denNgay)
         {
-            var data = await _context.ChiTietHoaDons
+            // Thêm logging để debug
+            var chiTietList = await _context.ChiTietHoaDons
                 .Include(ct => ct.MaHdNavigation)
                 .Include(ct => ct.MaDvNavigation)
                 .Where(ct => ct.MaHdNavigation.TrangThai == "Đã thanh toán"
                     && ct.MaHdNavigation.ThoiGianKetThuc.HasValue
                     && ct.MaHdNavigation.ThoiGianKetThuc.Value >= tuNgay
-                    && ct.MaHdNavigation.ThoiGianKetThuc.Value <= denNgay
-                    && ct.MaDvNavigation != null) // Thêm điều kiện này
+                    && ct.MaHdNavigation.ThoiGianKetThuc.Value <= denNgay)
                 .ToListAsync();
 
-            var result = data
-                .GroupBy(ct => ct.MaDvNavigation.Loai?.Trim() ?? "Khác")
+            // Log để kiểm tra
+            Console.WriteLine($"Tổng số chi tiết: {chiTietList.Count}");
+            foreach (var item in chiTietList)
+            {
+                Console.WriteLine($"Dịch vụ: {item.MaDvNavigation?.TenDv}, Loại: {item.MaDvNavigation?.Loai}");
+            }
+
+            var data = chiTietList
+                .Where(ct => ct.MaDvNavigation != null)
+                .GroupBy(ct => ct.MaDvNavigation.Loai ?? "Khác")
                 .Select(g => new DoanhThuTheoLoaiDichVuDto
                 {
                     Loai = g.Key,
@@ -222,7 +230,7 @@ namespace Billiard.BLL.Services
                 })
                 .ToList();
 
-            return result;
+            return data;
         }
         #endregion
 
