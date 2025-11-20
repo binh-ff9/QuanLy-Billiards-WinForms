@@ -2,6 +2,7 @@
 using Billiard.DAL.Entities;
 using Billiard.WinForm.Forms;
 using Billiard.WinForm.Forms.HoaDon;
+using Billiard.WinForm.Forms.ThongKe;
 using Billiard.WinForm.Forms.QLBan;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -261,7 +262,7 @@ namespace Billiard.WinForm
                         khForm.SetMainForm(this);
                         OpenChildForm(khForm); break;
                     case "btnThongKe":
-                        ShowComingSoon("Thống kê");
+                        OpenChildForm(Program.GetService<ThongKeForm>());
                         break;
                     case "btnNhanVien":
                         ShowComingSoon("Nhân viên");

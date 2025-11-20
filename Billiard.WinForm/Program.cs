@@ -5,6 +5,7 @@ using Billiard.DAL.Data;
 using Billiard.WinForm.Forms;
 using Billiard.WinForm.Forms.Auth;
 using Billiard.WinForm.Forms.HoaDon;
+using Billiard.WinForm.Forms.ThongKe;
 using Billiard.WinForm.Forms.QLBan;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -47,23 +48,31 @@ namespace Billiard.WinForm
 
         private static void ConfigureServices(IServiceCollection services)
         {
-            // Add DbContext
-            services.AddDbContext<BilliardDbContext>(options =>
-                options.UseSqlServer(
+            // ===== THAY ĐỔI: DbContext sang TRANSIENT =====
+            services.AddTransient<BilliardDbContext>(provider =>
+            {
+                var optionsBuilder = new DbContextOptionsBuilder<BilliardDbContext>();
+                optionsBuilder.UseSqlServer(
                     Configuration.GetConnectionString("DefaultConnection"),
                     sqlOptions => sqlOptions.EnableRetryOnFailure(
                         maxRetryCount: 3,
                         maxRetryDelay: TimeSpan.FromSeconds(5),
                         errorNumbersToAdd: null
                     )
-                )
-            );
+                );
+                return new BilliardDbContext(optionsBuilder.Options);
+            });
 
             // Register BLL Services
-            services.AddScoped<AuthService>();
-            services.AddScoped<EmailService>();
-            services.AddScoped<DichVuService>();
-            services.AddScoped<MatHangService>();
+            services.AddTransient<AuthService>();
+            services.AddTransient<EmailService>();
+            services.AddTransient<DichVuService>();
+            services.AddTransient<MatHangService>();
+            services.AddTransient<ThongKeService>();
+            services.AddTransient<BanBiaService>();
+            services.AddTransient<HoaDonService>();
+
+            // Register Forms
 
 
             // BanBia services
@@ -76,22 +85,19 @@ namespace Billiard.WinForm
             services.AddScoped<KhachHangService>();
 
             // Register Auth Forms
+
             services.AddTransient<LoginForm>();
             services.AddTransient<SignupForm>();
             services.AddTransient<ForgotPasswordForm>();
             services.AddTransient<ResetPasswordForm>();
-
-            // Register Main Form
             services.AddTransient<MainForm>();
-
-            // Register Feature Forms
             services.AddTransient<DichVuForm>();
             services.AddTransient<DichVuEditForm>();
             services.AddTransient<QLBanForm>();
-
-            // ĐÂY LÀ DÒNG QUAN TRỌNG - THÊM VÀO
             services.AddTransient<HoaDonForm>();
+            services.AddTransient<ThongKeForm>();
             services.AddTransient<KhachHangForm>(); // Khách hàng
+
         }
 
         public static T GetService<T>() where T : class
