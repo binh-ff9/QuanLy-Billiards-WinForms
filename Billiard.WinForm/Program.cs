@@ -13,6 +13,8 @@ using System;
 using System.IO;
 using System.Windows.Forms;
 using Billiard.BLL.Services.HoaDonServices;
+using Billiard.BLL.Services.KhachHangServices;
+using Billiard.WinForm.Forms.KhachHang;
 
 namespace Billiard.WinForm
 {
@@ -63,11 +65,15 @@ namespace Billiard.WinForm
             services.AddScoped<DichVuService>();
             services.AddScoped<MatHangService>();
 
+
             // BanBia services
             services.AddScoped<BanBiaService>();
 
             // HoaDon services
             services.AddScoped<HoaDonService>();
+
+            // KhachHang services
+            services.AddScoped<KhachHangService>();
 
             // Register Auth Forms
             services.AddTransient<LoginForm>();
@@ -85,6 +91,7 @@ namespace Billiard.WinForm
 
             // ĐÂY LÀ DÒNG QUAN TRỌNG - THÊM VÀO
             services.AddTransient<HoaDonForm>();
+            services.AddTransient<KhachHangForm>(); // Khách hàng
         }
 
         public static T GetService<T>() where T : class
