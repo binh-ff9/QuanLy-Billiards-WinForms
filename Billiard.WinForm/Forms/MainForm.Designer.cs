@@ -383,7 +383,7 @@
             pnlSidebar.Location = new Point(0, 257);
             pnlSidebar.MinimumSize = new Size(200, 0);
             pnlSidebar.Name = "pnlSidebar";
-            pnlSidebar.Size = new Size(250, 641);
+            pnlSidebar.Size = new Size(250, 1253);
             pnlSidebar.TabIndex = 2;
             // 
             // btnQuanLyBan
@@ -521,7 +521,7 @@
             btnCaiDat.FlatStyle = FlatStyle.Flat;
             btnCaiDat.Font = new Font("Segoe UI", 11F);
             btnCaiDat.ForeColor = Color.White;
-            btnCaiDat.Location = new Point(10, 581);
+            btnCaiDat.Location = new Point(10, 1193);
             btnCaiDat.Name = "btnCaiDat";
             btnCaiDat.Padding = new Padding(10, 0, 0, 0);
             btnCaiDat.Size = new Size(230, 50);
@@ -539,7 +539,7 @@
             pnlMain.Dock = DockStyle.Fill;
             pnlMain.Location = new Point(250, 257);
             pnlMain.Name = "pnlMain";
-            pnlMain.Size = new Size(1150, 641);
+            pnlMain.Size = new Size(1150, 1253);
             pnlMain.TabIndex = 3;
             // 
             // pnlDetail
@@ -550,7 +550,7 @@
             pnlDetail.Location = new Point(800, 257);
             pnlDetail.MinimumSize = new Size(300, 0);
             pnlDetail.Name = "pnlDetail";
-            pnlDetail.Size = new Size(600, 641);
+            pnlDetail.Size = new Size(600, 1253);
             pnlDetail.TabIndex = 4;
             pnlDetail.Visible = false;
             // 
@@ -558,7 +558,7 @@
             // 
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1400, 898);
+            ClientSize = new Size(1400, 1510);
             Controls.Add(pnlDetail);
             Controls.Add(pnlMain);
             Controls.Add(pnlSidebar);

@@ -1,6 +1,9 @@
-﻿using Billiard.DAL.Data;
+﻿using Billiard.BLL.Services.QLBan;
+using Billiard.DAL.Data;
 using Billiard.DAL.Entities;
 using Billiard.WinForm.Forms;
+using Billiard.WinForm.Forms.Auth;
+using Billiard.WinForm.Forms.CaiDat;
 using Billiard.WinForm.Forms.HoaDon;
 using Billiard.WinForm.Forms.QLBan;
 using Microsoft.EntityFrameworkCore;
@@ -8,8 +11,6 @@ using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
-using Billiard.WinForm.Forms.Auth;
-using Billiard.BLL.Services.QLBan;
 namespace Billiard.WinForm
 {
     public partial class MainForm : Form
@@ -265,7 +266,8 @@ namespace Billiard.WinForm
                         ShowComingSoon("Nhân viên");
                         break;
                     case "btnCaiDat":
-                        ShowComingSoon("Cài đặt");
+                        var vietQRConfigForm = Program.GetService<VietQRConfigForm>();
+                        vietQRConfigForm.ShowDialog();
                         break;
                 }
             }

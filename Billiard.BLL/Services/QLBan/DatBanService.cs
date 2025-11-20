@@ -48,7 +48,7 @@ namespace Billiard.BLL.Services.QLBan
         {
             return await _context.DatBans
                 .Include(d => d.MaKhNavigation)
-                .Where(d => d.MaBan == maBan && d.TrangThai == "Đang chờ")
+                .Where(d => d.MaBan == maBan && d.TrangThai == "Đã đặt")
                 .OrderBy(d => d.ThoiGianDat)
                 .ToListAsync();
         }
@@ -100,17 +100,18 @@ namespace Billiard.BLL.Services.QLBan
             string tenKhach,
             string sdt,
             DateTime thoiGianBatDau,
-            DateTime thoiGianKetThuc, // Thêm giờ kết thúc (Đã có trong file gốc, nhưng xác nhận lại)
+            DateTime thoiGianKetThuc,
             string ghiChu
         )
         {
+            // Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu
+            using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                // 1. Nếu maKhachHang là null và chưa có khách hàng, tạo khách hàng mới tạm thời
+                // 1. Nếu maKhachHang là null, kiểm tra/tạo khách hàng
                 int maKh = maKhachHang ?? 0;
                 if (!maKhachHang.HasValue)
                 {
-                    // Kiểm tra lại lần cuối xem có khách hàng này chưa
                     var existingCustomer = await GetCustomerByPhoneNumberAsync(sdt);
                     if (existingCustomer != null)
                     {
@@ -118,16 +119,15 @@ namespace Billiard.BLL.Services.QLBan
                     }
                     else
                     {
-                        // Tạo khách hàng mới (vãng lai/tạm thời)
+                        // Tạo khách hàng mới
                         var newCustomer = new KhachHang
                         {
                             TenKh = tenKhach,
                             Sdt = sdt,
                             NgayDangKy = DateTime.Now,
-                            // Các trường khác sẽ là giá trị mặc định (HoatDong = false, HangTv = "Đồng", ...)
                         };
                         _context.KhachHangs.Add(newCustomer);
-                        await _context.SaveChangesAsync(); // Lưu để lấy MaKh
+                        await _context.SaveChangesAsync();
                         maKh = newCustomer.MaKh;
                     }
                 }
@@ -137,24 +137,40 @@ namespace Billiard.BLL.Services.QLBan
                 {
                     MaBan = maBan,
                     MaKh = maKh,
-                    TenKhach = tenKhach, // Tên khách hàng (cho dù là khách TV hay vãng lai)
+                    TenKhach = tenKhach,
                     Sdt = sdt,
                     ThoiGianBatDau = thoiGianBatDau,
-                    ThoiGianKetThuc = thoiGianKetThuc, // Sử dụng giờ kết thúc
+                    ThoiGianKetThuc = thoiGianKetThuc,
                     GhiChu = ghiChu,
                     ThoiGianDat = DateTime.Now,
-                    TrangThai = "Đang chờ", // Mặc định là Đang chờ
-                    SoNguoi = 1 // Giả sử mặc định là 1 người, cần thêm trường này vào Form nếu muốn nhập
+                    TrangThai = "Đang chờ",
+                    SoNguoi = 1
                 };
 
                 _context.DatBans.Add(datBan);
+
+                // 3. **QUAN TRỌNG**: Cập nhật trạng thái bàn thành "Đã đặt"
+                var ban = await _context.BanBia.FindAsync(maBan);
+                if (ban != null)
+                {
+                    ban.TrangThai = "Đã đặt";
+                    ban.MaKh = maKh;
+                    ban.GhiChu = ghiChu;
+
+                    System.Diagnostics.Debug.WriteLine($"✓ Cập nhật bàn {ban.TenBan} -> Đã đặt");
+                }
+
+                // 4. Lưu tất cả thay đổi
                 await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                System.Diagnostics.Debug.WriteLine($"✓✓✓ ĐẶT BÀN THÀNH CÔNG - MaDat: {datBan.MaDat}");
                 return true;
             }
             catch (Exception ex)
             {
-                // Log the exception (tùy chọn)
-                Console.WriteLine(ex.Message);
+                await transaction.RollbackAsync();
+                System.Diagnostics.Debug.WriteLine($"❌ Lỗi đặt bàn: {ex.Message}");
                 return false;
             }
         }
