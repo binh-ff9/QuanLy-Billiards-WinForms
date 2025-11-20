@@ -1,11 +1,14 @@
 ﻿using Billiard.BLL.Services;
 using Billiard.DAL.Data;
+using Billiard.WinForm.Helpers;
+using Billiard.WinForm.Forms.Helpers;
 using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Billiard.WinForm.Forms.Users;
 
 namespace Billiard.WinForm.Forms.Auth
 {
@@ -152,6 +155,14 @@ namespace Billiard.WinForm.Forms.Auth
                     Debug.WriteLine($"KhachHang Name: {khachHang.TenKh}");
                     Debug.WriteLine($"KhachHang Rank: {khachHang.HangTv}");
 
+                    UserSession.MaKH = khachHang.MaKh;
+                    UserSession.TenKH = khachHang.TenKh;
+                    UserSession.Sdt = khachHang.Sdt;
+
+                    var clientForm = Program.GetService<ClientMainForm>();
+
+                    clientForm.Show();
+
                     MessageBox.Show(
                         $"✅ Chào mừng {khachHang.TenKh}!\n" +
                         $"🏆 Hạng thành viên: {khachHang.HangTv}\n" +
@@ -160,14 +171,25 @@ namespace Billiard.WinForm.Forms.Auth
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
 
-                    // TODO: Open CustomerMainForm when implemented
-                    Debug.WriteLine("WARNING: CustomerMainForm not implemented yet");
-                    MessageBox.Show(
-                        "Giao diện khách hàng đang được phát triển.\n" +
-                        "Vui lòng sử dụng tài khoản nhân viên để truy cập hệ thống.",
-                        "Thông báo",
-                        MessageBoxButtons.OK,
-                        MessageBoxIcon.Information);
+                    clientForm.FormClosed += (s, args) =>
+                    {
+                        UserSession.Logout(); // Xóa session
+                        this.Show();          // Hiện lại form đăng nhập
+                        ResetForm();
+                        txtUsername.Focus();
+                    };
+
+                    this.Hide(); // Ẩn form đăng nhập đi
+
+
+                    //// TODO: Open CustomerMainForm when implemented
+                    //Debug.WriteLine("WARNING: CustomerMainForm not implemented yet");
+                    //MessageBox.Show(
+                    //    "Giao diện khách hàng đang được phát triển.\n" +
+                    //    "Vui lòng sử dụng tài khoản nhân viên để truy cập hệ thống.",
+                    //    "Thông báo",
+                    //    MessageBoxButtons.OK,
+                    //    MessageBoxIcon.Information);
 
                     ResetForm();
                 }

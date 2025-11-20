@@ -16,6 +16,7 @@ using System.Windows.Forms;
 using Billiard.BLL.Services.HoaDonServices;
 using Billiard.BLL.Services.KhachHangServices;
 using Billiard.WinForm.Forms.KhachHang;
+using Billiard.WinForm.Forms.Users;
 
 namespace Billiard.WinForm
 {
@@ -43,7 +44,7 @@ namespace Billiard.WinForm
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
             // Run LoginForm
-            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
+            Application.Run(ServiceProvider.GetRequiredService<ClientMainForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -97,6 +98,9 @@ namespace Billiard.WinForm
             services.AddTransient<HoaDonForm>();
             services.AddTransient<ThongKeForm>();
             services.AddTransient<KhachHangForm>(); // Khách hàng
+            services.AddTransient<ClientMainForm>();
+            services.AddTransient<DatBanDialog>();   // Đăng ký luôn các Dialog con
+            services.AddTransient<UserProfileForm>();
 
         }
 
