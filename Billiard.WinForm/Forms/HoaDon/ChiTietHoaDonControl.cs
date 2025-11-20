@@ -1,4 +1,5 @@
 ﻿using Billiard.DAL.Entities;
+using Billiard.WinForm.Helpers;
 using System;
 using System.Drawing;
 using System.Linq;
@@ -8,6 +9,7 @@ namespace Billiard.WinForm.Forms.HoaDon
 {
     public partial class ChiTietHoaDonControl : UserControl
     {
+        private Billiard.DAL.Entities.HoaDon _currentHoaDon;
         public ChiTietHoaDonControl()
         {
             InitializeComponent();
@@ -22,14 +24,21 @@ namespace Billiard.WinForm.Forms.HoaDon
             this.BackColor = Color.White;
             this.Padding = new Padding(20); // Thêm khoảng cách lề cho thoáng
 
+            StyleLabel(lblTrangThai, 11, FontStyle.Bold, Color.FromArgb(22, 163, 74));
+
+
+
             // Style cho các Label (Nếu bạn đã kéo thả trong Designer)
             StyleLabel(lblMaHD, 16, FontStyle.Bold, Color.FromArgb(30, 41, 59)); // Màu xanh đen đậm
             StyleLabel(lblBan, 11, FontStyle.Regular, Color.FromArgb(71, 85, 105));
+            StyleLabel(lblKhachHang, 10, FontStyle.Regular, Color.FromArgb(100, 116, 139));
             StyleLabel(lblGioVao, 10, FontStyle.Regular, Color.FromArgb(100, 116, 139)); // Màu xám
             StyleLabel(lblGioRa, 10, FontStyle.Regular, Color.FromArgb(100, 116, 139));
+            StyleLabel(lblGiaGio, 10, FontStyle.Regular, Color.FromArgb(100, 116, 139));
 
             // Style đặc biệt cho Tổng tiền
             StyleLabel(lblTongTien, 18, FontStyle.Bold, Color.FromArgb(220, 38, 38)); // Màu đỏ nổi bật
+
 
             ConfigureGrid();
         }
@@ -83,18 +92,33 @@ namespace Billiard.WinForm.Forms.HoaDon
 
         public void LoadData(Billiard.DAL.Entities.HoaDon hd)
         {
+            _currentHoaDon = hd;
+
+            lblTrangThai.Text = hd.TrangThai ?? "Đang chơi";
+            if (hd.TrangThai == "Đang chơi")
+            {
+                lblTrangThai.ForeColor = Color.FromArgb(220, 38, 38);
+            }
+            else if (hd.TrangThai == "Đã thanh toán")
+            {
+                lblTrangThai.ForeColor = Color.FromArgb(22, 163, 74);
+            }
+
             // 1. Hiển thị thông tin chung
             lblMaHD.Text = $"HÓA ĐƠN #{hd.MaHd}";
             lblBan.Text = $"Bàn: {hd.MaBanNavigation?.TenBan ?? "Mang về"}";
 
             // Thêm icon hoặc ký tự đặc biệt cho đẹp
             lblGioVao.Text = $"🕒 Vào: {hd.ThoiGianBatDau?.ToString("HH:mm dd/MM/yyyy")}";
+            lblGioRa.Text = $"🕒 Ra: {hd.ThoiGianKetThuc?.ToString("HH:mm dd/MM/yyyy")}";
+            lblKhachHang.Text = $" Khách hàng: {hd.MaKhNavigation?.TenKh ?? "Vãng lai"}";
+            lblGiaGio.Text = $"Giá giờ: {hd.MaBanNavigation.MaLoaiNavigation.GiaGio}";
             // 2. Hiển thị danh sách món
             var listMon = hd.ChiTietHoaDons.Select(ct => new
             {
                 TenDichVu = ct.MaDvNavigation?.TenDv ?? "Dịch vụ",
                 SoLuong = ct.SoLuong,
-                DonGia = ct.ThanhTien,
+                DonGia = ct.MaDvNavigation.Gia,
                 ThanhTien = ct.ThanhTien
             }).ToList();
 
@@ -104,7 +128,7 @@ namespace Billiard.WinForm.Forms.HoaDon
             FormatGridColumns();
 
             // 4. Tổng tiền
-            lblTongTien.Text = $"{hd.TongTien:N0} đ";
+            lblTongTien.Text = $"Tổng tiền: {hd.TongTien:N0} đ";
 
         }
         private void FormatGridColumns()
@@ -118,7 +142,7 @@ namespace Billiard.WinForm.Forms.HoaDon
             if (dgvChiTiet.Columns["SoLuong"] != null)
             {
                 dgvChiTiet.Columns["SoLuong"].HeaderText = "SL";
-                dgvChiTiet.Columns["SoLuong"].FillWeight = 30; // Cột nhỏ thôi
+                dgvChiTiet.Columns["SoLuong"].FillWeight = 25; // Cột nhỏ thôi
                 dgvChiTiet.Columns["SoLuong"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             }
 
@@ -137,5 +161,25 @@ namespace Billiard.WinForm.Forms.HoaDon
                 dgvChiTiet.Columns["ThanhTien"].DefaultCellStyle.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold); // In đậm cột tiền
             }
         }
+
+
+        #region Button
+        private void btnInHoaDon_Click(object sender, EventArgs e)
+        {
+            if (_currentHoaDon == null)
+            {
+                MessageBox.Show("Không có dữ liệu hóa đơn để in!");
+                return;
+            }
+
+            var printer = new InvoicePrinter();
+
+            printer.PrintInvoice( _currentHoaDon, "CLB BI-A PRO VIP", "123 Lê Văn Việt, Thủ Đức ");
+        }
+
+
+
+
+        #endregion
     }
 }

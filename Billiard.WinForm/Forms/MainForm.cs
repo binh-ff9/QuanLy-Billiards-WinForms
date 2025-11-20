@@ -452,8 +452,10 @@ namespace Billiard.WinForm
 
         #region Detail Panel Management
 
-        public void UpdateDetailPanel(string title, Control content)
+        public void UpdateDetailPanel(string title, Control content, int width = 450)
         {
+            pnlDetail.Width = width;
+
             // Clear existing controls except title label
             pnlDetail.Controls.Clear();
 
