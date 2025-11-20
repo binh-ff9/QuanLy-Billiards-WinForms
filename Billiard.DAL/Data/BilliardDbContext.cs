@@ -26,7 +26,7 @@ public partial class BilliardDbContext : DbContext
             optionsBuilder.UseSqlServer("your_connection_string_here");
         }
     }
-    
+
 
     public virtual DbSet<BanBium> BanBia { get; set; }
 
@@ -225,10 +225,10 @@ public partial class BilliardDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__chi_tiet__3213E83F2C775D02");
 
             entity.ToTable("chi_tiet_hoa_don", tb =>
-                {
-                    tb.HasTrigger("trg_CongLaiSoLuongTon_HuyMon");
-                    tb.HasTrigger("trg_TruSoLuongTon_BanHang");
-                });
+            {
+                tb.HasTrigger("trg_CongLaiSoLuongTon_HuyMon");
+                tb.HasTrigger("trg_TruSoLuongTon_BanHang");
+            });
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.MaDv).HasColumnName("ma_dv");
