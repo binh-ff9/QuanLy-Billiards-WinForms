@@ -8,17 +8,16 @@ using Billiard.WinForm.Forms.HoaDon;
 using Billiard.WinForm.Forms.ThongKe;
 using Billiard.WinForm.Forms.QLBan;
 using Billiard.WinForm.Forms.CaiDat;
+using Billiard.BLL.Services.KhachHangServices;
+using Billiard.WinForm.Forms.KhachHang;
+using Billiard.BLL.Services.VietQR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
-
-using Billiard.BLL.Services.HoaDonServices;
-using Billiard.BLL.Services.KhachHangServices;
-using Billiard.WinForm.Forms.KhachHang;
 using System.Windows.Forms;
-using Billiard.BLL.Services.VietQR;
+using System.Net.Http;
 
 namespace Billiard.WinForm
 {
@@ -45,8 +44,8 @@ namespace Billiard.WinForm
             ConfigureServices(serviceCollection);
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            // Run LoginForm
-            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
+            // Run MainForm
+            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -56,53 +55,37 @@ namespace Billiard.WinForm
             {
                 var optionsBuilder = new DbContextOptionsBuilder<BilliardDbContext>();
                 optionsBuilder.UseSqlServer(
-                    Configuration.GetConnectionString("DefaultConnection"),
-                    sqlOptions => sqlOptions.EnableRetryOnFailure(
-                        maxRetryCount: 3,
-                        maxRetryDelay: TimeSpan.FromSeconds(5),
-                        errorNumbersToAdd: null
-                    )
-                )
-            );
+                    Configuration.GetConnectionString("DefaultConnection")
+                );
+                return new BilliardDbContext(optionsBuilder.Options);
+            });
 
-            // ✅ Đổi tất cả Services từ Scoped → Transient
-            services.AddTransient<AuthService>();
-            services.AddTransient<EmailService>();
-            services.AddTransient<DichVuService>();
-            services.AddTransient<MatHangService>();
-            services.AddTransient<AuthService>();
-            services.AddSingleton<HttpClient>();
-            // Register BLL Services
+            // ✅ Đổi tất cả Services từ Scoped → Transient (theo chỉ dẫn)
             services.AddTransient<AuthService>();
             services.AddTransient<EmailService>();
             services.AddTransient<DichVuService>();
             services.AddTransient<MatHangService>();
             services.AddTransient<ThongKeService>();
-            services.AddTransient<BanBiaService>();
-            services.AddTransient<HoaDonService>();
 
-            // Register Forms
+            // HttpClient (Singleton)
+            services.AddSingleton<HttpClient>();
 
-
-            // BanBia services
+            // BanBia services (Transient)
             services.AddTransient<BanBiaService>();
             services.AddTransient<DatBanService>();
             services.AddTransient<LoaiBanService>();
             services.AddTransient<KhuVucService>();
 
-            // HoaDon services
+            // HoaDon services (Transient)
             services.AddTransient<HoaDonService>();
             services.AddTransient<VietQRService>();
             services.AddTransient<ThanhToanService>();
-            services.AddTransient<ThanhToanService>();
             services.AddTransient<VietQRConfigForm>();
-            services.AddScoped<HoaDonService>();
 
-            // KhachHang services
-            services.AddScoped<KhachHangService>();
+            // KhachHang services (Transient - chuyển từ Scoped theo chỉ dẫn)
+            services.AddTransient<KhachHangService>();
 
-            // Register Auth Forms
-
+            // Register Forms (Transient)
             services.AddTransient<LoginForm>();
             services.AddTransient<SignupForm>();
             services.AddTransient<ForgotPasswordForm>();
@@ -112,10 +95,9 @@ namespace Billiard.WinForm
             services.AddTransient<DichVuEditForm>();
             services.AddTransient<QLBanForm>();
             services.AddTransient<HoaDonForm>();
-        }
-            services.AddTransient<HoaDonForm>();
             services.AddTransient<ThongKeForm>();
-            services.AddTransient<KhachHangForm>(); // Khách hàng
+            services.AddTransient<KhachHangForm>();
+        }
 
         // ✅ THÊM: Method để tạo Scope mới (tùy chọn)
         public static IServiceScope CreateScope()

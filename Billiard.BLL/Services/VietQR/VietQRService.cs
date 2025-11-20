@@ -20,7 +20,13 @@ namespace Billiard.BLL.Services.VietQR
             _context = context;
             _httpClient = httpClient;
         }
+        public async Task<bool> KiemTraCauHinh()
+        {
+            var config = await _context.VietqrConfigs
+                .FirstOrDefaultAsync(c => c.LaMacDinh == true && c.TrangThai == true);
 
+            return config != null;
+        }
         /// <summary>
         /// Tạo mã QR thanh toán cho hóa đơn
         /// </summary>
@@ -42,7 +48,10 @@ namespace Billiard.BLL.Services.VietQR
                 var noiDung = $"Thanh toan HD{maHd:D6}";
 
                 // Tạo URL VietQR
-                var qrUrl = TaoVietQRUrl(config, soTien, noiDung, maGiaoDich);
+                var qrUrl = $"https://img.vietqr.io/image/{config.BankId}-{config.AccountNo}-{config.Template}.png?" +
+            $"amount={soTien:F0}&" +
+            $"addInfo={Uri.EscapeDataString(noiDung)}&" +
+            $"accountName={Uri.EscapeDataString(config.AccountName)}";
 
                 // Lưu thông tin giao dịch vào database
                 var giaoDich = new VietqrGiaoDich

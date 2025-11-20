@@ -20,7 +20,8 @@ namespace Billiard.WinForm.Forms.QLBan
         private VietqrGiaoDich _qrGiaoDich;
         private Timer _qrCheckTimer;
         private CancellationTokenSource _cts;
-
+        private bool _isProcessingPayment = false;
+        private bool _formClosing = false;
         // UI Controls
         private Panel pnlMain;
         private Panel pnlLeft;
@@ -47,7 +48,8 @@ namespace Billiard.WinForm.Forms.QLBan
         {
             // Form settings
             this.Text = "Thanh toán";
-            this.Size = new Size(900, 600);
+            // CHỈNH SỬA KÍCH THƯỚC FORM: Tăng chiều cao từ 600 lên 700
+            this.Size = new Size(900, 700);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -77,7 +79,8 @@ namespace Billiard.WinForm.Forms.QLBan
             pnlLeft = new Panel
             {
                 Location = new Point(20, 70),
-                Size = new Size(420, 460),
+                // CHỈNH SỬA KÍCH THƯỚC: Tăng chiều cao từ 460 lên 560
+                Size = new Size(420, 560),
                 BackColor = Color.FromArgb(248, 250, 252)
             };
             pnlMain.Controls.Add(pnlLeft);
@@ -87,7 +90,8 @@ namespace Billiard.WinForm.Forms.QLBan
                 Text = "📋 Thông tin thanh toán",
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 Location = new Point(10, 10),
-                Size = new Size(400, 440),
+                // CHỈNH SỬA KÍCH THƯỚC: Tăng chiều cao từ 440 lên 540
+                Size = new Size(400, 540),
                 ForeColor = Color.FromArgb(30, 41, 59)
             };
             pnlLeft.Controls.Add(grpThongTin);
@@ -96,7 +100,8 @@ namespace Billiard.WinForm.Forms.QLBan
             pnlRight = new Panel
             {
                 Location = new Point(460, 70),
-                Size = new Size(400, 460),
+                // CHỈNH SỬA KÍCH THƯỚC: Tăng chiều cao từ 460 lên 560
+                Size = new Size(400, 560),
                 BackColor = Color.White
             };
             pnlMain.Controls.Add(pnlRight);
@@ -139,8 +144,10 @@ namespace Billiard.WinForm.Forms.QLBan
             pnlPaymentDetail = new Panel
             {
                 Location = new Point(0, 160),
-                Size = new Size(400, 300),
+                // CHỈNH SỬA KÍCH THƯỚC: Tăng chiều cao từ 300 lên 400
+                Size = new Size(400, 400),
                 BackColor = Color.White,
+                // Giữ AutoScroll mặc định là true. Sẽ tắt trong ShowQRCodePanel
                 AutoScroll = true
             };
             pnlRight.Controls.Add(pnlPaymentDetail);
@@ -329,6 +336,7 @@ namespace Billiard.WinForm.Forms.QLBan
         private void ShowTienMatPanel()
         {
             pnlPaymentDetail.Controls.Clear();
+            pnlPaymentDetail.AutoScroll = true; // Bật lại AutoScroll cho Tiền Mặt nếu cần
 
             var pnlTienMat = new Panel
             {
@@ -482,16 +490,23 @@ namespace Billiard.WinForm.Forms.QLBan
             {
                 this.Cursor = Cursors.WaitCursor;
                 pnlPaymentDetail.Controls.Clear();
+                pnlPaymentDetail.AutoScroll = false; // Tắt AutoScroll để hiển thị hết nội dung
 
                 // Tạo mã QR
                 _qrGiaoDich = await _vietQRService.TaoMaQRThanhToan(_maHd, _thanhToanInfo.TongTien);
 
+                if (_qrGiaoDich == null)
+                {
+                    throw new Exception("Không thể tạo mã QR. Vui lòng kiểm tra cấu hình VietQR!");
+                }
+
                 var pnlQR = new Panel
                 {
                     Location = new Point(10, 10),
-                    Size = new Size(380, 280),
+                    // CHỈNH SỬA KÍCH THƯỚC: Tăng chiều cao lên 380 để chứa các controls
+                    Size = new Size(380, 380),
                     BackColor = Color.FromArgb(239, 246, 255),
-                    AutoScroll = true
+                    AutoScroll = false
                 };
 
                 var lblTitle = new Label
@@ -514,7 +529,6 @@ namespace Billiard.WinForm.Forms.QLBan
                     BorderStyle = BorderStyle.FixedSingle
                 };
 
-                // Load QR image từ URL
                 await LoadQRImage(picQR, _qrGiaoDich.QrCodeUrl);
                 pnlQR.Controls.Add(picQR);
 
@@ -523,6 +537,7 @@ namespace Billiard.WinForm.Forms.QLBan
                     Text = $"Số tiền: {_thanhToanInfo.TongTien:N0} đ",
                     Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                     ForeColor = Color.FromArgb(220, 38, 38),
+                    // CHỈNH SỬA VỊ TRÍ
                     Location = new Point(15, 260),
                     Size = new Size(350, 25),
                     TextAlign = ContentAlignment.MiddleCenter
@@ -534,6 +549,7 @@ namespace Billiard.WinForm.Forms.QLBan
                     Text = $"Mã GD: {_qrGiaoDich.MaGiaoDich}",
                     Font = new Font("Segoe UI", 8F),
                     ForeColor = Color.Gray,
+                    // CHỈNH SỬA VỊ TRÍ
                     Location = new Point(15, 285),
                     Size = new Size(350, 20),
                     TextAlign = ContentAlignment.MiddleCenter
@@ -546,6 +562,7 @@ namespace Billiard.WinForm.Forms.QLBan
                     Text = "⏳ Đang chờ thanh toán...",
                     Font = new Font("Segoe UI", 9F, FontStyle.Italic),
                     ForeColor = Color.FromArgb(234, 179, 8),
+                    // CHỈNH SỬA VỊ TRÍ
                     Location = new Point(15, 310),
                     Size = new Size(350, 25),
                     TextAlign = ContentAlignment.MiddleCenter
@@ -555,6 +572,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 var btnXacNhan = new Button
                 {
                     Text = "✓ Đã thanh toán - Xác nhận",
+                    // CHỈNH SỬA VỊ TRÍ
                     Location = new Point(15, 345),
                     Size = new Size(350, 40),
                     BackColor = Color.FromArgb(34, 197, 94),
@@ -570,6 +588,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 var btnHuy = new Button
                 {
                     Text = "✕ Hủy",
+                    // CHỈNH SỬA VỊ TRÍ: Đặt ở dưới btnXacNhan, cách nhau 10px
                     Location = new Point(15, 395),
                     Size = new Size(350, 35),
                     BackColor = Color.FromArgb(148, 163, 184),
@@ -579,8 +598,17 @@ namespace Billiard.WinForm.Forms.QLBan
                     Cursor = Cursors.Hand
                 };
                 btnHuy.FlatAppearance.BorderSize = 0;
-                btnHuy.Click += (s, e) => pnlPaymentDetail.Controls.Clear();
+                btnHuy.Click += (s, e) =>
+                {
+                    _cts?.Cancel();
+                    _qrCheckTimer?.Stop();
+                    pnlPaymentDetail.Controls.Clear();
+                };
                 pnlQR.Controls.Add(btnHuy);
+
+                // Điều chỉnh kích thước pnlQR và pnlPaymentDetail để chứa hết các controls mới
+                pnlQR.Size = new Size(380, 440);
+                pnlPaymentDetail.Size = new Size(400, 450); // Đảm bảo pnlPaymentDetail đủ lớn
 
                 pnlPaymentDetail.Controls.Add(pnlQR);
                 this.Cursor = Cursors.Default;
@@ -595,7 +623,6 @@ namespace Billiard.WinForm.Forms.QLBan
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
         private async Task LoadQRImage(PictureBox picBox, string url)
         {
             try
@@ -635,23 +662,39 @@ namespace Billiard.WinForm.Forms.QLBan
             _qrCheckTimer.Interval = 3000; // Check mỗi 3 giây
             _qrCheckTimer.Tick += async (s, e) =>
             {
-                if (_cts.Token.IsCancellationRequested)
+                // Kiểm tra nếu đang xử lý hoặc form đang đóng
+                if (_cts.Token.IsCancellationRequested || _isProcessingPayment || _formClosing)
                 {
                     _qrCheckTimer?.Stop();
                     return;
                 }
 
-                var isPaid = await _vietQRService.KiemTraThanhToan(_qrGiaoDich.MaGiaoDich);
-                if (isPaid)
+                try
                 {
-                    _qrCheckTimer?.Stop();
-                    lblStatus.Text = "✓ Đã thanh toán thành công!";
-                    lblStatus.ForeColor = Color.FromArgb(34, 197, 94);
+                    var isPaid = await _vietQRService.KiemTraThanhToan(_qrGiaoDich.MaGiaoDich);
+                    if (isPaid && !_isProcessingPayment)
+                    {
+                        _isProcessingPayment = true;
+                        _qrCheckTimer?.Stop();
+                        _cts?.Cancel();
 
-                    MessageBox.Show("Đã nhận được thanh toán!", "Thành công",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        // Cập nhật UI nếu control còn tồn tại
+                        if (lblStatus != null && !lblStatus.IsDisposed && !_formClosing)
+                        {
+                            lblStatus.Invoke(new Action(() =>
+                            {
+                                lblStatus.Text = "✓ Đã thanh toán thành công!";
+                                lblStatus.ForeColor = Color.FromArgb(34, 197, 94);
+                            }));
+                        }
 
-                    await XacNhanThanhToanQR();
+                        // Xác nhận và đóng form
+                        await XacNhanThanhToanQR();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Lỗi check QR status: {ex.Message}");
                 }
             };
             _qrCheckTimer.Start();
@@ -659,36 +702,64 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private async Task XacNhanThanhToanQR()
         {
+            // Kiểm tra đã xử lý hoặc đang đóng form
+            if (_isProcessingPayment || _formClosing)
+            {
+                return;
+            }
+
+            _isProcessingPayment = true;
+
             try
             {
-                // Xác nhận thanh toán thủ công (nếu chưa tự động)
+                // Dừng timer
+                _cts?.Cancel();
+                _qrCheckTimer?.Stop();
+
+                this.Invoke(new Action(() => this.Cursor = Cursors.WaitCursor));
+
+                // Xác nhận thanh toán
                 await _vietQRService.XacNhanThanhToan(_qrGiaoDich.MaGiaoDich);
-
-                this.Cursor = Cursors.WaitCursor;
-
                 var result = await _thanhToanService.ThanhToanQR(_maHd, _qrGiaoDich.MaGiaoDich);
 
-                this.Cursor = Cursors.Default;
-
-                if (result.IsSuccess)
+                this.Invoke(new Action(() =>
                 {
-                    MessageBox.Show("✓ Thanh toán QR thành công!", "Thành công",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    this.Cursor = Cursors.Default;
 
-                    this.DialogResult = DialogResult.OK;
-                    this.Close();
-                }
-                else
-                {
-                    MessageBox.Show(result.Message, "Lỗi",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+                    if (result.IsSuccess)
+                    {
+                        _formClosing = true;
+                        this.DialogResult = DialogResult.OK;
+                        this.Close();
+                    }
+                    else
+                    {
+                        _isProcessingPayment = false;
+                        MessageBox.Show(result.Message, "Lỗi",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }));
             }
             catch (Exception ex)
             {
-                this.Cursor = Cursors.Default;
-                MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                this.Invoke(new Action(() =>
+                {
+                    this.Cursor = Cursors.Default;
+                    _isProcessingPayment = false;
+
+                    // Nếu lỗi do hóa đơn đã thanh toán, đóng form
+                    if (ex.Message.Contains("đã thanh toán") || ex.Message.Contains("Không tìm thấy"))
+                    {
+                        _formClosing = true;
+                        this.DialogResult = DialogResult.OK;
+                        this.Close();
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }));
             }
         }
 
@@ -696,6 +767,7 @@ namespace Billiard.WinForm.Forms.QLBan
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            _formClosing = true;
             _cts?.Cancel();
             _qrCheckTimer?.Stop();
             _qrCheckTimer?.Dispose();

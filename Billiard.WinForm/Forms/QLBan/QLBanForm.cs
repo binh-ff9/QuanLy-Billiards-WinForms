@@ -20,7 +20,7 @@ namespace Billiard.WinForm.Forms.QLBan
         private string _currentStatusFilter = "all";
         private string _currentTypeFilter = "all";
         private System.Windows.Forms.Timer _refreshTimer;
-        private bool _isRefreshing = false;
+
         public QLBanForm(BanBiaService banBiaService)
         {
             _banBiaService = banBiaService;
@@ -31,24 +31,12 @@ namespace Billiard.WinForm.Forms.QLBan
             this.AutoScroll = false;
             this.AutoSize = false;
         }
+
         private void InitializeRefreshTimer()
         {
             _refreshTimer = new System.Windows.Forms.Timer();
             _refreshTimer.Interval = 30000; // 30 seconds
-            _refreshTimer.Tick += async (s, e) =>
-            {
-                if (_isRefreshing) return;
-
-                _isRefreshing = true;
-                try
-                {
-                    await LoadBanBia();
-                }
-                finally
-                {
-                    _isRefreshing = false;
-                }
-            };
+            _refreshTimer.Tick += async (s, e) => await LoadBanBia();
         }
 
         private void SetupPermissions()

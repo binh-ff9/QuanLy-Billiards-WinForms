@@ -46,12 +46,6 @@ namespace Billiard.WinForm.Forms.QLBan
                 dtpGioKetThuc.CustomFormat = "HH:mm";
                 dtpGioKetThuc.ShowUpDown = true;
 
-                // Thêm sự kiện ValueChanged cho NgayDat và gọi chung DtpValue_Changed cho 2 datetimepicker còn lại
-                dtpNgayDat.ValueChanged += DtpNgayDat_ValueChanged;
-                dtpGioDat.ValueChanged += DtpDateTime_ValueChanged;
-                dtpGioKetThuc.ValueChanged += DtpDateTime_ValueChanged;
-                txtSoDienThoai.TextChanged += TxtSoDienThoai_TextChanged;
-                // Load available tables as cards
                 await LoadAvailableTablesForReservation();
             }
             catch (Exception ex)
@@ -61,77 +55,97 @@ namespace Billiard.WinForm.Forms.QLBan
             }
         }
 
-        private bool ValidateTimeRangeAndShowWarning()
-        {
-            // Reset _isWarningShown nếu bắt đầu kiểm tra mới
-            if (_isWarningShown) _isWarningShown = false;
+        //private bool ValidateTimeRangeAndShowWarning()
+        //{
+        //    if (_isWarningShown) _isWarningShown = false;
 
-            var gioBatDau = new DateTime(
-                dtpNgayDat.Value.Year,
-                dtpNgayDat.Value.Month,
-                dtpNgayDat.Value.Day,
-                dtpGioDat.Value.Hour,
-                dtpGioDat.Value.Minute,
-                0
-            );
+        //    // 1. Tính toán thời gian đặt bàn
+        //    var gioBatDau = dtpNgayDat.Value.Date
+        //        .AddHours(dtpGioDat.Value.Hour)
+        //        .AddMinutes(dtpGioDat.Value.Minute);
 
-            var gioKetThuc = new DateTime(
-                dtpNgayDat.Value.Year,
-                dtpNgayDat.Value.Month,
-                dtpNgayDat.Value.Day,
-                dtpGioKetThuc.Value.Hour,
-                dtpGioKetThuc.Value.Minute,
-                0
-            );
+        //    var gioKetThuc = dtpNgayDat.Value.Date
+        //        .AddHours(dtpGioKetThuc.Value.Hour)
+        //        .AddMinutes(dtpGioKetThuc.Value.Minute);
 
-            // Xử lý đặt qua đêm tạm thời để kiểm tra logic thời gian
-            if (gioKetThuc <= gioBatDau)
-            {
-                gioKetThuc = gioKetThuc.AddDays(1);
-            }
+        //    // Xử lý logic đặt qua đêm: Nếu giờ kết thúc < giờ bắt đầu, tự động cộng thêm 1 ngày
+        //    if (gioKetThuc < gioBatDau)
+        //    {
+        //        gioKetThuc = gioKetThuc.AddDays(1);
+        //    }
 
-            // Cảnh báo 1: Giờ kết thúc phải sau giờ bắt đầu
-            if (gioKetThuc <= gioBatDau)
-            {
-                if (!_isWarningShown)
-                {
-                    _isWarningShown = true;
-                    MessageBox.Show("Giờ kết thúc phải sau giờ bắt đầu!", "Cảnh báo thời gian",
-                       MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-                return false;
-            }
+        //    // Khung giờ hoạt động: 8:00 sáng (ngày D) đến 2:00 sáng (ngày D+1)
+        //    var thoiDiemBatDauHoatDong = dtpNgayDat.Value.Date.AddHours(8); // 8:00 AM Ngày D
+        //    var thoiDiemKetThucHoatDong = dtpNgayDat.Value.Date.AddDays(1).AddHours(2); // 2:00 AM Ngày D+1
 
-            // Cảnh báo 2: Thời gian đặt bàn phải sau thời gian hiện tại
-            // Dùng AddMinutes(5) để đảm bảo không bị lỗi time-sync và chặn đặt ngay lập tức
-            if (gioBatDau <= DateTime.Now.AddMinutes(5))
-            {
-                if (dtpNgayDat.Value.Date < DateTime.Now.Date)
-                {
-                    if (!_isWarningShown)
-                    {
-                        _isWarningShown = true;
-                        MessageBox.Show("Không thể đặt bàn cho ngày trong quá khứ!", "Cảnh báo ngày tháng",
-                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        // Tự động set về ngày hiện tại để người dùng dễ sửa
-                        dtpNgayDat.Value = DateTime.Now.Date;
-                    }
-                }
-                else
-                {
-                    // Nếu ngày đúng nhưng giờ trong quá khứ
-                    if (!_isWarningShown)
-                    {
-                        _isWarningShown = true;
-                        MessageBox.Show("Thời gian đặt bàn phải sau thời gian hiện tại!", "Cảnh báo thời gian",
-                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
-                }
-                return false;
-            }
+        //    // Nếu ngày đặt là ngày D, nhưng giờ đặt nằm trong khoảng 00:00 - 02:00, 
+        //    // ta phải xem nó thuộc ngày làm việc của ngày D-1 (tức là 8:00 sáng D-1 đến 2:00 sáng D)
+        //    if (dtpNgayDat.Value.Date == DateTime.Now.Date && gioBatDau.Hour >= 0 && gioBatDau.Hour < 2)
+        //    {
+        //        // Nếu người dùng chọn hôm nay, và chọn giờ 00:00 - 02:00, thì không hợp lệ vì quán đã đóng hoặc sắp đóng.
+        //        // Tuy nhiên, logic này phức tạp. Tạm thời dùng: Bắt đầu phải sau hiện tại.
 
-            return true;
-        }
+        //        // Nếu ngày đặt là ngày hôm sau và giờ đặt 00:00 - 02:00
+        //        // Logic sẽ được đơn giản hóa bằng cách kiểm tra:
+        //        // 1. Giờ kết thúc phải > Giờ bắt đầu (đã xử lý cộng ngày)
+        //        if (gioKetThuc <= gioBatDau)
+        //        {
+        //            if (!_isWarningShown)
+        //            {
+        //                _isWarningShown = true;
+        //                MessageBox.Show("Giờ kết thúc phải sau giờ bắt đầu (hoặc sau 00:00 sáng hôm sau)!", "Cảnh báo thời gian",
+        //                   MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        //            }
+        //            return false;
+        //        }
+        //    }
+
+
+        //    // Cảnh báo 2: Thời gian đặt bàn phải sau thời gian hiện tại
+        //    // Dùng AddMinutes(5) để chặn đặt ngay lập tức
+        //    if (gioBatDau <= DateTime.Now.AddMinutes(5))
+        //    {
+        //        if (dtpNgayDat.Value.Date < DateTime.Now.Date)
+        //        {
+        //            if (!_isWarningShown)
+        //            {
+        //                _isWarningShown = true;
+        //                MessageBox.Show("Không thể đặt bàn cho ngày trong quá khứ!", "Cảnh báo ngày tháng",
+        //                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        //                dtpNgayDat.Value = DateTime.Now.Date;
+        //            }
+        //        }
+        //        else
+        //        {
+        //            // Chỉ cảnh báo nếu giờ bắt đầu nằm trong vòng 5 phút so với hiện tại
+        //            if (!_isWarningShown)
+        //            {
+        //                _isWarningShown = true;
+        //                MessageBox.Show("Thời gian đặt bàn phải sau thời gian hiện tại!", "Cảnh báo thời gian",
+        //                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        //            }
+        //        }
+        //        return false;
+        //    }
+
+        //    // 3. Ràng buộc khung giờ hoạt động (Đã được kiểm tra kỹ trong BtnXacNhan_Click, nhưng cần kiểm tra ở đây để lọc bàn)
+        //    // Ràng buộc 3a: Giờ kết thúc không được sau 2:00 sáng của ngày làm việc
+        //    // Ngày làm việc là ngày của gioBatDau.
+        //    var endOfDayWork = gioBatDau.Date.AddDays(1).AddHours(2); // 2:00 AM ngày hôm sau
+
+        //    if (gioKetThuc > endOfDayWork)
+        //    {
+        //        if (!_isWarningShown)
+        //        {
+        //            _isWarningShown = true;
+        //            MessageBox.Show("Giờ kết thúc đặt bàn không được sau 2:00 sáng của ngày làm việc (Ngày bắt đầu)!",
+        //                "Cảnh báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        //        }
+        //        return false;
+        //    }
+
+        //    return true;
+        //}
 
         private async void DtpDateTime_ValueChanged(object sender, EventArgs e)
         {
@@ -143,59 +157,8 @@ namespace Billiard.WinForm.Forms.QLBan
                 dtpGioKetThuc.Value = dtpGioDat.Value.AddHours(2);
                 dtpGioKetThuc.ValueChanged += DtpDateTime_ValueChanged;
             }
-
-            // Gọi hàm kiểm tra trước khi tải danh sách bàn
-            if (ValidateTimeRangeAndShowWarning())
-            {
-                await LoadAvailableTablesForReservation();
-            }
-            else
-            {
-                ClearTableDisplay();
-            }
         }
 
-        private async void DtpNgayDat_ValueChanged(object sender, EventArgs e)
-        {
-            if (ValidateTimeRangeAndShowWarning())
-            {
-                await LoadAvailableTablesForReservation();
-            }
-            else
-            {
-                ClearTableDisplay();
-            }
-        }
-
-        private async void DtpGioDat_ValueChanged(object sender, EventArgs e)
-        {
-            dtpGioKetThuc.ValueChanged -= DtpDateTime_ValueChanged;
-            dtpGioKetThuc.Value = dtpGioDat.Value.AddHours(2);
-            dtpGioKetThuc.ValueChanged += DtpDateTime_ValueChanged;
-
-            // Thêm: Gọi hàm kiểm tra trước khi tải danh sách bàn
-            if (ValidateTimeRangeAndShowWarning())
-            {
-                await LoadAvailableTablesForReservation();
-            }
-            else
-            {
-                ClearTableDisplay();
-            }
-        }
-
-        private async void DtpGioKetThuc_ValueChanged(object sender, EventArgs e)
-        {
-            // Validation có thể thêm ở đây nếu cần
-            if (ValidateTimeRangeAndShowWarning())
-            {
-                await LoadAvailableTablesForReservation();
-            }
-            else
-            {
-                ClearTableDisplay();
-            }
-        }
 
         // Phương thức mới để dọn dẹp màn hình hiển thị bàn
         private void ClearTableDisplay()
@@ -230,13 +193,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 flpBanTrong.SuspendLayout();
                 flpBanTrong.Controls.Clear();
 
-                // Kiểm tra lại tính hợp lệ của thời gian trước khi tính toán
-                if (!ValidateTimeRangeAndShowWarning())
-                {
-                    ClearTableDisplay();
-                    return;
-                }
-
+                
                 var gioBatDau = new DateTime(
                     dtpNgayDat.Value.Year,
                     dtpNgayDat.Value.Month,

@@ -127,7 +127,6 @@
             dtpGioKetThuc.Name = "dtpGioKetThuc";
             dtpGioKetThuc.Size = new Size(382, 37);
             dtpGioKetThuc.TabIndex = 5;
-            dtpGioKetThuc.ValueChanged += DtpGioKetThuc_ValueChanged;
             // 
             // lblGioKetThuc
             // 
@@ -146,7 +145,6 @@
             dtpGioDat.Name = "dtpGioDat";
             dtpGioDat.Size = new Size(382, 37);
             dtpGioDat.TabIndex = 3;
-            dtpGioDat.ValueChanged += DtpGioDat_ValueChanged;
             // 
             // lblGioDat
             // 

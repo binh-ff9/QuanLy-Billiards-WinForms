@@ -388,7 +388,7 @@ namespace Billiard.WinForm.Forms.QLBan
         private Panel CreateServiceCard(DichVu service)
         {
             // Đảm bảo cardWidth được tính toán lại khi form resize
-            int cardWidth = (flpServices.ClientSize.Width / 2) - 25; // Cố gắng hiển thị 2 cột, trừ padding
+            int cardWidth = (flpServices.ClientSize.Width / 2) - 50; // Cố gắng hiển thị 2 cột, trừ padding
             if (cardWidth < 300) cardWidth = flpServices.ClientSize.Width - 30; // Chuyển sang 1 cột nếu quá hẹp
 
             var card = new Panel

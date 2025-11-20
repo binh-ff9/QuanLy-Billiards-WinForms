@@ -319,6 +319,20 @@ namespace Billiard.WinForm.Forms.CaiDat
                 txtAccountName.Focus();
                 return false;
             }
+            var validBanks = new[] { "MB", "VCB", "TCB", "ACB", "VPB", "TPB", "STB", "BIDV" };
+            if (!validBanks.Contains(txtBankId.Text.Trim().ToUpper()))
+            {
+                var result = MessageBox.Show(
+                    $"Mã ngân hàng '{txtBankId.Text}' có thể không được hỗ trợ.\n\n" +
+                    "Các mã phổ biến: MB, VCB, TCB, ACB, VPB, TPB, STB, BIDV\n\n" +
+                    "Bạn có muốn tiếp tục không?",
+                    "Cảnh báo",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (result != DialogResult.Yes)
+                    return false;
+            }
 
             return true;
         }

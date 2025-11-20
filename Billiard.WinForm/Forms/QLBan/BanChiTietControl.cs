@@ -219,13 +219,41 @@ namespace Billiard.WinForm.Forms.QLBan
         // 6. Sửa lỗi out parameter và dùng alias
         private async Task<int> AddPaymentInfo(HoaDonEntity hoaDon, TimeSpan duration, int yPos, int panelWidth)
         {
-            var soGio = (decimal)duration.TotalMinutes / 60;
+            // TÍNH TOÁN CHÍNH XÁC
+            // 1. Tính thời gian (làm tròn lên phút)
+            var tongPhut = (int)Math.Ceiling(duration.TotalMinutes);
+            var soGio = (decimal)tongPhut / 60m;
+
+            // 2. Lấy giá giờ
             var giaGioDecimal = _ban.MaLoaiNavigation?.GiaGio ?? 0;
-            var tienBan = giaGioDecimal * soGio;
-            var tienDichVu = hoaDon.TienDichVu ?? 0;
-            var tamTinh = tienBan + tienDichVu;
-            var tongCong = Math.Ceiling(tamTinh / 1000) * 1000;
+
+            // 3. Tính tiền bàn
+            var tienBan = soGio * giaGioDecimal;
+
+            // 4. Tính tiền dịch vụ từ CSDL
+            var tienDichVu = await _banBiaService.GetInvoiceDetailsAsync(hoaDon.MaHd)
+            .ContinueWith(t => t.Result.Sum(ct => ct.ThanhTien));
+
+            // 5. Lấy giảm giá
+            var giamGia = hoaDon.GiamGia ?? 0;
+
+            // 6. Tính tạm tính
+            var tamTinh = tienBan + tienDichVu - giamGia;
+
+            // 7. Làm tròn lên nghìn
+            var tongCong = Math.Ceiling((tamTinh ?? 0m) / 1000m) * 1000m;
             var chenhLech = tongCong - tamTinh;
+
+            // Log để debug
+            System.Diagnostics.Debug.WriteLine($"\n=== HIỂN THỊ THANH TOÁN ===");
+            System.Diagnostics.Debug.WriteLine($"Thời gian: {tongPhut} phút ({soGio:F4} giờ)");
+            System.Diagnostics.Debug.WriteLine($"Giá giờ: {giaGioDecimal:N0} đ");
+            System.Diagnostics.Debug.WriteLine($"Tiền bàn: {tienBan:N2} đ");
+            System.Diagnostics.Debug.WriteLine($"Tiền dịch vụ: {tienDichVu:N0} đ");
+            System.Diagnostics.Debug.WriteLine($"Giảm giá: {giamGia:N0} đ");
+            System.Diagnostics.Debug.WriteLine($"Tạm tính: {tamTinh:N2} đ");
+            System.Diagnostics.Debug.WriteLine($"Tổng cộng (làm tròn): {tongCong:N0} đ");
+            System.Diagnostics.Debug.WriteLine($"Chênh lệch: {chenhLech:N2} đ\n");
 
             var pnlPayment = CreateCard(panelWidth, Color.FromArgb(248, 250, 252));
             pnlPayment.Location = new Point(0, yPos);
@@ -235,9 +263,15 @@ namespace Billiard.WinForm.Forms.QLBan
             payYPos = AddPaymentRow(pnlPayment, "Tiền bàn:", $"{tienBan:N0} đ", payYPos, panelWidth);
             payYPos = AddPaymentRow(pnlPayment, "Dịch vụ:", $"{tienDichVu:N0} đ", payYPos, panelWidth);
 
+            if (giamGia > 0)
+            {
+                payYPos = AddPaymentRow(pnlPayment, "Giảm giá:", $"-{giamGia:N0} đ", payYPos, panelWidth);
+            }
+
             if (chenhLech > 0)
             {
                 payYPos = AddPaymentRow(pnlPayment, "Tạm tính:", $"{tamTinh:N0} đ", payYPos, panelWidth, true);
+                payYPos = AddPaymentRow(pnlPayment, "Làm tròn:", $"+{chenhLech:N0} đ", payYPos, panelWidth, true);
             }
 
             // Separator
