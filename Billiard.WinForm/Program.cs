@@ -14,6 +14,8 @@ using System;
 using System.IO;
 using System.Windows.Forms;
 using Billiard.BLL.Services.HoaDonServices;
+using Billiard.BLL.Services.KhachHangServices;
+using Billiard.WinForm.Forms.KhachHang;
 
 namespace Billiard.WinForm
 {
@@ -41,7 +43,7 @@ namespace Billiard.WinForm
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
             // Run LoginForm
-            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
+            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -71,6 +73,19 @@ namespace Billiard.WinForm
             services.AddTransient<HoaDonService>();
 
             // Register Forms
+
+
+            // BanBia services
+            services.AddScoped<BanBiaService>();
+
+            // HoaDon services
+            services.AddScoped<HoaDonService>();
+
+            // KhachHang services
+            services.AddScoped<KhachHangService>();
+
+            // Register Auth Forms
+
             services.AddTransient<LoginForm>();
             services.AddTransient<SignupForm>();
             services.AddTransient<ForgotPasswordForm>();
@@ -81,6 +96,8 @@ namespace Billiard.WinForm
             services.AddTransient<QLBanForm>();
             services.AddTransient<HoaDonForm>();
             services.AddTransient<ThongKeForm>();
+            services.AddTransient<KhachHangForm>(); // Khách hàng
+
         }
 
         public static T GetService<T>() where T : class
