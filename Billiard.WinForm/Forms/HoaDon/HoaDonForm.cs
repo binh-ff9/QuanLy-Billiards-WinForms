@@ -35,7 +35,7 @@ namespace Billiard.WinForm.Forms.HoaDon
             dtpTuNgay.ValueChanged += Filter_Changed;
             dtpDenNgay.ValueChanged += Filter_Changed;
             btnTatCa.Click += (s, e) => SetStatusFilter("Tất cả", btnTatCa);
-            btnChuaThanhToan.Click += (s, e) => SetStatusFilter("Chưa thanh toán", btnChuaThanhToan);
+            btnChuaThanhToan.Click += (s, e) => SetStatusFilter("Đang chơi", btnChuaThanhToan);
             btnDaThanhToan.Click += (s, e) => SetStatusFilter("Đã thanh toán", btnDaThanhToan);
             btnXuatBaoCao.Click += btnXuatBaoCao_Click;
         }
@@ -380,7 +380,8 @@ namespace Billiard.WinForm.Forms.HoaDon
                     var detailControl = new ChiTietHoaDonControl();
                     detailControl.LoadData(fullInfo);
 
-                    _mainForm.UpdateDetailPanel("Chi Tiết hóa đơn", detailControl);
+                   
+                    _mainForm.UpdateDetailPanel("Chi Tiết hóa đơn", detailControl,450);
 
                 }
 
