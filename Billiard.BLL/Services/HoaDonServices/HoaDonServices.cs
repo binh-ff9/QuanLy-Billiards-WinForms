@@ -35,6 +35,7 @@ namespace Billiard.BLL.Services.HoaDonServices
         {
             return await _context.HoaDons
                 .Include(h => h.MaBanNavigation)
+                .Include(h=>h.MaBanNavigation.MaLoaiNavigation)
                 .Include(h => h.MaNvNavigation)
                 .Include(h => h.MaKhNavigation)
                 .Include(h => h.ChiTietHoaDons)

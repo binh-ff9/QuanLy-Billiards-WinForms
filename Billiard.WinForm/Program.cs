@@ -5,6 +5,7 @@ using Billiard.DAL.Data;
 using Billiard.WinForm.Forms;
 using Billiard.WinForm.Forms.Auth;
 using Billiard.WinForm.Forms.HoaDon;
+using Billiard.WinForm.Forms.ThongKe;
 using Billiard.WinForm.Forms.QLBan;
 using Billiard.WinForm.Forms.CaiDat;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
+
+using Billiard.BLL.Services.HoaDonServices;
+using Billiard.BLL.Services.KhachHangServices;
+using Billiard.WinForm.Forms.KhachHang;
 using System.Windows.Forms;
 using Billiard.BLL.Services.VietQR;
 
@@ -41,23 +46,23 @@ namespace Billiard.WinForm
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
             // Run LoginForm
-            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
+            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
         {
-            // ✅ QUAN TRỌNG: Đăng ký DbContext với TRANSIENT lifetime cho WinForms
-            services.AddDbContext<BilliardDbContext>(
-                options => options.UseSqlServer(
+            // DbContext - GIỮ NGUYÊN TRANSIENT
+            services.AddTransient<BilliardDbContext>(provider =>
+            {
+                var optionsBuilder = new DbContextOptionsBuilder<BilliardDbContext>();
+                optionsBuilder.UseSqlServer(
                     Configuration.GetConnectionString("DefaultConnection"),
                     sqlOptions => sqlOptions.EnableRetryOnFailure(
                         maxRetryCount: 3,
                         maxRetryDelay: TimeSpan.FromSeconds(5),
                         errorNumbersToAdd: null
                     )
-                ),
-                ServiceLifetime.Transient,  // ← THÊM DÒNG NÀY
-                ServiceLifetime.Transient   // ← VÀ DÒNG NÀY
+                )
             );
 
             // ✅ Đổi tất cả Services từ Scoped → Transient
@@ -67,6 +72,18 @@ namespace Billiard.WinForm
             services.AddTransient<MatHangService>();
             services.AddTransient<AuthService>();
             services.AddSingleton<HttpClient>();
+            // Register BLL Services
+            services.AddTransient<AuthService>();
+            services.AddTransient<EmailService>();
+            services.AddTransient<DichVuService>();
+            services.AddTransient<MatHangService>();
+            services.AddTransient<ThongKeService>();
+            services.AddTransient<BanBiaService>();
+            services.AddTransient<HoaDonService>();
+
+            // Register Forms
+
+
             // BanBia services
             services.AddTransient<BanBiaService>();
             services.AddTransient<DatBanService>();
@@ -79,21 +96,26 @@ namespace Billiard.WinForm
             services.AddTransient<ThanhToanService>();
             services.AddTransient<ThanhToanService>();
             services.AddTransient<VietQRConfigForm>();
+            services.AddScoped<HoaDonService>();
+
+            // KhachHang services
+            services.AddScoped<KhachHangService>();
+
             // Register Auth Forms
+
             services.AddTransient<LoginForm>();
             services.AddTransient<SignupForm>();
             services.AddTransient<ForgotPasswordForm>();
             services.AddTransient<ResetPasswordForm>();
-
-            // Register Main Form
             services.AddTransient<MainForm>();
-
-            // Register Feature Forms
             services.AddTransient<DichVuForm>();
             services.AddTransient<DichVuEditForm>();
             services.AddTransient<QLBanForm>();
             services.AddTransient<HoaDonForm>();
         }
+            services.AddTransient<HoaDonForm>();
+            services.AddTransient<ThongKeForm>();
+            services.AddTransient<KhachHangForm>(); // Khách hàng
 
         // ✅ THÊM: Method để tạo Scope mới (tùy chọn)
         public static IServiceScope CreateScope()

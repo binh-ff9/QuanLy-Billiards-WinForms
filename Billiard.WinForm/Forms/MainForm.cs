@@ -5,12 +5,16 @@ using Billiard.WinForm.Forms;
 using Billiard.WinForm.Forms.Auth;
 using Billiard.WinForm.Forms.CaiDat;
 using Billiard.WinForm.Forms.HoaDon;
+using Billiard.WinForm.Forms.ThongKe;
 using Billiard.WinForm.Forms.QLBan;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using Billiard.WinForm.Forms.Auth;
+using Billiard.BLL.Services.QLBan;
+using Billiard.WinForm.Forms.KhachHang;
 namespace Billiard.WinForm
 {
     public partial class MainForm : Form
@@ -257,10 +261,11 @@ namespace Billiard.WinForm
                         OpenChildForm(hoaDonForm);
                         break;
                     case "btnKhachHang":
-                        ShowComingSoon("Khách hàng");
-                        break;
+                        var khForm = Program.GetService<KhachHangForm>();
+                        khForm.SetMainForm(this);
+                        OpenChildForm(khForm); break;
                     case "btnThongKe":
-                        ShowComingSoon("Thống kê");
+                        OpenChildForm(Program.GetService<ThongKeForm>());
                         break;
                     case "btnNhanVien":
                         ShowComingSoon("Nhân viên");
@@ -454,8 +459,10 @@ namespace Billiard.WinForm
 
         #region Detail Panel Management
 
-        public void UpdateDetailPanel(string title, Control content)
+        public void UpdateDetailPanel(string title, Control content, int width = 450)
         {
+            pnlDetail.Width = width;
+
             // Clear existing controls except title label
             pnlDetail.Controls.Clear();
 
