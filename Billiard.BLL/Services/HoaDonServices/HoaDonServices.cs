@@ -261,5 +261,22 @@ namespace Billiard.BLL.Services.HoaDonServices
         }
 
         #endregion
+
+
+        #region Lịch sử hóa đơn cho User
+        public async Task<List<HoaDon>> GetHistoryByCustomerAsync(int maKh)
+        {
+            return await _context.HoaDons
+                .Include(h => h.MaBanNavigation)
+                .Include(h => h.ChiTietHoaDons) // Để tính tổng tiền hoặc xem chi tiết sau này
+                    .ThenInclude(ct => ct.MaDvNavigation)
+                .Where(h => h.MaKh == maKh && h.TrangThai == "Đã thanh toán") // Chỉ lấy đơn đã xong
+                .OrderByDescending(h => h.ThoiGianBatDau)
+                .ToListAsync();
+        }
+
+
+
+        #endregion
     }
 }

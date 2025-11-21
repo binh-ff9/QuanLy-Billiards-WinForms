@@ -258,5 +258,21 @@ namespace Billiard.BLL.Services.QLBan
             await _context.SaveChangesAsync();
         }
 
+
+        // Hủy đặt bàng
+        public async Task<bool> CancelBookingAsync(int maDat)
+        {
+            var booking = await _context.DatBans.FindAsync(maDat);
+            if (booking == null) return false;
+
+            // Chỉ cho phép hủy nếu chưa xác nhận
+            if (booking.TrangThai == "Đang chờ")
+            {
+                booking.TrangThai = "Đã hủy";
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            return false;
+        }
     }
 }
