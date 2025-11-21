@@ -200,8 +200,8 @@ namespace Billiard.WinForm.Forms.NhanVien
             // Status badge
             var statusBadge = new Label
             {
-                Text = emp.TrangThai == "DangLam" ? "Đang làm" : "Nghỉ việc",
-                BackColor = emp.TrangThai == "DangLam" ? Color.FromArgb(40, 167, 69) : Color.FromArgb(220, 53, 69),
+                Text = emp.TrangThai == "Đang làm" ? "Đang làm" : "Nghỉ việc",
+                BackColor = emp.TrangThai == "Đang làm" ? Color.FromArgb(40, 167, 69) : Color.FromArgb(220, 53, 69),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 8F, FontStyle.Bold),
                 AutoSize = true,
@@ -418,7 +418,20 @@ namespace Billiard.WinForm.Forms.NhanVien
 
         private void btnAttendance_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("⚠️ Chức năng chấm công đang phát triển", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            try
+            {
+                var chamCongForm = new ChamCongForm();
+                chamCongForm.SetUserInfo(_currentUserId, _currentUserRole);
+                chamCongForm.ShowDialog(this);
+
+                // Reload data nếu cần
+                LoadEmployees();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở form chấm công: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void btnSchedule_Click(object sender, EventArgs e)
@@ -527,6 +540,21 @@ namespace Billiard.WinForm.Forms.NhanVien
 
         private void flowLayoutEmployees_Paint(object sender, PaintEventArgs e)
         {
+        }
+
+        private void btnSalary_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var salaryForm = new SalaryManagementForm(_nhanVienService);
+                salaryForm.SetUserInfo(_currentUserId, _currentUserRole);
+                salaryForm.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở form bảng lương: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }

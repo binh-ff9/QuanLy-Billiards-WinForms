@@ -36,6 +36,7 @@
             txtSearch = new TextBox();
             panelContent = new Panel();
             flowLayoutEmployees = new FlowLayoutPanel();
+            btnSalary = new Button();
             panelHeader.SuspendLayout();
             panelFilter.SuspendLayout();
             panelContent.SuspendLayout();
@@ -44,6 +45,7 @@
             // panelHeader
             // 
             panelHeader.BackColor = Color.White;
+            panelHeader.Controls.Add(btnSalary);
             panelHeader.Controls.Add(lblTitle);
             panelHeader.Controls.Add(btnAdd);
             panelHeader.Controls.Add(btnAttendance);
@@ -321,6 +323,23 @@
             flowLayoutEmployees.Size = new Size(1345, 480);
             flowLayoutEmployees.TabIndex = 0;
             // 
+            // btnSalary
+            // 
+            btnSalary.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnSalary.BackColor = Color.FromArgb(0, 192, 192);
+            btnSalary.Cursor = Cursors.Hand;
+            btnSalary.FlatAppearance.BorderSize = 0;
+            btnSalary.FlatStyle = FlatStyle.Flat;
+            btnSalary.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            btnSalary.ForeColor = Color.Black;
+            btnSalary.Location = new Point(245, 20);
+            btnSalary.Name = "btnSalary";
+            btnSalary.Size = new Size(150, 42);
+            btnSalary.TabIndex = 4;
+            btnSalary.Text = "Lương";
+            btnSalary.UseVisualStyleBackColor = false;
+            btnSalary.Click += btnSalary_Click;
+            // 
             // NhanVienForm
             // 
             AutoScaleDimensions = new SizeF(10F, 25F);
@@ -363,5 +382,6 @@
         private System.Windows.Forms.TextBox txtSearch;
         private System.Windows.Forms.Panel panelContent;
         private System.Windows.Forms.FlowLayoutPanel flowLayoutEmployees;
+        private Button btnSalary;
     }
 }

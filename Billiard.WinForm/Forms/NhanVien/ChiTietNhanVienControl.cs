@@ -546,8 +546,16 @@ namespace Billiard.WinForm.Forms.NhanVien
 
         private void BtnViewAttendance_Click(object sender, EventArgs e)
         {
-            MessageBox.Show($"Xem chi tiết chấm công của {_nhanVien.TenNv}\n(Chức năng đang phát triển)",
-                "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            try
+            {
+                var historyForm = new AttendanceHistoryForm(_nhanVien.MaNv, _nhanVien.TenNv);
+                historyForm.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở lịch sử chấm công: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
         #endregion
     }

@@ -16,9 +16,10 @@ namespace Billiard.WinForm.Forms.NhanVien
     {
         #region Fields
         private readonly NhanVienService _nhanVienService;
+        private readonly LichLamViecService _lichLamViecService;
         private List<DAL.Entities.NhanVien> _allEmployees;
         private DateTime _currentWeekStart;
-        private List<LichLamViec> _scheduleData;
+        private List<DAL.Entities.LichLamViec> _scheduleData;
         private int _currentUserId;
         private string _currentUserRole;
         private Panel pnlCalendar;
@@ -37,11 +38,14 @@ namespace Billiard.WinForm.Forms.NhanVien
         public ScheduleForm(NhanVienService nhanVienService)
         {
             _nhanVienService = nhanVienService;
-            _scheduleData = new List<LichLamViec>();
+            _lichLamViecService = new LichLamViecService();
+            _scheduleData = new List<DAL.Entities.LichLamViec>();
             _currentWeekStart = GetWeekStart(DateTime.Now);
 
             InitializeComponent();
             InitializeCustomControls();
+
+            // CRITICAL: Load employees FIRST before loading schedule
             LoadEmployees();
             LoadScheduleFromDatabase();
         }
@@ -177,15 +181,49 @@ namespace Billiard.WinForm.Forms.NhanVien
         {
             try
             {
-                _allEmployees = _nhanVienService.GetAllEmployees()
-                    .Where(e => e.TrangThai == "DangLam")
+                // Load tất cả nhân viên trước
+                var allEmployees = _nhanVienService.GetAllEmployees();
+
+                System.Diagnostics.Debug.WriteLine($"=== LoadEmployees ===");
+                System.Diagnostics.Debug.WriteLine($"Total employees in DB: {allEmployees.Count}");
+
+                // Debug: Xem trạng thái của từng nhân viên
+                foreach (var emp in allEmployees)
+                {
+                    System.Diagnostics.Debug.WriteLine($"  - ID:{emp.MaNv} {emp.TenNv} Status:'{emp.TrangThai}' ({emp.MaNhomNavigation?.TenNhom ?? "No Role"})");
+                }
+
+                // FIX: Lọc nhân viên đang làm việc (xử lý cả 2 định dạng: "DangLam" và "Đang làm")
+                _allEmployees = allEmployees
+                    .Where(e => e.TrangThai != null &&
+                               (e.TrangThai.Equals("DangLam", StringComparison.OrdinalIgnoreCase) ||
+                                e.TrangThai.Equals("Đang làm", StringComparison.OrdinalIgnoreCase) ||
+                                e.TrangThai.Contains("Đang", StringComparison.OrdinalIgnoreCase)))
                     .ToList();
+
+                System.Diagnostics.Debug.WriteLine($"Active employees (filtered): {_allEmployees.Count}");
+
+                if (_allEmployees.Count == 0)
+                {
+                    System.Diagnostics.Debug.WriteLine("WARNING: No active employees found after filtering!");
+                    System.Diagnostics.Debug.WriteLine("Check if TrangThai values match the filter criteria");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine("Active employees list:");
+                    foreach (var emp in _allEmployees)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  ✓ ID:{emp.MaNv} {emp.TenNv} ({emp.MaNhomNavigation?.TenNhom ?? "No Role"})");
+                    }
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi khi tải danh sách nhân viên: {ex.Message}", "Lỗi",
+                MessageBox.Show($"Lỗi khi tải danh sách nhân viên: {ex.Message}\n\nStack: {ex.StackTrace}", "Lỗi",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 _allEmployees = new List<DAL.Entities.NhanVien>();
+                System.Diagnostics.Debug.WriteLine($"LoadEmployees ERROR: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");
             }
         }
 
@@ -193,21 +231,16 @@ namespace Billiard.WinForm.Forms.NhanVien
         {
             try
             {
-                using (var context = new BilliardDbContext())
-                {
-                    var weekEnd = _currentWeekStart.AddDays(7);
-                    _scheduleData = context.Set<LichLamViec>()
-                        .Include(l => l.NhanVien)
-                        .Where(l => l.Ngay >= DateOnly.FromDateTime(_currentWeekStart)
-                                 && l.Ngay < DateOnly.FromDateTime(weekEnd))
-                        .ToList();
-                }
+                // Sử dụng LichLamViecService để lấy dữ liệu
+                _scheduleData = _lichLamViecService.GetScheduleByWeek(_currentWeekStart);
 
-                // Debug: Log số lượng schedule đã load
-                System.Diagnostics.Debug.WriteLine($"Loaded {_scheduleData.Count} schedules for week {_currentWeekStart:dd/MM}");
+                System.Diagnostics.Debug.WriteLine($"=== LoadScheduleFromDatabase ===");
+                System.Diagnostics.Debug.WriteLine($"Week start: {_currentWeekStart:dd/MM/yyyy}");
+                System.Diagnostics.Debug.WriteLine($"Loaded {_scheduleData.Count} schedules");
+
                 foreach (var s in _scheduleData)
                 {
-                    System.Diagnostics.Debug.WriteLine($"  - {s.NhanVien?.TenNv}: {s.Ngay} {s.GioBatDau}-{s.GioKetThuc}");
+                    System.Diagnostics.Debug.WriteLine($"  - ID:{s.Id} NV:{s.MaNv} ({s.NhanVien?.TenNv ?? "NULL"}): {s.Ngay} {s.GioBatDau}-{s.GioKetThuc}");
                 }
 
                 RenderCalendar();
@@ -215,10 +248,11 @@ namespace Billiard.WinForm.Forms.NhanVien
             }
             catch (Exception ex)
             {
-                _scheduleData = new List<LichLamViec>();
+                _scheduleData = new List<DAL.Entities.LichLamViec>();
                 RenderCalendar();
                 UpdateWeekDisplay();
                 System.Diagnostics.Debug.WriteLine($"LoadSchedule error: {ex.Message}");
+                MessageBox.Show($"Lỗi khi tải lịch: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
         #endregion
@@ -313,30 +347,26 @@ namespace Billiard.WinForm.Forms.NhanVien
             var panel = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0), Cursor = isPast ? Cursors.Default : Cursors.Hand, Tag = new TimeSlotInfo { Date = date, Hour = hour } };
             panel.BackColor = GetCellBackgroundColor(isPast, isCurrentHour, isToday);
 
-            // [FIX] Sửa logic kiểm tra nhân viên trong khung giờ
-            // Kiểm tra xem hour có nằm trong khoảng [GioBatDau, GioKetThuc) không
+            // Kiểm tra nhân viên trong khung giờ này
             var employeesAtHour = _scheduleData
                 .Where(s => s.Ngay == dateOnly &&
                            hour >= s.GioBatDau.Hour &&
                            hour < s.GioKetThuc.Hour)
                 .ToList();
 
-            // Debug log
             if (employeesAtHour.Any())
             {
-                System.Diagnostics.Debug.WriteLine($"Cell {date:dd/MM} {hour}:00 has {employeesAtHour.Count} employees");
-            }
-
-            if (employeesAtHour.Any())
-            {
+                // Tạo tooltip với danh sách nhân viên
                 var tooltip = new ToolTip();
-                var names = string.Join("\n", employeesAtHour.Select(e => $"👤 {e.NhanVien?.TenNv ?? "N/A"} ({e.GioBatDau:HH\\:mm}-{e.GioKetThuc:HH\\:mm})"));
+                var names = string.Join("\n", employeesAtHour.Select(e =>
+                    $"👤 {e.NhanVien?.TenNv ?? $"NV#{e.MaNv}"} ({e.GioBatDau:HH\\:mm}-{e.GioKetThuc:HH\\:mm})"));
                 tooltip.SetToolTip(panel, names);
 
+                // Hiển thị số lượng nhân viên
                 var lblCount = new Label
                 {
                     Text = employeesAtHour.Count.ToString(),
-                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                     ForeColor = Color.FromArgb(102, 126, 234),
                     AutoSize = true,
                     Location = new Point(5, 5),
@@ -344,17 +374,18 @@ namespace Billiard.WinForm.Forms.NhanVien
                 };
                 panel.Controls.Add(lblCount);
 
+                // Icon nhóm
                 var lblIcon = new Label
                 {
                     Text = "👥",
-                    Font = new Font("Segoe UI", 10F),
+                    Font = new Font("Segoe UI", 12F),
                     AutoSize = true,
-                    Location = new Point(20, 3),
+                    Location = new Point(22, 3),
                     BackColor = Color.Transparent
                 };
                 panel.Controls.Add(lblIcon);
 
-                // Hiển thị màu ca đầu tiên
+                // Thanh màu chỉ ca làm
                 var shift = employeesAtHour.First().Ca;
                 var shiftIndicator = new Panel
                 {
@@ -364,23 +395,40 @@ namespace Billiard.WinForm.Forms.NhanVien
                 };
                 panel.Controls.Add(shiftIndicator);
 
-                // Đổi màu nền cell để dễ nhìn hơn
-                panel.BackColor = Color.FromArgb(240, 249, 255);
-            }
+                // Đổi màu nền cell có nhân viên
+                panel.BackColor = Color.FromArgb(230, 244, 255);
 
-            panel.Click += (s, e) => HandleCellClick(panel, date, hour, isPast);
+                // FIX: Single-click để xem chi tiết (không cần double-click nữa)
+                panel.Click += (s, e) =>
+                {
+                    // Nếu click vào cell có nhân viên, hiển thị chi tiết
+                    ShowTimeSlotDetails(date, hour, employeesAtHour);
+                };
+
+                // Cũng cho children
+                foreach (Control ctrl in panel.Controls)
+                {
+                    ctrl.Click += (s, e) => ShowTimeSlotDetails(date, hour, employeesAtHour);
+                    ctrl.Cursor = Cursors.Hand;
+                }
+            }
+            else
+            {
+                // Cell trống - Click để chọn khung giờ (cho việc thêm mới)
+                panel.Click += (s, e) => HandleCellClick(panel, date, hour, isPast);
+            }
 
             if (!isPast)
             {
                 panel.MouseEnter += (s, e) =>
                 {
                     if (panel != _selectedStartCell && panel != _selectedEndCell)
-                        panel.BackColor = employeesAtHour.Any() ? Color.FromArgb(220, 239, 255) : Color.FromArgb(239, 246, 255);
+                        panel.BackColor = employeesAtHour.Any() ? Color.FromArgb(200, 230, 255) : Color.FromArgb(239, 246, 255);
                 };
                 panel.MouseLeave += (s, e) =>
                 {
                     if (panel != _selectedStartCell && panel != _selectedEndCell)
-                        panel.BackColor = employeesAtHour.Any() ? Color.FromArgb(240, 249, 255) : GetCellBackgroundColor(isPast, isCurrentHour, isToday);
+                        panel.BackColor = employeesAtHour.Any() ? Color.FromArgb(230, 244, 255) : GetCellBackgroundColor(isPast, isCurrentHour, isToday);
                 };
             }
             return panel;
@@ -398,21 +446,46 @@ namespace Billiard.WinForm.Forms.NhanVien
 
         private void AddLegend(int yPosition)
         {
-            var pnlLegend = new Panel { Location = new Point(0, yPosition), Size = new Size(pnlCalendar.Width - 40, 80), BackColor = Color.White, Padding = new Padding(15) };
+            var pnlLegend = new Panel { Location = new Point(0, yPosition), Size = new Size(pnlCalendar.Width - 40, 100), BackColor = Color.White, Padding = new Padding(15) };
+
             var lblLegend = new Label { Text = "📌 Chú thích:", Font = new Font("Segoe UI", 10F, FontStyle.Bold), AutoSize = true, Location = new Point(15, 15) };
 
-            var shiftLegends = new[] { (Color.FromArgb(251, 191, 36), "Ca Sáng"), (Color.FromArgb(139, 92, 246), "Ca Tối"), (Color.FromArgb(134, 239, 172), "Đang chọn"), (Color.FromArgb(240, 249, 255), "Có NV") };
+            var shiftLegends = new[]
+            {
+                (Color.FromArgb(251, 191, 36), "Ca Sáng"),
+                (Color.FromArgb(139, 92, 246), "Ca Tối"),
+                (Color.FromArgb(134, 239, 172), "Đang chọn"),
+                (Color.FromArgb(230, 244, 255), "Có nhân viên")
+            };
+
             int xPos = 130;
             foreach (var (color, text) in shiftLegends)
             {
                 var box = new Panel { Size = new Size(25, 25), Location = new Point(xPos, 13), BackColor = color };
                 var lbl = new Label { Text = text, Font = new Font("Segoe UI", 9F), AutoSize = true, Location = new Point(xPos + 32, 15) };
                 pnlLegend.Controls.AddRange(new Control[] { box, lbl });
-                xPos += 120;
+                xPos += 140;
             }
 
-            var lblInfo = new Label { Text = "👥 = Số nhân viên làm việc | Hover để xem chi tiết", Font = new Font("Segoe UI", 9F, FontStyle.Italic), ForeColor = Color.Gray, AutoSize = true, Location = new Point(15, 50) };
-            pnlLegend.Controls.AddRange(new Control[] { lblLegend, lblInfo });
+            var lblInfo1 = new Label
+            {
+                Text = "💡 Hướng dẫn sử dụng:",
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(59, 130, 246),
+                AutoSize = true,
+                Location = new Point(15, 50)
+            };
+
+            var lblInfo2 = new Label
+            {
+                Text = "• Click vào ô có nhân viên (👥) để xem chi tiết và chỉnh sửa ca làm việc",
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = Color.FromArgb(75, 85, 99),
+                AutoSize = true,
+                Location = new Point(15, 70)
+            };
+
+            pnlLegend.Controls.AddRange(new Control[] { lblLegend, lblInfo1, lblInfo2 });
             pnlCalendar.Controls.Add(pnlLegend);
         }
         #endregion
@@ -422,13 +495,11 @@ namespace Billiard.WinForm.Forms.NhanVien
         {
             if (isPast) return;
 
-            // Nếu đã chọn đủ 2 lần (start và end), reset và bắt đầu lại
             if (_selectedStartHour.HasValue && _selectedEndHour.HasValue)
             {
                 ResetSelection();
             }
 
-            // Nếu đang chọn ngày khác, reset
             if (_selectedDate.HasValue && _selectedDate.Value.Date != date.Date)
             {
                 ResetSelection();
@@ -450,7 +521,7 @@ namespace Billiard.WinForm.Forms.NhanVien
                     MessageBox.Show("⚠️ Giờ kết thúc phải sau giờ bắt đầu!", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
-                _selectedEndHour = hour + 1; // Kết thúc là giờ tiếp theo
+                _selectedEndHour = hour + 1;
                 _selectedEndCell = cell;
                 cell.BackColor = Color.FromArgb(134, 239, 172);
                 OpenEmployeeSelectionDialog();
@@ -496,7 +567,7 @@ namespace Billiard.WinForm.Forms.NhanVien
             var dialog = new Form
             {
                 Text = $"Đăng ký ca - {_selectedDate.Value:dd/MM/yyyy}",
-                Size = new Size(500, 600),
+                Size = new Size(500, 650),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -545,7 +616,7 @@ namespace Billiard.WinForm.Forms.NhanVien
 
             var lblSelectEmp = new Label
             {
-                Text = "Chọn nhân viên:",
+                Text = $"Chọn nhân viên ({_allEmployees?.Count ?? 0} người):",
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 AutoSize = true,
                 Location = new Point(20, 160)
@@ -554,32 +625,78 @@ namespace Billiard.WinForm.Forms.NhanVien
             var listBox = new CheckedListBox
             {
                 Location = new Point(20, 190),
-                Size = new Size(440, 300),
+                Size = new Size(440, 340),
                 Font = new Font("Segoe UI", 10F),
                 CheckOnClick = true
             };
 
             var dateOnly = DateOnly.FromDateTime(_selectedDate.Value);
 
-            // [FIX] Tìm nhân viên đã được assign cho khung giờ này
-            var assignedIds = _scheduleData
-                .Where(s => s.Ngay == dateOnly &&
-                           s.GioBatDau == startTime &&
-                           s.GioKetThuc == endTime)
+            // Load lại schedule data mới nhất trước khi hiển thị
+            var currentSchedules = _lichLamViecService.GetScheduleByDate(dateOnly);
+
+            // Tìm nhân viên đã được assign cho khung giờ này
+            var assignedIds = currentSchedules
+                .Where(s => s.GioBatDau == startTime && s.GioKetThuc == endTime)
                 .Select(s => s.MaNv)
                 .ToHashSet();
 
-            foreach (var emp in _allEmployees)
+            System.Diagnostics.Debug.WriteLine($"=== OpenEmployeeSelectionDialog ===");
+            System.Diagnostics.Debug.WriteLine($"Date: {dateOnly}, Start: {startTime}, End: {endTime}");
+            System.Diagnostics.Debug.WriteLine($"Total employees: {_allEmployees?.Count ?? 0}");
+            System.Diagnostics.Debug.WriteLine($"Already assigned: {assignedIds.Count}");
+
+            // CRITICAL: Kiểm tra _allEmployees có dữ liệu không
+            if (_allEmployees == null || _allEmployees.Count == 0)
             {
-                var item = new EmployeeListItem { Id = emp.MaNv, Name = emp.TenNv };
-                listBox.Items.Add(item, assignedIds.Contains(emp.MaNv));
+                var lblNoEmp = new Label
+                {
+                    Text = "⚠️ Không có nhân viên nào đang làm việc trong hệ thống!\n\nVui lòng kiểm tra lại danh sách nhân viên.",
+                    Font = new Font("Segoe UI", 10F, FontStyle.Italic),
+                    ForeColor = Color.Red,
+                    Location = new Point(30, 220),
+                    Size = new Size(420, 80),
+                    TextAlign = ContentAlignment.MiddleCenter
+                };
+                dialog.Controls.Add(lblNoEmp);
+                System.Diagnostics.Debug.WriteLine("ERROR: _allEmployees is null or empty!");
+
+                var btnRefresh = new Button
+                {
+                    Text = "🔄 Tải lại danh sách",
+                    Size = new Size(150, 40),
+                    Location = new Point(165, 320),
+                    BackColor = Color.FromArgb(102, 126, 234),
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                    Cursor = Cursors.Hand
+                };
+                btnRefresh.FlatAppearance.BorderSize = 0;
+                btnRefresh.Click += (s, e) =>
+                {
+                    dialog.Close();
+                    LoadEmployees();
+                    OpenEmployeeSelectionDialog();
+                };
+                dialog.Controls.Add(btnRefresh);
+            }
+            else
+            {
+                foreach (var emp in _allEmployees)
+                {
+                    var item = new EmployeeListItem { Id = emp.MaNv, Name = emp.TenNv };
+                    bool isAssigned = assignedIds.Contains(emp.MaNv);
+                    listBox.Items.Add(item, isAssigned);
+                    System.Diagnostics.Debug.WriteLine($"  - {emp.TenNv} (ID:{emp.MaNv}): {(isAssigned ? "✓ ASSIGNED" : "○ not assigned")}");
+                }
             }
 
             var btnSave = new Button
             {
                 Text = "💾 Lưu",
                 Size = new Size(120, 45),
-                Location = new Point(200, 510),
+                Location = new Point(200, 560),
                 BackColor = Color.FromArgb(34, 197, 94),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -589,17 +706,20 @@ namespace Billiard.WinForm.Forms.NhanVien
             btnSave.FlatAppearance.BorderSize = 0;
             btnSave.Click += (s, e) =>
             {
-                SaveScheduleToDatabase(dateOnly, startTime, endTime, shift, listBox);
+                bool saved = SaveScheduleToDatabase(dateOnly, startTime, endTime, shift, listBox);
                 dialog.Close();
                 ResetSelection();
-                LoadScheduleFromDatabase(); // Reload dữ liệu sau khi lưu
+                if (saved)
+                {
+                    LoadScheduleFromDatabase();
+                }
             };
 
             var btnCancel = new Button
             {
                 Text = "Hủy",
                 Size = new Size(100, 45),
-                Location = new Point(330, 510),
+                Location = new Point(330, 560),
                 BackColor = Color.FromArgb(108, 117, 125),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -611,72 +731,262 @@ namespace Billiard.WinForm.Forms.NhanVien
             {
                 dialog.Close();
                 ResetSelection();
-                LoadScheduleFromDatabase();
             };
 
             dialog.Controls.AddRange(new Control[] { lblTitle, pnlInfo, lblSelectEmp, listBox, btnSave, btnCancel });
             dialog.ShowDialog(this);
         }
 
-        private void SaveScheduleToDatabase(DateOnly date, TimeOnly startTime, TimeOnly endTime, string shift, CheckedListBox listBox)
+        private bool SaveScheduleToDatabase(DateOnly date, TimeOnly startTime, TimeOnly endTime, string shift, CheckedListBox listBox)
         {
             try
             {
-                using (var context = new BilliardDbContext())
+                var selectedEmployeeIds = new List<int>();
+                for (int i = 0; i < listBox.CheckedItems.Count; i++)
                 {
-                    // Xóa lịch cũ cho khoảng thời gian này
-                    var oldSchedules = context.Set<LichLamViec>()
-                        .Where(l => l.Ngay == date &&
-                                   l.GioBatDau == startTime &&
-                                   l.GioKetThuc == endTime)
-                        .ToList();
-                    context.Set<LichLamViec>().RemoveRange(oldSchedules);
+                    var item = (EmployeeListItem)listBox.CheckedItems[i];
+                    selectedEmployeeIds.Add(item.Id);
+                }
 
-                    // Thêm lịch mới cho từng nhân viên được chọn
-                    for (int i = 0; i < listBox.CheckedItems.Count; i++)
-                    {
-                        var item = (EmployeeListItem)listBox.CheckedItems[i];
-                        var newSchedule = new LichLamViec
-                        {
-                            MaNv = item.Id,
-                            Ngay = date,
-                            GioBatDau = startTime,
-                            GioKetThuc = endTime,
-                            Ca = shift,
-                            TrangThai = "DaXepLich",
-                            NgayTao = DateTime.Now,
-                            NguoiTao = _currentUserId
-                        };
-                        context.Set<LichLamViec>().Add(newSchedule);
+                System.Diagnostics.Debug.WriteLine($"Saving: Date={date}, Start={startTime}, End={endTime}, Shift={shift}");
+                System.Diagnostics.Debug.WriteLine($"Selected {selectedEmployeeIds.Count} employees: {string.Join(", ", selectedEmployeeIds)}");
 
-                        System.Diagnostics.Debug.WriteLine($"Adding schedule: {item.Name} on {date} from {startTime} to {endTime}");
-                    }
+                bool success = _lichLamViecService.SaveScheduleForTimeSlot(
+                    date, startTime, endTime, shift, selectedEmployeeIds, _currentUserId);
 
-                    var saved = context.SaveChanges();
-                    System.Diagnostics.Debug.WriteLine($"Saved {saved} records");
-
+                if (success || selectedEmployeeIds.Count == 0)
+                {
                     MessageBox.Show(
                         $"✅ Đã lưu lịch làm việc!\n\n" +
                         $"📅 Ngày: {date:dd/MM/yyyy}\n" +
                         $"⏰ Giờ: {startTime:HH\\:mm} - {endTime:HH\\:mm}\n" +
-                        $"👥 Số NV: {listBox.CheckedItems.Count}",
+                        $"👥 Số NV: {selectedEmployeeIds.Count}",
                         "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return true;
+                }
+                else
+                {
+                    MessageBox.Show("Không có thay đổi nào được lưu.", "Thông báo",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return false;
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi khi lưu: {ex.Message}\n\nHãy đảm bảo bảng LichLamViec đã được tạo trong database.", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Lỗi khi lưu: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
             }
         }
         #endregion
 
         #region Time Slot Details
-        private void ShowTimeSlotDetails(DateTime date, int hour, List<LichLamViec> employees)
+        private void ShowTimeSlotDetails(DateTime date, int hour, List<DAL.Entities.LichLamViec> employees)
         {
             var dialog = new Form
             {
-                Text = $"Chi tiết - {date:dd/MM/yyyy} - {hour:00}:00",
-                Size = new Size(500, 500),
+                Text = $"Chi tiết ca làm việc - {date:dd/MM/yyyy}",
+                Size = new Size(550, 600),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.FromArgb(248, 249, 250)
+            };
+
+            var pnlContent = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(20),
+                AutoScroll = true,
+                BackColor = Color.FromArgb(248, 249, 250)
+            };
+
+            // Header với gradient background
+            var pnlHeader = new Panel
+            {
+                Size = new Size(490, 100),
+                Location = new Point(20, 20),
+                BackColor = Color.FromArgb(102, 126, 234)
+            };
+
+            var lblDate = new Label
+            {
+                Text = date.ToString("dddd, dd/MM/yyyy"),
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(20, 20)
+            };
+
+            var lblTimeRange = new Label
+            {
+                Text = $"⏰ Khung giờ: {hour:00}:00 - {hour + 1:00}:00",
+                Font = new Font("Segoe UI", 11F),
+                ForeColor = Color.FromArgb(230, 230, 255),
+                AutoSize = true,
+                Location = new Point(20, 50)
+            };
+
+            var lblEmployeeCount = new Label
+            {
+                Text = $"👥 {employees.Count}",
+                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(420, 35)
+            };
+
+            pnlHeader.Controls.AddRange(new Control[] { lblDate, lblTimeRange, lblEmployeeCount });
+
+            int yPos = 140;
+
+            if (employees.Any())
+            {
+                var lblTitle = new Label
+                {
+                    Text = $"Danh sách nhân viên làm việc:",
+                    Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(26, 26, 46),
+                    AutoSize = true,
+                    Location = new Point(20, yPos)
+                };
+                pnlContent.Controls.Add(lblTitle);
+                yPos += 40;
+
+                // Nhóm nhân viên theo ca làm việc
+                var groupedByShift = employees.GroupBy(e => new { e.GioBatDau, e.GioKetThuc, e.Ca });
+
+                foreach (var shiftGroup in groupedByShift)
+                {
+                    // Shift header
+                    var pnlShiftHeader = new Panel
+                    {
+                        Size = new Size(490, 35),
+                        Location = new Point(20, yPos),
+                        BackColor = GetShiftColor(shiftGroup.Key.Ca)
+                    };
+
+                    var lblShift = new Label
+                    {
+                        Text = $"📋 Ca {(shiftGroup.Key.Ca == "Sang" ? "Sáng" : "Tối")}: {shiftGroup.Key.GioBatDau:HH\\:mm} - {shiftGroup.Key.GioKetThuc:HH\\:mm}",
+                        Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                        ForeColor = Color.White,
+                        AutoSize = true,
+                        Location = new Point(15, 8)
+                    };
+
+                    pnlShiftHeader.Controls.Add(lblShift);
+                    pnlContent.Controls.Add(pnlShiftHeader);
+                    yPos += 40;
+
+                    // Danh sách nhân viên trong ca này
+                    foreach (var emp in shiftGroup)
+                    {
+                        var card = CreateEmployeeDetailCard(emp, date.Date < DateTime.Today);
+                        card.Location = new Point(20, yPos);
+                        card.Width = 490;
+                        pnlContent.Controls.Add(card);
+                        yPos += card.Height + 8;
+                    }
+
+                    yPos += 10; // Space between shifts
+                }
+            }
+            else
+            {
+                var pnlEmpty = new Panel
+                {
+                    Size = new Size(490, 150),
+                    Location = new Point(20, yPos),
+                    BackColor = Color.White
+                };
+
+                var lblEmptyIcon = new Label
+                {
+                    Text = "📭",
+                    Font = new Font("Segoe UI", 48F),
+                    AutoSize = true,
+                    Location = new Point(210, 20)
+                };
+
+                var lblEmpty = new Label
+                {
+                    Text = "Chưa có nhân viên trong khung giờ này",
+                    Font = new Font("Segoe UI", 11F, FontStyle.Italic),
+                    ForeColor = Color.Gray,
+                    AutoSize = true,
+                    Location = new Point(130, 100)
+                };
+
+                pnlEmpty.Controls.AddRange(new Control[] { lblEmptyIcon, lblEmpty });
+                pnlContent.Controls.Add(pnlEmpty);
+                yPos += 160;
+            }
+
+            // Action buttons panel
+            var pnlButtons = new Panel
+            {
+                Size = new Size(490, 50),
+                Location = new Point(20, yPos + 10),
+                BackColor = Color.Transparent
+            };
+
+            var btnEdit = new Button
+            {
+                Text = "✏️ Chỉnh sửa ca",
+                Size = new Size(140, 45),
+                Location = new Point(0, 0),
+                BackColor = Color.FromArgb(59, 130, 246),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Visible = (_currentUserRole == "Admin" || _currentUserRole == "Quản lý") && date.Date >= DateTime.Today
+            };
+            btnEdit.FlatAppearance.BorderSize = 0;
+            btnEdit.Click += (s, e) =>
+            {
+                dialog.Close();
+                // Mở dialog chỉnh sửa ca này
+                EditTimeSlot(date, hour, employees);
+            };
+
+            var btnClose = new Button
+            {
+                Text = "Đóng",
+                Size = new Size(120, 45),
+                Location = new Point(370, 0),
+                BackColor = Color.FromArgb(108, 117, 125),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10F),
+                Cursor = Cursors.Hand
+            };
+            btnClose.FlatAppearance.BorderSize = 0;
+            btnClose.Click += (s, e) => dialog.Close();
+
+            pnlButtons.Controls.AddRange(new Control[] { btnEdit, btnClose });
+
+            pnlContent.Controls.AddRange(new Control[] { pnlHeader, pnlButtons });
+            dialog.Controls.Add(pnlContent);
+            dialog.ShowDialog(this);
+        }
+
+        private void EditTimeSlot(DateTime date, int hour, List<DAL.Entities.LichLamViec> employees)
+        {
+            if (employees.Count == 0) return;
+
+            // Lấy thông tin ca làm việc từ nhân viên đầu tiên
+            var firstEmp = employees.First();
+            var dateOnly = DateOnly.FromDateTime(date);
+            var startTime = firstEmp.GioBatDau;
+            var endTime = firstEmp.GioKetThuc;
+            string shift = firstEmp.Ca;
+
+            var dialog = new Form
+            {
+                Text = $"Chỉnh sửa ca - {date:dd/MM/yyyy}",
+                Size = new Size(500, 650),
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
@@ -684,58 +994,209 @@ namespace Billiard.WinForm.Forms.NhanVien
                 BackColor = Color.White
             };
 
-            var pnlContent = new Panel { Dock = DockStyle.Fill, Padding = new Padding(20), AutoScroll = true };
-            var lblTitle = new Label { Text = $"📅 {date:dddd, dd/MM/yyyy}", Font = new Font("Segoe UI", 14F, FontStyle.Bold), AutoSize = true, Location = new Point(20, 20) };
-            var lblTime = new Label { Text = $"⏰ Khung giờ: {hour:00}:00 - {hour + 1:00}:00", Font = new Font("Segoe UI", 11F), ForeColor = Color.Gray, AutoSize = true, Location = new Point(20, 55) };
-
-            int yPos = 100;
-            if (employees.Any())
+            var lblTitle = new Label
             {
-                var lblEmp = new Label { Text = $"👥 Nhân viên ({employees.Count}):", Font = new Font("Segoe UI", 11F, FontStyle.Bold), AutoSize = true, Location = new Point(20, yPos) };
-                pnlContent.Controls.Add(lblEmp);
-                yPos += 35;
+                Text = "👥 Chỉnh sửa nhân viên làm việc",
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(20, 20)
+            };
 
-                foreach (var emp in employees)
+            var pnlInfo = new Panel
+            {
+                Location = new Point(20, 60),
+                Size = new Size(440, 80),
+                BackColor = Color.FromArgb(239, 246, 255),
+                Padding = new Padding(15)
+            };
+
+            var lblDate = new Label
+            {
+                Text = $"📅 Ngày: {date:dddd, dd/MM/yyyy}",
+                Font = new Font("Segoe UI", 10F),
+                AutoSize = true,
+                Location = new Point(15, 10)
+            };
+
+            var lblTimeRange = new Label
+            {
+                Text = $"⏰ Giờ: {startTime:HH\\:mm} - {endTime:HH\\:mm}",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(37, 99, 235),
+                AutoSize = true,
+                Location = new Point(15, 35)
+            };
+
+            var lblShiftInfo = new Label
+            {
+                Text = $"📋 Ca: {(shift == "Sang" ? "Sáng" : "Tối")}",
+                Font = new Font("Segoe UI", 10F),
+                AutoSize = true,
+                Location = new Point(300, 35)
+            };
+
+            pnlInfo.Controls.AddRange(new Control[] { lblDate, lblTimeRange, lblShiftInfo });
+
+            var lblSelectEmp = new Label
+            {
+                Text = $"Chọn nhân viên ({_allEmployees?.Count ?? 0} người):",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(20, 160)
+            };
+
+            var listBox = new CheckedListBox
+            {
+                Location = new Point(20, 190),
+                Size = new Size(440, 340),
+                Font = new Font("Segoe UI", 10F),
+                CheckOnClick = true
+            };
+
+            // Load danh sách nhân viên và check những người đã được assign
+            var assignedIds = employees.Select(e => e.MaNv).ToHashSet();
+
+            if (_allEmployees != null && _allEmployees.Count > 0)
+            {
+                foreach (var emp in _allEmployees)
                 {
-                    var card = CreateEmployeeDetailCard(emp, date.Date < DateTime.Today);
-                    card.Location = new Point(20, yPos);
-                    card.Width = 440;
-                    pnlContent.Controls.Add(card);
-                    yPos += card.Height + 10;
+                    var item = new EmployeeListItem { Id = emp.MaNv, Name = emp.TenNv };
+                    bool isAssigned = assignedIds.Contains(emp.MaNv);
+                    listBox.Items.Add(item, isAssigned);
                 }
             }
-            else
+
+            var btnSave = new Button
             {
-                var lblEmpty = new Label { Text = "Chưa có nhân viên trong khung giờ này", Font = new Font("Segoe UI", 10F, FontStyle.Italic), ForeColor = Color.Gray, AutoSize = true, Location = new Point(20, yPos) };
-                pnlContent.Controls.Add(lblEmpty);
-            }
+                Text = "💾 Lưu thay đổi",
+                Size = new Size(140, 45),
+                Location = new Point(180, 560),
+                BackColor = Color.FromArgb(34, 197, 94),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnSave.FlatAppearance.BorderSize = 0;
+            btnSave.Click += (s, e) =>
+            {
+                bool saved = SaveScheduleToDatabase(dateOnly, startTime, endTime, shift, listBox);
+                dialog.Close();
+                if (saved)
+                {
+                    LoadScheduleFromDatabase();
+                }
+            };
 
-            var btnClose = new Button { Text = "Đóng", Size = new Size(100, 40), Location = new Point(360, yPos + 20), BackColor = Color.FromArgb(108, 117, 125), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.Click += (s, e) => dialog.Close();
+            var btnCancel = new Button
+            {
+                Text = "Hủy",
+                Size = new Size(100, 45),
+                Location = new Point(330, 560),
+                BackColor = Color.FromArgb(108, 117, 125),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10F),
+                Cursor = Cursors.Hand
+            };
+            btnCancel.FlatAppearance.BorderSize = 0;
+            btnCancel.Click += (s, e) => dialog.Close();
 
-            pnlContent.Controls.AddRange(new Control[] { lblTitle, lblTime, btnClose });
-            dialog.Controls.Add(pnlContent);
+            dialog.Controls.AddRange(new Control[] { lblTitle, pnlInfo, lblSelectEmp, listBox, btnSave, btnCancel });
             dialog.ShowDialog(this);
         }
 
-        private Panel CreateEmployeeDetailCard(LichLamViec item, bool isPast)
+        private Panel CreateEmployeeDetailCard(DAL.Entities.LichLamViec item, bool isPast)
         {
-            var card = new Panel { Height = 80, BackColor = isPast ? Color.FromArgb(240, 240, 240) : Color.FromArgb(249, 250, 251) };
-            var shiftBar = new Panel { Width = 5, Height = card.Height, Location = new Point(0, 0), BackColor = GetShiftColor(item.Ca) };
-            var lblName = new Label { Text = $"👤 {item.NhanVien?.TenNv ?? "N/A"}", Font = new Font("Segoe UI", 11F, FontStyle.Bold), AutoSize = true, Location = new Point(15, 15) };
-            var lblShift = new Label { Text = $"📋 Ca: {(item.Ca == "Sang" ? "Sáng" : "Tối")}", Font = new Font("Segoe UI", 9F), ForeColor = Color.Gray, AutoSize = true, Location = new Point(15, 40) };
-            var lblTime = new Label { Text = $"🕐 {item.GioBatDau:HH\\:mm} - {item.GioKetThuc:HH\\:mm}", Font = new Font("Segoe UI", 9F), ForeColor = Color.Gray, AutoSize = true, Location = new Point(15, 58) };
+            var card = new Panel
+            {
+                Height = 90,
+                BackColor = Color.White,
+                Cursor = Cursors.Hand
+            };
 
-            card.Controls.AddRange(new Control[] { shiftBar, lblName, lblShift, lblTime });
+            // Hover effect
+            card.MouseEnter += (s, e) => card.BackColor = Color.FromArgb(245, 247, 250);
+            card.MouseLeave += (s, e) => card.BackColor = Color.White;
+
+            var shiftBar = new Panel
+            {
+                Width = 5,
+                Height = card.Height,
+                Location = new Point(0, 0),
+                BackColor = GetShiftColor(item.Ca)
+            };
+
+            // Avatar placeholder
+            var pnlAvatar = new Panel
+            {
+                Size = new Size(60, 60),
+                Location = new Point(15, 15),
+                BackColor = Color.FromArgb(102, 126, 234)
+            };
+
+            var lblInitial = new Label
+            {
+                Text = item.NhanVien?.TenNv?.Substring(0, 1).ToUpper() ?? "?",
+                Font = new Font("Segoe UI", 20F, FontStyle.Bold),
+                ForeColor = Color.White,
+                Size = new Size(60, 60),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            pnlAvatar.Controls.Add(lblInitial);
+
+            var lblName = new Label
+            {
+                Text = item.NhanVien?.TenNv ?? "N/A",
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                AutoSize = true,
+                Location = new Point(85, 18),
+                ForeColor = Color.FromArgb(26, 26, 46)
+            };
+
+            var lblRole = new Label
+            {
+                Text = $"👔 {item.NhanVien?.MaNhomNavigation?.TenNhom ?? "N/A"}",
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = Color.FromArgb(107, 114, 128),
+                AutoSize = true,
+                Location = new Point(85, 45)
+            };
+
+            var lblTime = new Label
+            {
+                Text = $"🕐 {item.GioBatDau:HH\\:mm} - {item.GioKetThuc:HH\\:mm}",
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = Color.FromArgb(107, 114, 128),
+                AutoSize = true,
+                Location = new Point(85, 65)
+            };
+
+            card.Controls.AddRange(new Control[] { shiftBar, pnlAvatar, lblName, lblRole, lblTime });
 
             if (!isPast && (_currentUserRole == "Admin" || _currentUserRole == "Quản lý"))
             {
-                var btnDelete = new Button { Text = "✕", Size = new Size(30, 30), Location = new Point(400, 25), BackColor = Color.FromArgb(220, 53, 69), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 11F, FontStyle.Bold), Cursor = Cursors.Hand };
+                var btnDelete = new Button
+                {
+                    Text = "✕",
+                    Size = new Size(35, 35),
+                    Location = new Point(440, 28),
+                    BackColor = Color.FromArgb(220, 53, 69),
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                    Cursor = Cursors.Hand
+                };
                 btnDelete.FlatAppearance.BorderSize = 0;
+                btnDelete.MouseEnter += (s, e) => btnDelete.BackColor = Color.FromArgb(185, 28, 28);
+                btnDelete.MouseLeave += (s, e) => btnDelete.BackColor = Color.FromArgb(220, 53, 69);
                 btnDelete.Click += (s, e) =>
                 {
-                    if (MessageBox.Show($"Xóa {item.NhanVien?.TenNv} khỏi ca này?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                    if (MessageBox.Show(
+                        $"Xóa {item.NhanVien?.TenNv} khỏi ca làm việc này?",
+                        "Xác nhận xóa",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question) == DialogResult.Yes)
                     {
                         RemoveScheduleFromDatabase(item.Id);
                         ((Form)card.TopLevelControl).Close();
@@ -743,6 +1204,7 @@ namespace Billiard.WinForm.Forms.NhanVien
                 };
                 card.Controls.Add(btnDelete);
             }
+
             return card;
         }
 
@@ -750,16 +1212,11 @@ namespace Billiard.WinForm.Forms.NhanVien
         {
             try
             {
-                using (var context = new BilliardDbContext())
+                bool success = _lichLamViecService.DeleteSchedule(scheduleId);
+                if (success)
                 {
-                    var item = context.Set<LichLamViec>().Find(scheduleId);
-                    if (item != null)
-                    {
-                        context.Set<LichLamViec>().Remove(item);
-                        context.SaveChanges();
-                        MessageBox.Show("✅ Đã xóa khỏi lịch!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        LoadScheduleFromDatabase();
-                    }
+                    MessageBox.Show("✅ Đã xóa khỏi lịch!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    LoadScheduleFromDatabase();
                 }
             }
             catch (Exception ex)
@@ -859,20 +1316,6 @@ namespace Billiard.WinForm.Forms.NhanVien
     }
 
     #region Helper Classes
-    public class LichLamViec
-    {
-        public int Id { get; set; }
-        public int MaNv { get; set; }
-        public DateOnly Ngay { get; set; }
-        public TimeOnly GioBatDau { get; set; }
-        public TimeOnly GioKetThuc { get; set; }
-        public string Ca { get; set; }
-        public string TrangThai { get; set; }
-        public DateTime? NgayTao { get; set; }
-        public int? NguoiTao { get; set; }
-        public virtual DAL.Entities.NhanVien NhanVien { get; set; }
-    }
-
     public class TimeSlotInfo
     {
         public DateTime Date { get; set; }

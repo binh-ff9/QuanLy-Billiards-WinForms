@@ -95,7 +95,7 @@ namespace Billiard.BLL.Services.NhanVienService
                     throw new ArgumentException("Số điện thoại đã tồn tại trong hệ thống");
 
                 // Set default values
-                employee.TrangThai ??= "DangLam";
+                employee.TrangThai ??= "Đang làm";
                 employee.CaMacDinh ??= "Sang";
                 employee.LuongCoBan ??= 0;
                 employee.PhuCap ??= 0;

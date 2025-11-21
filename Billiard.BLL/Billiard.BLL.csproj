@@ -11,6 +11,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Emgu.CV" Version="4.12.0.5764" />
+    <PackageReference Include="System.Drawing.Common" Version="8.0.22" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Billiard.DAL\Billiard.DAL.csproj" />
     <ProjectReference Include="..\Billiards.Shared\Billiard.Shared.csproj" />
   </ItemGroup>
