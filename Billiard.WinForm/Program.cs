@@ -44,7 +44,7 @@ namespace Billiard.WinForm
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
             // Run LoginForm
-            Application.Run(ServiceProvider.GetRequiredService<ClientMainForm>());
+            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -85,6 +85,7 @@ namespace Billiard.WinForm
             // KhachHang services
             services.AddScoped<KhachHangService>();
 
+            services.AddScoped<DatBanService>();
             // Register Auth Forms
 
             services.AddTransient<LoginForm>();

@@ -2,7 +2,7 @@
 {
     public static class UserSession
     {
-        public static int MaKH { get; set; } = 0;
+        public static int? MaKH { get; set; } = 0;
         public static string TenKH { get; set; }
         public static string Sdt { get; set; }
 
