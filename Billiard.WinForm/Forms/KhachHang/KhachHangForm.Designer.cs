@@ -29,7 +29,7 @@
         private void InitializeComponent()
         {
             pnlFilters = new Panel();
-            btnThungRac = new Button();
+            btnDaXoa = new Button();
             btnThem = new Button();
             btnXuatBaoCao = new Button();
             txtSearch = new TextBox();
@@ -47,7 +47,7 @@
             // 
             // pnlFilters
             // 
-            pnlFilters.Controls.Add(btnThungRac);
+            pnlFilters.Controls.Add(btnDaXoa);
             pnlFilters.Controls.Add(btnThem);
             pnlFilters.Controls.Add(btnXuatBaoCao);
             pnlFilters.Controls.Add(txtSearch);
@@ -59,21 +59,22 @@
             pnlFilters.Size = new Size(800, 127);
             pnlFilters.TabIndex = 3;
             // 
-            // btnThungRac
+            // btnDaXoa
             // 
-            btnThungRac.BackColor = Color.FromArgb(100, 116, 139);
-            btnThungRac.Cursor = Cursors.Hand;
-            btnThungRac.FlatAppearance.BorderSize = 0;
-            btnThungRac.FlatStyle = FlatStyle.Flat;
-            btnThungRac.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            btnThungRac.ForeColor = Color.White;
-            btnThungRac.Location = new Point(609, 67);
-            btnThungRac.Margin = new Padding(3, 4, 3, 4);
-            btnThungRac.Name = "btnThungRac";
-            btnThungRac.Size = new Size(160, 34);
-            btnThungRac.TabIndex = 14;
-            btnThungRac.Text = "Đã xóa";
-            btnThungRac.UseVisualStyleBackColor = false;
+            btnDaXoa.BackColor = Color.FromArgb(100, 116, 139);
+            btnDaXoa.Cursor = Cursors.Hand;
+            btnDaXoa.FlatAppearance.BorderSize = 0;
+            btnDaXoa.FlatStyle = FlatStyle.Flat;
+            btnDaXoa.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            btnDaXoa.ForeColor = Color.White;
+            btnDaXoa.Location = new Point(609, 67);
+            btnDaXoa.Margin = new Padding(3, 4, 3, 4);
+            btnDaXoa.Name = "btnDaXoa";
+            btnDaXoa.Size = new Size(160, 34);
+            btnDaXoa.TabIndex = 14;
+            btnDaXoa.Text = "Đã xóa";
+            btnDaXoa.UseVisualStyleBackColor = false;
+            btnDaXoa.Click += BtnDaXoa_Click;
             // 
             // btnThem
             // 
@@ -90,6 +91,7 @@
             btnThem.TabIndex = 13;
             btnThem.Text = "➕ Thêm thành viên";
             btnThem.UseVisualStyleBackColor = false;
+            btnThem.Click += btnThem_Click_1;
             // 
             // btnXuatBaoCao
             // 
@@ -272,6 +274,6 @@
         private Button btnBac;
         private Button btnVang;
         private Button btnBachKim;
-        private Button btnThungRac;
+        private Button btnDaXoa;
     }
 }

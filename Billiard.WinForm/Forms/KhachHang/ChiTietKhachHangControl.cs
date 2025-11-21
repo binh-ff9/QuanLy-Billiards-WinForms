@@ -9,7 +9,12 @@ namespace Billiard.WinForm.Forms.KhachHang
     public partial class ChiTietKhachHangControl : UserControl
     {
         private FlowLayoutPanel pnlContainer;
+        private int _currentMaKh; // Lưu ID khách hàng đang xem
 
+        public event EventHandler<int> OnEditClick;
+        public event EventHandler<int> OnDeleteClick;
+        private bool _isDeletedUser = false;
+        private Button btnDeleteAction;
         public ChiTietKhachHangControl()
         {
             InitializeComponent();
@@ -19,6 +24,31 @@ namespace Billiard.WinForm.Forms.KhachHang
 
         private void SetupLayout()
         {
+            var pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 60, Padding = new Padding(10) };
+
+            // Dùng TableLayoutPanel để chia đôi 2 nút (Sửa và Xóa)
+            var tblButtons = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
+            tblButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F)); // 50%
+            tblButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F)); // 50%
+
+            // Nút Sửa (Code cũ, giữ nguyên, cho vào cột 0)
+            var btnEdit = new Button { Text = "✏️ Chỉnh sửa", Dock = DockStyle.Fill, BackColor = Color.FromArgb(234, 179, 8), ForeColor = Color.White, Font = new Font("Segoe UI", 10, FontStyle.Bold), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand, Margin = new Padding(0, 0, 5, 0) };
+            btnEdit.FlatAppearance.BorderSize = 0;
+            btnEdit.Click += (s, e) => OnEditClick?.Invoke(this, _currentMaKh);
+
+            btnDeleteAction = new Button { Dock = DockStyle.Fill, ForeColor = Color.White, Font = new Font("Segoe UI", 10, FontStyle.Bold), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand, Margin = new Padding(5, 0, 0, 0) };
+            btnDeleteAction.FlatAppearance.BorderSize = 0;
+            btnDeleteAction.Click += (s, e) => OnDeleteClick?.Invoke(this, _currentMaKh);
+
+            tblButtons.Controls.Add(btnEdit, 0, 0);
+            tblButtons.Controls.Add(btnDeleteAction, 1, 0);
+
+            pnlFooter.Controls.Add(tblButtons);
+            this.Controls.Add(pnlFooter);
+
+            //pnlFooter.Controls.Add(btnEdit);
+            //this.Controls.Add(pnlFooter); // Thêm Footer vào UserControl
+
             pnlContainer = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -27,15 +57,34 @@ namespace Billiard.WinForm.Forms.KhachHang
                 AutoScroll = true,
                 Padding = new Padding(20)
             };
+
             // Hack full width
             pnlContainer.SizeChanged += (s, e) => {
                 foreach (Control c in pnlContainer.Controls) c.Width = pnlContainer.ClientSize.Width - 40;
             };
             this.Controls.Add(pnlContainer);
+            pnlContainer.BringToFront();
         }
 
         public void LoadData(Billiard.DAL.Entities.KhachHang kh)
         {
+            _currentMaKh = kh.MaKh; // Lưu ID lại để dùng khi bấm nút Sửa
+            _isDeletedUser = !(kh.HoatDong ?? true); // Kiểm tra xem đang hoạt động hay xóa
+
+            if (_isDeletedUser)
+            {
+                // Đang bị xóa -> Hiện nút KHÔI PHỤC (Màu xanh)
+                btnDeleteAction.Text = "♻️ Khôi phục";
+                btnDeleteAction.BackColor = Color.FromArgb(34, 197, 94); // Green
+            }
+            else
+            {
+                // Đang hoạt động -> Hiện nút XÓA (Màu đỏ)
+                btnDeleteAction.Text = "🗑️ Xóa bỏ";
+                btnDeleteAction.BackColor = Color.FromArgb(239, 68, 68); // Red
+            }
+
+
             pnlContainer.Controls.Clear();
 
             // --- 1. AVATAR & NAME HEADER ---
