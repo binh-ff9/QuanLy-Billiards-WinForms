@@ -39,11 +39,16 @@ namespace Billiard.WinForm.Forms.Auth
         private void LoginForm_Load(object sender, EventArgs e)
         {
             txtUsername.Select();
-
-            // Debug log
             Debug.WriteLine("=== LoginForm Loaded ===");
             Debug.WriteLine($"AuthService: {(_authService != null ? "OK" : "NULL")}");
             Debug.WriteLine($"DbContext: {(_context != null ? "OK" : "NULL")}");
+        }
+
+        // Toggle password visibility
+        private void BtnTogglePassword_Click(object sender, EventArgs e)
+        {
+            txtPassword.UseSystemPasswordChar = !txtPassword.UseSystemPasswordChar;
+            btnTogglePassword.Text = txtPassword.UseSystemPasswordChar ? "👁" : "🙈";
         }
 
         private async void BtnLogin_Click(object sender, EventArgs e)
@@ -53,7 +58,6 @@ namespace Billiard.WinForm.Forms.Auth
             try
             {
                 _isLoggingIn = true;
-
                 string username = txtUsername.Text.Trim();
                 string password = txtPassword.Text;
 
@@ -62,7 +66,6 @@ namespace Billiard.WinForm.Forms.Auth
                 Debug.WriteLine($"Password Length: {password.Length}");
                 Debug.WriteLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
-                // Validate inputs
                 if (string.IsNullOrWhiteSpace(username))
                 {
                     Debug.WriteLine("ERROR: Username is empty");
@@ -79,7 +82,6 @@ namespace Billiard.WinForm.Forms.Auth
 
                 SetLoadingState(true);
 
-                // Debug: Test database connection
                 try
                 {
                     bool canConnect = await _context.Database.CanConnectAsync();
@@ -90,8 +92,6 @@ namespace Billiard.WinForm.Forms.Auth
                     Debug.WriteLine($"Database Connection Error: {dbEx.Message}");
                 }
 
-                
-                // Use AuthService to login
                 Debug.WriteLine("Calling AuthService.LoginAsync...");
                 var result = await _authService.LoginAsync(username, password);
 
@@ -122,7 +122,6 @@ namespace Billiard.WinForm.Forms.Auth
 
                 Debug.WriteLine("LOGIN SUCCESS!");
 
-                // Check user type and open appropriate form
                 if (result.UserType == UserType.NhanVien)
                 {
                     Debug.WriteLine("User Type: NHAN VIEN");
@@ -137,7 +136,6 @@ namespace Billiard.WinForm.Forms.Auth
                     mainForm.ChucVu = nhanVien.MaNhomNavigation?.TenNhom ?? "Nhân viên";
 
                     Debug.WriteLine("Opening MainForm...");
-
                     mainForm.Show();
                     mainForm.FormClosed += (s, args) => {
                         Debug.WriteLine("MainForm closed, showing LoginForm");
@@ -160,7 +158,6 @@ namespace Billiard.WinForm.Forms.Auth
                     UserSession.Sdt = khachHang.Sdt;
 
                     var clientForm = Program.GetService<ClientMainForm>();
-
                     clientForm.Show();
 
                     MessageBox.Show(
@@ -173,24 +170,13 @@ namespace Billiard.WinForm.Forms.Auth
 
                     clientForm.FormClosed += (s, args) =>
                     {
-                        UserSession.Logout(); // Xóa session
-                        this.Show();          // Hiện lại form đăng nhập
+                        UserSession.Logout();
+                        this.Show();
                         ResetForm();
                         txtUsername.Focus();
                     };
 
-                    this.Hide(); // Ẩn form đăng nhập đi
-
-
-                    //// TODO: Open CustomerMainForm when implemented
-                    //Debug.WriteLine("WARNING: CustomerMainForm not implemented yet");
-                    //MessageBox.Show(
-                    //    "Giao diện khách hàng đang được phát triển.\n" +
-                    //    "Vui lòng sử dụng tài khoản nhân viên để truy cập hệ thống.",
-                    //    "Thông báo",
-                    //    MessageBoxButtons.OK,
-                    //    MessageBoxIcon.Information);
-
+                    this.Hide();
                     ResetForm();
                 }
             }
@@ -234,6 +220,8 @@ namespace Billiard.WinForm.Forms.Auth
             txtUsername.Clear();
             txtPassword.Clear();
             chkRemember.Checked = false;
+            txtPassword.UseSystemPasswordChar = true;
+            btnTogglePassword.Text = "👁";
             txtUsername.Focus();
             Debug.WriteLine("Form reset");
         }
@@ -289,11 +277,6 @@ namespace Billiard.WinForm.Forms.Auth
                 e.Handled = true;
                 txtPassword.Focus();
             }
-        }
-
-        private void ChkShowPassword_CheckedChanged(object sender, EventArgs e)
-        {
-            txtPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
         }
 
         #region UI Effects

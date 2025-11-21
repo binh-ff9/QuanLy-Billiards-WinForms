@@ -24,11 +24,24 @@ namespace Billiard.WinForm.Forms.Auth
             txtTenKH.Focus();
         }
 
+        // Toggle password visibility
+        private void BtnTogglePassword_Click(object sender, EventArgs e)
+        {
+            txtMatKhau.UseSystemPasswordChar = !txtMatKhau.UseSystemPasswordChar;
+            btnTogglePassword.Text = txtMatKhau.UseSystemPasswordChar ? "👁" : "🙈";
+        }
+
+        // Toggle confirm password visibility
+        private void BtnToggleConfirm_Click(object sender, EventArgs e)
+        {
+            txtXacNhanMatKhau.UseSystemPasswordChar = !txtXacNhanMatKhau.UseSystemPasswordChar;
+            btnToggleConfirm.Text = txtXacNhanMatKhau.UseSystemPasswordChar ? "👁" : "🙈";
+        }
+
         private async void BtnSignup_Click(object sender, EventArgs e)
         {
             try
             {
-                // Validate inputs
                 if (string.IsNullOrWhiteSpace(txtTenKH.Text))
                 {
                     ShowError("Vui lòng nhập họ và tên!", txtTenKH);
@@ -79,10 +92,8 @@ namespace Billiard.WinForm.Forms.Auth
                     return;
                 }
 
-                // Show loading
                 SetLoadingState(true);
 
-                // Use AuthService to register customer
                 var ngaySinh = dtpNgaySinh.Value.Date > DateTime.Now.Date
                     ? (DateOnly?)null
                     : DateOnly.FromDateTime(dtpNgaySinh.Value);
@@ -149,12 +160,6 @@ namespace Billiard.WinForm.Forms.Auth
         private void BtnClose_Click(object sender, EventArgs e)
         {
             this.Close();
-        }
-
-        private void ChkShowPassword_CheckedChanged(object sender, EventArgs e)
-        {
-            txtMatKhau.UseSystemPasswordChar = !chkShowPassword.Checked;
-            txtXacNhanMatKhau.UseSystemPasswordChar = !chkShowPassword.Checked;
         }
 
         private void TxtXacNhanMatKhau_KeyPress(object sender, KeyPressEventArgs e)

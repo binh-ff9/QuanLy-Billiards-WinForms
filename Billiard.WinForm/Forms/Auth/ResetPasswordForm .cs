@@ -30,8 +30,8 @@ namespace Billiard.WinForm.Forms.Auth
             _email = email;
             _correctOTP = otp;
             _isAdminMode = isAdminMode;
-            _otpExpiration = DateTime.Now.AddMinutes(5); // OTP expires in 5 minutes
-            _remainingSeconds = 300; // 5 minutes = 300 seconds
+            _otpExpiration = DateTime.Now.AddMinutes(5);
+            _remainingSeconds = 300;
 
             InitializeComponent();
             InitializeTimer();
@@ -57,7 +57,7 @@ namespace Billiard.WinForm.Forms.Auth
         private void InitializeTimer()
         {
             _countdownTimer = new System.Windows.Forms.Timer();
-            _countdownTimer.Interval = 1000; // 1 second
+            _countdownTimer.Interval = 1000;
             _countdownTimer.Tick += CountdownTimer_Tick;
             _countdownTimer.Start();
         }
@@ -85,19 +85,12 @@ namespace Billiard.WinForm.Forms.Auth
             int seconds = _remainingSeconds % 60;
             lblCountdown.Text = $"⏱️ Thời gian còn lại: {minutes:D2}:{seconds:D2}";
 
-            // Change color based on remaining time
             if (_remainingSeconds <= 60)
-            {
-                lblCountdown.ForeColor = Color.FromArgb(239, 68, 68); // Red
-            }
+                lblCountdown.ForeColor = Color.FromArgb(239, 68, 68);
             else if (_remainingSeconds <= 120)
-            {
-                lblCountdown.ForeColor = Color.FromArgb(245, 158, 11); // Orange
-            }
+                lblCountdown.ForeColor = Color.FromArgb(245, 158, 11);
             else
-            {
-                lblCountdown.ForeColor = Color.FromArgb(100, 116, 139); // Gray
-            }
+                lblCountdown.ForeColor = Color.FromArgb(100, 116, 139);
         }
 
         private void ResetPasswordForm_Load(object sender, EventArgs e)
@@ -107,11 +100,24 @@ namespace Billiard.WinForm.Forms.Auth
             txtOTP.Focus();
         }
 
+        // Toggle new password visibility
+        private void BtnTogglePassword_Click(object sender, EventArgs e)
+        {
+            txtNewPassword.UseSystemPasswordChar = !txtNewPassword.UseSystemPasswordChar;
+            btnTogglePassword.Text = txtNewPassword.UseSystemPasswordChar ? "👁" : "🙈";
+        }
+
+        // Toggle confirm password visibility
+        private void BtnToggleConfirm_Click(object sender, EventArgs e)
+        {
+            txtConfirmPassword.UseSystemPasswordChar = !txtConfirmPassword.UseSystemPasswordChar;
+            btnToggleConfirm.Text = txtConfirmPassword.UseSystemPasswordChar ? "👁" : "🙈";
+        }
+
         private async void BtnResetPassword_Click(object sender, EventArgs e)
         {
             try
             {
-                // Validate OTP
                 if (string.IsNullOrWhiteSpace(txtOTP.Text))
                 {
                     ShowError("Vui lòng nhập mã OTP!", txtOTP);
@@ -124,14 +130,12 @@ namespace Billiard.WinForm.Forms.Auth
                     return;
                 }
 
-                // Check OTP expiration
                 if (DateTime.Now > _otpExpiration)
                 {
                     ShowError("Mã OTP đã hết hạn!\nVui lòng yêu cầu gửi lại mã mới.", txtOTP);
                     return;
                 }
 
-                // Verify OTP
                 if (txtOTP.Text.Trim() != _correctOTP)
                 {
                     ShowError("❌ Mã OTP không chính xác!", txtOTP);
@@ -140,7 +144,6 @@ namespace Billiard.WinForm.Forms.Auth
                     return;
                 }
 
-                // Validate new password
                 if (string.IsNullOrWhiteSpace(txtNewPassword.Text))
                 {
                     ShowError("Vui lòng nhập mật khẩu mới!", txtNewPassword);
@@ -167,10 +170,8 @@ namespace Billiard.WinForm.Forms.Auth
                     return;
                 }
 
-                // Show loading
                 SetLoadingState(true);
 
-                // Use AuthService to reset password (auto-detect user type)
                 bool success = await _authService.ResetPasswordAsync(_email, txtNewPassword.Text);
 
                 SetLoadingState(false);
@@ -237,15 +238,8 @@ namespace Billiard.WinForm.Forms.Auth
             BtnCancel_Click(sender, e);
         }
 
-        private void ChkShowPassword_CheckedChanged(object sender, EventArgs e)
-        {
-            txtNewPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
-            txtConfirmPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
-        }
-
         private void TxtOTP_KeyPress(object sender, KeyPressEventArgs e)
         {
-            // Only allow digits
             if (!char.IsDigit(e.KeyChar) && e.KeyChar != (char)Keys.Back)
             {
                 e.Handled = true;
@@ -280,7 +274,6 @@ namespace Billiard.WinForm.Forms.Auth
                 _countdownTimer.Stop();
                 this.Close();
 
-                // Reopen ForgotPasswordForm
                 var forgotForm = new ForgotPasswordForm(_context, _authService);
                 forgotForm.ShowDialog();
             }
