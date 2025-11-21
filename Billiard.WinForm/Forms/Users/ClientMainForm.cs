@@ -53,7 +53,7 @@ namespace Billiard.WinForm.Forms.Users
                 Text = "👤 Hồ sơ & Lịch sử",
                 Font = new Font("Segoe UI", 10),
                 Size = new Size(250, 35),
-                Location = new Point(this.Width - 320, 12),
+                Location = new Point(this.Width - 420, 12),
                 BackColor = Color.FromArgb(241, 245, 249),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand
@@ -80,7 +80,9 @@ namespace Billiard.WinForm.Forms.Users
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
-                Padding = new Padding(20)
+                //Padding = new Padding(left: 20, top: 60, right: 20, bottom: 60)
+                Padding = new Padding(20, 60, 20, 60),
+
             };
             this.Controls.Add(flpBan);
             pnlHeader.BringToFront(); // Đảm bảo header nằm trên
@@ -183,8 +185,7 @@ namespace Billiard.WinForm.Forms.Users
                 // 1. Xóa sạch thông tin người dùng
                 UserSession.Logout();
 
-                // 2. Đóng form này lại
-                // (LoginForm đang đứng đợi sự kiện đóng của form này để hiện lên lại)
+
                 this.Close();
             }
         }
