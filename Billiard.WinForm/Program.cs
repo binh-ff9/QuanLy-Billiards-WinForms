@@ -106,6 +106,7 @@ namespace Billiard.WinForm
             services.AddTransient<ClientMainForm>();
             services.AddTransient<DatBanDialog>();   // Đăng ký luôn các Dialog con
             services.AddTransient<UserProfileForm>();
+        }
 
         // ✅ THÊM: Method để tạo Scope mới (tùy chọn)
         public static IServiceScope CreateScope()
