@@ -120,7 +120,7 @@
             // lblTrangThai
             // 
             lblTrangThai.AutoSize = true;
-            lblTrangThai.Location = new Point(217, 5);
+            lblTrangThai.Location = new Point(271, 12);
             lblTrangThai.Name = "lblTrangThai";
             lblTrangThai.Size = new Size(103, 20);
             lblTrangThai.TabIndex = 8;

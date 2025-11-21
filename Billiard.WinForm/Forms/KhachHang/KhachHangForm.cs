@@ -2,6 +2,7 @@
 using Billiard.BLL.Services.KhachHangServices;
 using Billiard.DAL.Entities; // Để dùng Entity KhachHang
 using ClosedXML.Excel;
+using DocumentFormat.OpenXml.VariantTypes;
 using Microsoft.Extensions.DependencyInjection; // Để tạo Scope mới
 using System;
 using System.Drawing;
@@ -18,6 +19,8 @@ namespace Billiard.WinForm.Forms.KhachHang
 
         private string _currentRankFilter = "Tất cả"; // Filters ở đây
 
+        private bool _isShowDeletedMode = false;
+
         public KhachHangForm(KhachHangService khService)
         {
             InitializeComponent();
@@ -31,8 +34,6 @@ namespace Billiard.WinForm.Forms.KhachHang
 
             txtSearch.TextChanged += async (s, e) => await LoadDataAsync();
 
-            // Nếu có nút thêm
-            if (btnThem != null) btnThem.Click += BtnThem_Click;
 
             if (btnXuatBaoCao != null) btnXuatBaoCao.Click += btnXuatBaoCao_Click;
 
@@ -67,7 +68,7 @@ namespace Billiard.WinForm.Forms.KhachHang
 
                 // 1. Lấy dữ liệu từ Service
                 string keyword = txtSearch.Text.Trim();
-                var listKH = await _khService.GetListKhachHangAsync(keyword);
+                var listKH = await _khService.GetListKhachHangAsync(keyword, _currentRankFilter, _isShowDeletedMode);
 
                 if (listKH == null || listKH.Count == 0)
                 {
@@ -125,6 +126,7 @@ namespace Billiard.WinForm.Forms.KhachHang
             flowLayoutPanel1.Controls.Add(lblEmpty);
         }
 
+        // Xem Chi Tiết
         private async void ShowDetail(int maKh)
         {
             try
@@ -132,16 +134,43 @@ namespace Billiard.WinForm.Forms.KhachHang
                 using (var scope = Program.ServiceProvider.CreateScope())
                 {
                     var tempService = scope.ServiceProvider.GetRequiredService<KhachHangService>();
-
-                    // Lấy chi tiết đầy đủ (Kèm lịch sử hóa đơn)
                     var detail = await tempService.GetKhachHangDetailAsync(maKh);
 
                     if (detail != null && _mainForm != null)
                     {
-                        // Tạo Control chi tiết (Cái Profile Card đẹp bạn đã làm)
                         var detailControl = new ChiTietKhachHangControl();
                         detailControl.LoadData(detail);
 
+                        detailControl.OnEditClick += (s, id) =>
+                        {
+                            // Gọi hàm sửa (Hàm này mình viết ở dưới)
+                            EditKhachHang(id);
+                        };
+
+                        detailControl.OnDeleteClick += async (s, id) =>
+                        {
+                            string actionName = _isShowDeletedMode ? "Khôi phục" : "Xóa";
+                            var confirm = MessageBox.Show($"Bạn có chắc muốn {actionName} khách hàng này?", "Xác nhận", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                            if (confirm == DialogResult.Yes)
+                            {
+                                using (var scope2 = Program.ServiceProvider.CreateScope())
+                                {
+                                    var svc = scope2.ServiceProvider.GetRequiredService<KhachHangService>();
+
+                                    // Gọi hàm đổi trạng thái
+                                    // Nếu đang xem list Xóa (_isShowDeletedMode = true) -> Cần set Active = true (Khôi phục)
+                                    // Nếu đang xem list Active (_isShowDeletedMode = false) -> Cần set Active = false (Xóa)
+                                    await svc.ToggleStatusAsync(id, _isShowDeletedMode);
+                                }
+
+                                // Tải lại danh sách và đóng panel
+                                await LoadDataAsync();
+                                _mainForm.HideDetailPanel();
+
+                                MessageBox.Show("Thao tác thành công!");
+                            }
+                        };
                         // Gọi MainForm mở Panel phải (Rộng 500px cho đẹp)
                         _mainForm.UpdateDetailPanel("Thông tin khách hàng", detailControl, 500);
                     }
@@ -153,6 +182,24 @@ namespace Billiard.WinForm.Forms.KhachHang
             }
         }
 
+        private async void EditKhachHang(int maKh)
+        {
+            using (var scope = Program.ServiceProvider.CreateScope())
+            {
+                var service = scope.ServiceProvider.GetRequiredService<KhachHangService>();
+
+                var frm = new KhachHangEditForm(service, maKh);
+
+                if (frm.ShowDialog() == DialogResult.OK)
+                {
+                    await LoadDataAsync();
+
+                    ShowDetail(maKh);
+
+                    MessageBox.Show("Đã cập nhật thông tin!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+        }
         #region Filters
         private void AssignFilterEvents()
         {
@@ -193,17 +240,20 @@ namespace Billiard.WinForm.Forms.KhachHang
         #endregion
 
         #region CRUD
-        private void BtnThem_Click(object sender, EventArgs e)
+        private async void btnThem_Click_1(object sender, EventArgs e)
         {
-            // Mở form thêm mới (Code sau này)
-            MessageBox.Show("Chức năng Thêm khách hàng đang phát triển");
+            using (var scrope = Program.ServiceProvider.CreateScope())
+            {
+                var service = scrope.ServiceProvider.GetRequiredService<KhachHangService>();
 
-            // Logic ví dụ sau này:
-            // var frm = new KhachHangEditForm();
-            // if (frm.ShowDialog() == DialogResult.OK) await LoadDataAsync();
+                var frm = new KhachHangEditForm(service, null);
+
+                if (frm.ShowDialog() == DialogResult.OK)
+                {
+                    await LoadDataAsync();
+                }
+            }
         }
-
-
 
         #endregion
 
@@ -289,6 +339,30 @@ namespace Billiard.WinForm.Forms.KhachHang
             if (diem > 150) return "Vàng";
             if (diem > 70) return "Bạc";
             return "Đồng";
+        }
+
+        private void BtnDaXoa_Click(object sender, EventArgs e)
+        {
+            // 1. Đảo ngược trạng thái
+            _isShowDeletedMode = !_isShowDeletedMode;
+
+            // 2. Đổi Text và Màu của nút "Đã xóa" để người dùng biết
+            if (_isShowDeletedMode)
+            {
+                btnDaXoa.Text = "⬅️ Quay lại";
+                btnDaXoa.BackColor = Color.Gray;
+            }
+            else
+            {
+                btnDaXoa.Text = "🗑️ Đã xóa";
+                btnDaXoa.BackColor = Color.FromArgb(51, 65, 85); // Màu gốc
+            }
+
+            // 3. Tải lại dữ liệu theo chế độ mới
+            LoadDataAsync();
+
+            // 4. Đóng panel chi tiết cũ đi (vì ID cũ có thể không còn trong list mới)
+            if (_mainForm != null) _mainForm.HideDetailPanel();
         }
     }
 }

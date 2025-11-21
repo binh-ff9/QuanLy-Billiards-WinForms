@@ -1,6 +1,6 @@
-﻿namespace Billiard.WinForm.Forms.QLBan
+﻿namespace Billiard.WinForm.Forms.Users
 {
-    partial class ThemDichVuForm
+    partial class UserProfileForm
     {
         /// <summary>
         /// Required designer variable.
@@ -28,17 +28,10 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.SuspendLayout();
-            // 
-            // ThemDichVuForm
-            // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(10F, 25F);
+            this.components = new System.ComponentModel.Container();
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(900, 700);
-            this.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.Name = "ThemDichVuForm";
-            this.Text = "Thêm dịch vụ";
-            this.ResumeLayout(false);
+            this.ClientSize = new System.Drawing.Size(800, 450);
+            this.Text = "UserProfileForm";
         }
 
         #endregion

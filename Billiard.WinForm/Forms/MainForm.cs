@@ -1,6 +1,9 @@
-﻿using Billiard.DAL.Data;
+﻿using Billiard.BLL.Services.QLBan;
+using Billiard.DAL.Data;
 using Billiard.DAL.Entities;
 using Billiard.WinForm.Forms;
+using Billiard.WinForm.Forms.Auth;
+using Billiard.WinForm.Forms.CaiDat;
 using Billiard.WinForm.Forms.HoaDon;
 using Billiard.WinForm.Forms.ThongKe;
 using Billiard.WinForm.Forms.QLBan;
@@ -268,7 +271,8 @@ namespace Billiard.WinForm
                         ShowComingSoon("Nhân viên");
                         break;
                     case "btnCaiDat":
-                        ShowComingSoon("Cài đặt");
+                        var vietQRConfigForm = Program.GetService<VietQRConfigForm>();
+                        vietQRConfigForm.ShowDialog();
                         break;
                 }
             }

@@ -7,15 +7,21 @@ using Billiard.WinForm.Forms.Auth;
 using Billiard.WinForm.Forms.HoaDon;
 using Billiard.WinForm.Forms.ThongKe;
 using Billiard.WinForm.Forms.QLBan;
+using Billiard.WinForm.Forms.CaiDat;
+using Billiard.BLL.Services.KhachHangServices;
+using Billiard.WinForm.Forms.KhachHang;
+using Billiard.BLL.Services.VietQR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
-
+using System.Windows.Forms;
 using Billiard.BLL.Services.HoaDonServices;
 using Billiard.BLL.Services.KhachHangServices;
 using Billiard.WinForm.Forms.KhachHang;
+using Billiard.WinForm.Forms.Users;
+using System.Net.Http;
 
 namespace Billiard.WinForm
 {
@@ -43,7 +49,7 @@ namespace Billiard.WinForm
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
             // Run LoginForm
-            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
+            Application.Run(ServiceProvider.GetRequiredService<ClientMainForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -53,39 +59,39 @@ namespace Billiard.WinForm
             {
                 var optionsBuilder = new DbContextOptionsBuilder<BilliardDbContext>();
                 optionsBuilder.UseSqlServer(
-                    Configuration.GetConnectionString("DefaultConnection"),
-                    sqlOptions => sqlOptions.EnableRetryOnFailure(
-                        maxRetryCount: 3,
-                        maxRetryDelay: TimeSpan.FromSeconds(5),
-                        errorNumbersToAdd: null
-                    )
+                    Configuration.GetConnectionString("DefaultConnection")
                 );
                 return new BilliardDbContext(optionsBuilder.Options);
             });
 
-            // Register BLL Services
+            // ✅ Đổi tất cả Services từ Scoped → Transient (theo chỉ dẫn)
             services.AddTransient<AuthService>();
             services.AddTransient<EmailService>();
             services.AddTransient<DichVuService>();
             services.AddTransient<MatHangService>();
             services.AddTransient<ThongKeService>();
+
+            // HttpClient (Singleton)
+            services.AddSingleton<HttpClient>();
+
+            // BanBia services (Transient)
             services.AddTransient<BanBiaService>();
+            services.AddTransient<DatBanService>();
+            services.AddTransient<LoaiBanService>();
+            services.AddTransient<KhuVucService>();
+
+            // HoaDon services (Transient)
             services.AddTransient<HoaDonService>();
+            services.AddTransient<VietQRService>();
+            services.AddTransient<ThanhToanService>();
+            services.AddTransient<VietQRConfigForm>();
 
-            // Register Forms
-
-
-            // BanBia services
-            services.AddScoped<BanBiaService>();
-
-            // HoaDon services
-            services.AddScoped<HoaDonService>();
-
-            // KhachHang services
-            services.AddScoped<KhachHangService>();
-
+            services.AddScoped<DatBanService>();
             // Register Auth Forms
+            // KhachHang services (Transient - chuyển từ Scoped theo chỉ dẫn)
+            services.AddTransient<KhachHangService>();
 
+            // Register Forms (Transient)
             services.AddTransient<LoginForm>();
             services.AddTransient<SignupForm>();
             services.AddTransient<ForgotPasswordForm>();
@@ -97,7 +103,15 @@ namespace Billiard.WinForm
             services.AddTransient<HoaDonForm>();
             services.AddTransient<ThongKeForm>();
             services.AddTransient<KhachHangForm>(); // Khách hàng
+            services.AddTransient<ClientMainForm>();
+            services.AddTransient<DatBanDialog>();   // Đăng ký luôn các Dialog con
+            services.AddTransient<UserProfileForm>();
+        }
 
+        // ✅ THÊM: Method để tạo Scope mới (tùy chọn)
+        public static IServiceScope CreateScope()
+        {
+            return ServiceProvider.CreateScope();
         }
 
         public static T GetService<T>() where T : class

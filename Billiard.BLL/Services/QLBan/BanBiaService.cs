@@ -11,7 +11,7 @@ namespace Billiard.BLL.Services.QLBan
     public class BanBiaService
     {
         private readonly BilliardDbContext _context;
-
+        private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
         public BanBiaService(BilliardDbContext context)
         {
             _context = context;
@@ -60,39 +60,104 @@ namespace Billiard.BLL.Services.QLBan
         // Bắt đầu chơi bàn
         public async Task<bool> StartTableAsync(int maBan, int maNv, int? maKh = null)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
+            await _semaphore.WaitAsync();
             try
             {
-                var ban = await _context.BanBia.FindAsync(maBan);
-                if (ban == null || ban.TrangThai != "Trống")
-                    return false;
+                // Sử dụng Execution Strategy
+                var strategy = _context.Database.CreateExecutionStrategy();
 
-                ban.TrangThai = "Đang chơi";
-                ban.GioBatDau = DateTime.Now;
-                ban.MaKh = maKh;
-
-                var hoaDon = new HoaDon
+                return await strategy.ExecuteAsync(async () =>
                 {
-                    MaBan = maBan,
-                    MaNv = maNv,
-                    MaKh = maKh,
-                    ThoiGianBatDau = DateTime.Now,
-                    TrangThai = "Đang chơi",
-                    TienBan = 0,
-                    TienDichVu = 0,
-                    GiamGia = 0,
-                    TongTien = 0
-                };
+                    using var transaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        var ban = await _context.BanBia
+                            .Include(b => b.MaKhuVucNavigation)
+                            .Include(b => b.MaLoaiNavigation)
+                            .FirstOrDefaultAsync(b => b.MaBan == maBan);
 
-                _context.HoaDons.Add(hoaDon);
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
+                        if (ban == null)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"❌ Không tìm thấy bàn {maBan}");
+                            return false;
+                        }
 
-                return true;
+                        // Cho phép bắt đầu cả bàn "Trống" VÀ "Đã đặt"
+                        if (ban.TrangThai != "Trống" && ban.TrangThai != "Đã đặt")
+                        {
+                            System.Diagnostics.Debug.WriteLine($"❌ Bàn {ban.TenBan} có trạng thái: {ban.TrangThai}");
+                            return false;
+                        }
+
+                        // Kiểm tra hóa đơn đang hoạt động
+                        var existingInvoice = await _context.HoaDons
+                            .FirstOrDefaultAsync(h => h.MaBan == maBan && h.TrangThai == "Đang chơi");
+
+                        if (existingInvoice != null)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"❌ Bàn {ban.TenBan} đã có hóa đơn: HD{existingInvoice.MaHd}");
+                            return false;
+                        }
+
+                        // Nếu là bàn "Đã đặt", xử lý đơn đặt bàn
+                        if (ban.TrangThai == "Đã đặt")
+                        {
+                            var datBan = await _context.DatBans
+                                .Where(d => d.MaBan == maBan && (d.TrangThai == "Đang chờ" || d.TrangThai == "Đã đặt"))
+                                .OrderBy(d => d.ThoiGianBatDau)
+                                .FirstOrDefaultAsync();
+
+                            if (datBan != null)
+                            {
+                                if (!maKh.HasValue && datBan.MaKh.HasValue)
+                                {
+                                    maKh = datBan.MaKh;
+                                }
+                                datBan.TrangThai = "Đã xác nhận";
+                            }
+                        }
+
+                        // Cập nhật trạng thái bàn
+                        ban.TrangThai = "Đang chơi";
+                        ban.GioBatDau = DateTime.Now;
+                        ban.MaKh = maKh;
+
+                        // Tạo hóa đơn mới
+                        var hoaDon = new HoaDon
+                        {
+                            MaBan = maBan,
+                            MaNv = maNv,
+                            MaKh = maKh,
+                            ThoiGianBatDau = DateTime.Now,
+                            TrangThai = "Đang chơi",
+                            TienBan = 0,
+                            TienDichVu = 0,
+                            GiamGia = 0,
+                            TongTien = 0
+                        };
+
+                        _context.HoaDons.Add(hoaDon);
+
+                        System.Diagnostics.Debug.WriteLine($"✓ Bắt đầu bàn {ban.TenBan}");
+
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        await transaction.RollbackAsync();
+                        System.Diagnostics.Debug.WriteLine($"❌ Inner Exception: {ex.Message}");
+                        throw;
+                    }
+                });
             }
-            catch
+            catch (Exception ex)
             {
-                await transaction.RollbackAsync();
+                System.Diagnostics.Debug.WriteLine($"❌ StartTableAsync Exception: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Inner: {ex.InnerException?.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");
                 return false;
             }
         }
@@ -393,77 +458,170 @@ namespace Billiard.BLL.Services.QLBan
         // Hủy đặt bàn
         public async Task<bool> CancelReservationAsync(int maDat)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
-            try
-            {
-                var datBan = await _context.DatBans.FindAsync(maDat);
-                if (datBan == null)
-                    return false;
+            var strategy = _context.Database.CreateExecutionStrategy();
 
-                var ban = await _context.BanBia.FindAsync(datBan.MaBan);
-                if (ban != null)
+            return await strategy.ExecuteAsync(async () =>
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
                 {
-                    ban.TrangThai = "Trống";
-                    ban.MaKh = null;
-                    ban.GhiChu = null;
+                    System.Diagnostics.Debug.WriteLine($"\n=== CancelReservationAsync ===");
+                    System.Diagnostics.Debug.WriteLine($"MaDat: {maDat}");
+
+                    var datBan = await _context.DatBans
+                        .Include(d => d.MaBanNavigation)
+                        .FirstOrDefaultAsync(d => d.MaDat == maDat);
+
+                    if (datBan == null)
+                    {
+                        System.Diagnostics.Debug.WriteLine("❌ Không tìm thấy đơn đặt bàn");
+                        return false;
+                    }
+
+                    System.Diagnostics.Debug.WriteLine($"Đơn đặt: {datBan.TenKhach}");
+
+                    // Cập nhật trạng thái bàn về Trống
+                    if (datBan.MaBanNavigation != null)
+                    {
+                        var ban = datBan.MaBanNavigation;
+                        System.Diagnostics.Debug.WriteLine($"Bàn: {ban.TenBan} - Trạng thái cũ: {ban.TrangThai}");
+
+                        ban.TrangThai = "Trống";
+                        ban.MaKh = null;
+                        ban.GhiChu = null;
+                        ban.GioBatDau = null;
+
+                        System.Diagnostics.Debug.WriteLine($"✓ Cập nhật bàn -> Trống");
+                    }
+
+                    // Cập nhật trạng thái đơn đặt thành "Đã hủy"
+                    datBan.TrangThai = "Đã hủy";
+                    System.Diagnostics.Debug.WriteLine($"✓ Cập nhật đơn đặt -> Đã hủy");
+
+                    await _context.SaveChangesAsync();
+                    System.Diagnostics.Debug.WriteLine("✓ SaveChanges thành công");
+
+                    await transaction.CommitAsync();
+                    System.Diagnostics.Debug.WriteLine("✓✓✓ HOÀN TẤT HỦY ĐẶT BÀN");
+
+                    return true;
                 }
-
-                _context.DatBans.Remove(datBan);
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                return true;
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                return false;
-            }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    System.Diagnostics.Debug.WriteLine($"❌ Exception: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Inner: {ex.InnerException?.Message}");
+                    throw;
+                }
+            });
         }
 
         // Xác nhận đặt bàn và bắt đầu chơi
         public async Task<bool> ConfirmReservationAsync(int maDat, int maNv)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
-            try
+            // Sử dụng Execution Strategy để tránh lỗi transaction
+            var strategy = _context.Database.CreateExecutionStrategy();
+
+            return await strategy.ExecuteAsync(async () =>
             {
-                var datBan = await _context.DatBans
-                    .Include(d => d.MaBanNavigation)
-                    .FirstOrDefaultAsync(d => d.MaDat == maDat);
-
-                if (datBan == null || datBan.MaBanNavigation == null)
-                    return false;
-
-                var ban = datBan.MaBanNavigation;
-                ban.TrangThai = "Đang chơi";
-                ban.GioBatDau = DateTime.Now;
-
-                var hoaDon = new HoaDon
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
                 {
-                    MaBan = datBan.MaBan,
-                    MaNv = maNv,
-                    MaKh = datBan.MaKh,
-                    ThoiGianBatDau = DateTime.Now,
-                    TrangThai = "Đang chơi",
-                    TienBan = 0,
-                    TienDichVu = 0,
-                    GiamGia = 0,
-                    TongTien = 0
-                };
+                    System.Diagnostics.Debug.WriteLine($"\n=== ConfirmReservationAsync ===");
+                    System.Diagnostics.Debug.WriteLine($"MaDat: {maDat}, MaNV: {maNv}");
 
-                _context.HoaDons.Add(hoaDon);
-                _context.DatBans.Remove(datBan);
+                    // 1. Tìm đơn đặt bàn
+                    var datBan = await _context.DatBans
+                        .Include(d => d.MaBanNavigation)
+                        .FirstOrDefaultAsync(d => d.MaDat == maDat);
 
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
+                    if (datBan == null)
+                    {
+                        System.Diagnostics.Debug.WriteLine("❌ Không tìm thấy đơn đặt bàn");
+                        return false;
+                    }
 
-                return true;
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                return false;
-            }
+                    if (datBan.MaBanNavigation == null)
+                    {
+                        System.Diagnostics.Debug.WriteLine("❌ Không tìm thấy thông tin bàn");
+                        return false;
+                    }
+
+                    System.Diagnostics.Debug.WriteLine($"Đơn đặt: {datBan.TenKhach} - Bàn: {datBan.MaBanNavigation.TenBan}");
+                    System.Diagnostics.Debug.WriteLine($"Trạng thái đơn: {datBan.TrangThai}");
+                    System.Diagnostics.Debug.WriteLine($"Trạng thái bàn: {datBan.MaBanNavigation.TrangThai}");
+
+                    // 2. Kiểm tra trạng thái đơn đặt
+                    if (datBan.TrangThai != "Đang chờ" && datBan.TrangThai != "Đã đặt")
+                    {
+                        System.Diagnostics.Debug.WriteLine($"❌ Trạng thái đơn không hợp lệ: {datBan.TrangThai}");
+                        return false;
+                    }
+
+                    // 3. Kiểm tra trạng thái bàn
+                    var ban = datBan.MaBanNavigation;
+                    if (ban.TrangThai != "Đã đặt" && ban.TrangThai != "Trống")
+                    {
+                        System.Diagnostics.Debug.WriteLine($"❌ Bàn có trạng thái không hợp lệ: {ban.TrangThai}");
+                        return false;
+                    }
+
+                    // 4. Kiểm tra xem bàn có hóa đơn đang hoạt động không
+                    var existingInvoice = await _context.HoaDons
+                        .FirstOrDefaultAsync(h => h.MaBan == ban.MaBan && h.TrangThai == "Đang chơi");
+
+                    if (existingInvoice != null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"❌ Bàn đã có hóa đơn đang hoạt động: HD{existingInvoice.MaHd}");
+                        return false;
+                    }
+
+                    // 5. Cập nhật trạng thái bàn
+                    ban.TrangThai = "Đang chơi";
+                    ban.GioBatDau = DateTime.Now;
+                    ban.MaKh = datBan.MaKh; // Gán khách hàng từ đơn đặt
+                    System.Diagnostics.Debug.WriteLine($"✓ Cập nhật bàn: {ban.TenBan} -> Đang chơi");
+
+                    // 6. Tạo hóa đơn mới
+                    var hoaDon = new HoaDon
+                    {
+                        MaBan = datBan.MaBan,
+                        MaNv = maNv,
+                        MaKh = datBan.MaKh,
+                        ThoiGianBatDau = DateTime.Now,
+                        TrangThai = "Đang chơi",
+                        TienBan = 0,
+                        TienDichVu = 0,
+                        GiamGia = 0,
+                        TongTien = 0
+                    };
+
+                    _context.HoaDons.Add(hoaDon);
+                    System.Diagnostics.Debug.WriteLine($"✓ Tạo hóa đơn mới cho bàn {ban.TenBan}");
+
+                    // 7. Cập nhật trạng thái đơn đặt thành "Đã xác nhận"
+                    datBan.TrangThai = "Đã xác nhận";
+                    System.Diagnostics.Debug.WriteLine($"✓ Cập nhật trạng thái đơn đặt -> Đã xác nhận");
+
+                    // 8. Lưu thay đổi
+                    await _context.SaveChangesAsync();
+                    System.Diagnostics.Debug.WriteLine("✓ SaveChanges thành công");
+
+                    await transaction.CommitAsync();
+                    System.Diagnostics.Debug.WriteLine("✓✓✓ HOÀN TẤT XÁC NHẬN ĐẶT BÀN");
+
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    System.Diagnostics.Debug.WriteLine($"❌ Exception trong ConfirmReservationAsync:");
+                    System.Diagnostics.Debug.WriteLine($"Message: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Inner: {ex.InnerException?.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");
+                    throw;
+                }
+            });
         }
     }
 }

@@ -17,9 +17,18 @@ namespace Billiard.BLL.Services.KhachHangServices
         }
 
         // GET :: DANH SÁCH
-        public async Task<List<KhachHang>> GetListKhachHangAsync(string keyword = "", string rank = "Tất cả")
+        public async Task<List<KhachHang>> GetListKhachHangAsync(string keyword = "", string rank = "Tất cả", bool isDeleted = false)
         {
             var query = _context.KhachHangs.AsQueryable();
+
+            if (isDeleted)
+            {
+                query = query.Where(k => k.HoatDong == false);
+            }
+            else
+            {
+                query = query.Where(k => k.HoatDong == true || k.HoatDong == null);
+            }
 
             // Lọc tên
             if (!string.IsNullOrEmpty(keyword))
@@ -53,12 +62,11 @@ namespace Billiard.BLL.Services.KhachHangServices
            
             // Sắp xếp tên A-Z
             return await query.Include(k => k.HoaDons)
+                                      .AsNoTracking()
                                       .OrderByDescending(k => k.DiemTichLuy) // Người điểm cao xếp trước
-                                      .ToListAsync();
-            
+                                    .ToListAsync();   
         }
 
-        // 2. Lấy chi tiết khách hàng (Kèm lịch sử hóa đơn)
         public async Task<KhachHang> GetKhachHangDetailAsync(int maKh)
         {
             return await _context.KhachHangs
@@ -78,7 +86,15 @@ namespace Billiard.BLL.Services.KhachHangServices
             _context.KhachHangs.Update(kh); await _context.SaveChangesAsync(); 
         }
 
+        public async Task ToggleStatusAsync(int maKh, bool isActive)
+        {
+            var kh = await _context.KhachHangs.FindAsync(maKh);
+            if (kh != null)
+            {
+                kh.HoatDong = isActive; // true = khôi phục, false = xóa mềm
+                await _context.SaveChangesAsync();
+            }
+        }
 
-        // ... Bạn có thể thêm hàm Delete nếu cần
     }
 }
