@@ -23,7 +23,7 @@ public partial class BilliardDbContext : DbContext
         if (!optionsBuilder.IsConfigured)
         {
             // Connection string của bạn
-            optionsBuilder.UseSqlServer("your_connection_string_here");
+            optionsBuilder.UseSqlServer("Server=localhost,1434;Database=QL_QuanBi_a;User Id=sa;Password=TuanDat@0608;MultipleActiveResultSets=True;TrustServerCertificate=True;");
         }
     }
 

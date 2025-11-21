@@ -15,6 +15,7 @@ using System.Windows.Forms;
 using Billiard.WinForm.Forms.Auth;
 using Billiard.BLL.Services.QLBan;
 using Billiard.WinForm.Forms.KhachHang;
+using Billiard.WinForm.Forms.NhanVien;
 namespace Billiard.WinForm
 {
     public partial class MainForm : Form
@@ -268,7 +269,10 @@ namespace Billiard.WinForm
                         OpenChildForm(Program.GetService<ThongKeForm>());
                         break;
                     case "btnNhanVien":
-                        ShowComingSoon("Nhân viên");
+                        var nhanVienForm = Program.GetService<NhanVienForm>();
+                        nhanVienForm.SetUserInfo(MaNV, ChucVu);
+                        nhanVienForm.SetMainForm(this);
+                        OpenChildForm(nhanVienForm);
                         break;
                     case "btnCaiDat":
                         var vietQRConfigForm = Program.GetService<VietQRConfigForm>();
