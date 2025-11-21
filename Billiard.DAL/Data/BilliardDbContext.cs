@@ -23,7 +23,7 @@ public partial class BilliardDbContext : DbContext
         if (!optionsBuilder.IsConfigured)
         {
             // Connection string của bạn
-            optionsBuilder.UseSqlServer("your_connection_string_here");
+            optionsBuilder.UseSqlServer("Server=localhost,1434;Database=QL_QuanBi_a;User Id=sa;Password=TuanDat@0608;MultipleActiveResultSets=True;TrustServerCertificate=True;");
         }
     }
 
@@ -61,6 +61,8 @@ public partial class BilliardDbContext : DbContext
     public virtual DbSet<NhaCungCap> NhaCungCaps { get; set; }
 
     public virtual DbSet<NhanVien> NhanViens { get; set; }
+    public virtual DbSet<LichLamViec> LichLamViecs { get; set; }
+
 
     public virtual DbSet<NhomQuyen> NhomQuyens { get; set; }
 
@@ -724,7 +726,58 @@ public partial class BilliardDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK__nhan_vien__ma_nh__70DDC3D8");
         });
+        modelBuilder.Entity<LichLamViec>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PK_lich_lam_viec");
 
+            entity.ToTable("lich_lam_viec");
+
+            entity.HasIndex(e => e.Ngay, "idx_lich_lam_viec_ngay");
+            entity.HasIndex(e => e.MaNv, "idx_lich_lam_viec_ma_nv");
+            entity.HasIndex(e => new { e.MaNv, e.Ngay, e.GioBatDau, e.GioKetThuc }, "idx_lich_lam_viec_unique").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.MaNv).HasColumnName("ma_nv");
+            entity.Property(e => e.Ngay).HasColumnName("ngay");
+            entity.Property(e => e.GioBatDau).HasColumnName("gio_bat_dau");
+            entity.Property(e => e.GioKetThuc).HasColumnName("gio_ket_thuc");
+            entity.Property(e => e.Ca)
+                .HasMaxLength(20)
+                .HasDefaultValue("Sang")
+                .HasColumnName("ca");
+            entity.Property(e => e.TrangThai)
+                .HasMaxLength(20)
+                .HasDefaultValue("DaXepLich")
+                .HasColumnName("trang_thai");
+            entity.Property(e => e.GhiChu)
+                .HasMaxLength(255)
+                .HasColumnName("ghi_chu");
+            entity.Property(e => e.NgayTao)
+                .HasDefaultValueSql("(getdate())")
+                .HasColumnType("datetime")
+                .HasColumnName("ngay_tao");
+            entity.Property(e => e.NguoiTao).HasColumnName("nguoi_tao");
+            entity.Property(e => e.NgayCapNhat)
+                .HasColumnType("datetime")
+                .HasColumnName("ngay_cap_nhat");
+            entity.Property(e => e.NguoiCapNhat).HasColumnName("nguoi_cap_nhat");
+
+            entity.HasOne(d => d.NhanVien)
+                .WithMany(p => p.LichLamViecs)
+                .HasForeignKey(d => d.MaNv)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_lich_lam_viec_nhan_vien");
+
+            entity.HasOne(d => d.NguoiTaoNavigation)
+                .WithMany()
+                .HasForeignKey(d => d.NguoiTao)
+                .HasConstraintName("FK_lich_lam_viec_nguoi_tao");
+
+            entity.HasOne(d => d.NguoiCapNhatNavigation)
+                .WithMany()
+                .HasForeignKey(d => d.NguoiCapNhat)
+                .HasConstraintName("FK_lich_lam_viec_nguoi_cap_nhat");
+        });
         modelBuilder.Entity<NhomQuyen>(entity =>
         {
             entity.HasKey(e => e.MaNhom).HasName("PK__nhom_quy__9B8FD98CCE19E15A");

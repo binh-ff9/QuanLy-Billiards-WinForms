@@ -1,21 +1,24 @@
 ﻿using Billiard.BLL.Services;
-using Billiard.BLL.Services.QLBan;
 using Billiard.BLL.Services.HoaDonServices;
+using Billiard.BLL.Services.KhachHangServices;
+using Billiard.BLL.Services.NhanVienService;
+using Billiard.BLL.Services.QLBan;
+using Billiard.BLL.Services.VietQR;
 using Billiard.DAL.Data;
 using Billiard.WinForm.Forms;
 using Billiard.WinForm.Forms.Auth;
-using Billiard.WinForm.Forms.HoaDon;
-using Billiard.WinForm.Forms.ThongKe;
-using Billiard.WinForm.Forms.QLBan;
 using Billiard.WinForm.Forms.CaiDat;
-using Billiard.BLL.Services.KhachHangServices;
+using Billiard.WinForm.Forms.HoaDon;
 using Billiard.WinForm.Forms.KhachHang;
-using Billiard.BLL.Services.VietQR;
+using Billiard.WinForm.Forms.NhanVien; // ✅ THÊM
+using Billiard.WinForm.Forms.QLBan;
+using Billiard.WinForm.Forms.ThongKe;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
+using System.Net.Http;
 using System.Windows.Forms;
 using Billiard.BLL.Services.HoaDonServices;
 using Billiard.BLL.Services.KhachHangServices;
@@ -64,12 +67,13 @@ namespace Billiard.WinForm
                 return new BilliardDbContext(optionsBuilder.Options);
             });
 
-            // ✅ Đổi tất cả Services từ Scoped → Transient (theo chỉ dẫn)
+            // ✅ Services (Transient)
             services.AddTransient<AuthService>();
             services.AddTransient<EmailService>();
             services.AddTransient<DichVuService>();
             services.AddTransient<MatHangService>();
             services.AddTransient<ThongKeService>();
+            services.AddTransient<NhanVienService>(); 
 
             // HttpClient (Singleton)
             services.AddSingleton<HttpClient>();
@@ -106,9 +110,14 @@ namespace Billiard.WinForm
             services.AddTransient<ClientMainForm>();
             services.AddTransient<DatBanDialog>();   // Đăng ký luôn các Dialog con
             services.AddTransient<UserProfileForm>();
+            services.AddTransient<KhachHangForm>();
+
+            // ✅ THÊM: NhanVien Forms
+            services.AddTransient<NhanVienForm>();
+            services.AddTransient<AddNhanVienForm>();
+            services.AddTransient<EditNhanVienForm>();
         }
 
-        // ✅ THÊM: Method để tạo Scope mới (tùy chọn)
         public static IServiceScope CreateScope()
         {
             return ServiceProvider.CreateScope();
