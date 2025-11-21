@@ -252,5 +252,11 @@ namespace Billiard.BLL.Services.QLBan
 
             return (dangCho, daXacNhan, daHuy);
         }
+        public async Task AddAsync(DatBan booking)
+        {
+            _context.DatBans.Add(booking);
+            await _context.SaveChangesAsync();
+        }
+
     }
 }

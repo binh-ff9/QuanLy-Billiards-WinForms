@@ -20,6 +20,11 @@ using System;
 using System.IO;
 using System.Net.Http;
 using System.Windows.Forms;
+using Billiard.BLL.Services.HoaDonServices;
+using Billiard.BLL.Services.KhachHangServices;
+using Billiard.WinForm.Forms.KhachHang;
+using Billiard.WinForm.Forms.Users;
+using System.Net.Http;
 
 namespace Billiard.WinForm
 {
@@ -46,7 +51,7 @@ namespace Billiard.WinForm
             ConfigureServices(serviceCollection);
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            // Run MainForm
+            // Run LoginForm
             Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
         }
 
@@ -85,7 +90,9 @@ namespace Billiard.WinForm
             services.AddTransient<ThanhToanService>();
             services.AddTransient<VietQRConfigForm>();
 
-            // KhachHang services (Transient)
+            services.AddScoped<DatBanService>();
+            // Register Auth Forms
+            // KhachHang services (Transient - chuyển từ Scoped theo chỉ dẫn)
             services.AddTransient<KhachHangService>();
 
             // Register Forms (Transient)
@@ -99,6 +106,10 @@ namespace Billiard.WinForm
             services.AddTransient<QLBanForm>();
             services.AddTransient<HoaDonForm>();
             services.AddTransient<ThongKeForm>();
+            services.AddTransient<KhachHangForm>(); // Khách hàng
+            services.AddTransient<ClientMainForm>();
+            services.AddTransient<DatBanDialog>();   // Đăng ký luôn các Dialog con
+            services.AddTransient<UserProfileForm>();
             services.AddTransient<KhachHangForm>();
 
             // ✅ THÊM: NhanVien Forms
