@@ -1,6 +1,6 @@
-﻿namespace Billiard.WinForm.Forms.QLBan
+﻿namespace Billiard.WinForm.Forms.CaiDat
 {
-    partial class ThemDichVuForm
+    partial class VietQRConfigForm
     {
         /// <summary>
         /// Required designer variable.
@@ -28,17 +28,16 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.SuspendLayout();
+            SuspendLayout();
             // 
-            // ThemDichVuForm
+            // VietQRConfigForm
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(10F, 25F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(900, 700);
-            this.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.Name = "ThemDichVuForm";
-            this.Text = "Thêm dịch vụ";
-            this.ResumeLayout(false);
+            AutoScaleDimensions = new SizeF(12F, 30F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(800, 664);
+            Name = "VietQRConfigForm";
+            Text = "VietQRConfigForm";
+            ResumeLayout(false);
         }
 
         #endregion

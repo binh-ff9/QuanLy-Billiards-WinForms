@@ -207,7 +207,8 @@ namespace Billiard.WinForm.Forms.QLBan
                 {
                     System.Diagnostics.Debug.WriteLine("Đang xử lý thay đổi ảnh...");
 
-                    // Xóa ảnh cũ nếu có
+                    // Xóa ảnh cũ nếu có - BÌNH LUẬN DÒNG XÓA FILE NGUỒN (YÊU CẦU CỦA USER)
+                    /*
                     if (!string.IsNullOrEmpty(_banBia.HinhAnh))
                     {
                         var projectRoot = Directory.GetParent(Directory.GetParent(Directory.GetParent(
@@ -227,10 +228,12 @@ namespace Billiard.WinForm.Forms.QLBan
                             }
                         }
                     }
+                    */
 
-                    // Lưu ảnh mới
+                    // Lưu ảnh mới (nếu có ảnh mới được chọn)
                     if (!string.IsNullOrEmpty(_selectedImagePath))
                     {
+                        // Nếu có ảnh mới, tạo tên mới và copy
                         imageName = $"table_{DateTime.Now:yyyyMMddHHmmss}{Path.GetExtension(_selectedImagePath)}";
 
                         var projectRoot = Directory.GetParent(Directory.GetParent(Directory.GetParent(
@@ -245,6 +248,7 @@ namespace Billiard.WinForm.Forms.QLBan
                     }
                     else
                     {
+                        // Nếu _selectedImagePath là null (người dùng nhấn Xóa ảnh)
                         imageName = null;
                         System.Diagnostics.Debug.WriteLine("Xóa ảnh - set imageName = null");
                     }

@@ -1,18 +1,17 @@
-﻿using Billiard.BLL.Services;
-
-using Microsoft.Extensions.DependencyInjection;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Windows.Forms.DataVisualization.Charting;
+using Billiard.BLL.Services;
+using Microsoft.Extensions.DependencyInjection;
 using WinFormsChart = System.Windows.Forms.DataVisualization.Charting.Chart;
 using WinFormsChartArea = System.Windows.Forms.DataVisualization.Charting.ChartArea;
-using WinFormsLegend = System.Windows.Forms.DataVisualization.Charting.Legend;
 using WinFormsSeries = System.Windows.Forms.DataVisualization.Charting.Series;
+using WinFormsLegend = System.Windows.Forms.DataVisualization.Charting.Legend;
+using System.Windows.Forms.DataVisualization.Charting;
 
 namespace Billiard.WinForm.Forms.ThongKe
 {
@@ -36,7 +35,7 @@ namespace Billiard.WinForm.Forms.ThongKe
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi khi tải dữ liệu: {ex.Message}\n\nStack: {ex.StackTrace}", "Lỗi",
+                MessageBox.Show($"Lỗi khi tải dữ liệu: {ex.Message}", "Lỗi",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -68,6 +67,7 @@ namespace Billiard.WinForm.Forms.ThongKe
             dgvTopKhachHang.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 249, 250);
         }
 
+        // ===== PHƯƠNG THỨC TẠO SERVICE MỚI CHO MỖI THAO TÁC =====
         private ThongKeService CreateService()
         {
             return _serviceProvider.GetRequiredService<ThongKeService>();
@@ -75,27 +75,12 @@ namespace Billiard.WinForm.Forms.ThongKe
 
         private async Task LoadAllData()
         {
+            // Tải dữ liệu tuần tự để tránh xung đột
             await LoadTongQuan();
             await LoadDoanhThu7Ngay();
             await LoadDoanhThuThang();
             await LoadKhungGio();
             await LoadPhuongThuc();
-
-            // Load tab hiện tại
-            if (tabControl.SelectedTab == tabDichVu)
-            {
-                await LoadTopDichVu();
-                await LoadLoaiDichVu();
-                await LoadLoaiBan();
-            }
-            else if (tabControl.SelectedTab == tabKhachHang)
-            {
-                await LoadTopKhachHang();
-            }
-            else if (tabControl.SelectedTab == tabKhac)
-            {
-                await LoadSoSanh();
-            }
         }
 
         #region Button Events
@@ -178,7 +163,7 @@ namespace Billiard.WinForm.Forms.ThongKe
         }
         #endregion
 
-        #region Load Data Methods
+        #region Load Data Methods - MỖI PHƯƠNG THỨC TẠO SERVICE MỚI
         private async Task LoadTongQuan()
         {
             try
@@ -224,8 +209,6 @@ namespace Billiard.WinForm.Forms.ThongKe
         {
             try
             {
-                if (cboNam.SelectedItem == null) return;
-
                 int nam = Convert.ToInt32(cboNam.SelectedItem);
                 using var service = CreateService();
                 var data = await service.GetDoanhThuTheoThangAsync(nam);
@@ -399,16 +382,16 @@ namespace Billiard.WinForm.Forms.ThongKe
         #endregion
 
         #region Chart Helper Methods
+        // ... (Giữ nguyên các phương thức UpdateBarChart, UpdateLineChart, etc.)
+
         private void UpdateBarChart(WinFormsChart chart, string title, List<Tuple<string, decimal>> data, Color color)
         {
-            if (chart == null) return;
-
             chart.Series.Clear();
             chart.ChartAreas.Clear();
             chart.Titles.Clear();
 
-            var titleObj = chart.Titles.Add(title);
-            titleObj.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            chart.Titles.Add(title);
+            chart.Titles[0].Font = new Font("Segoe UI", 12F, FontStyle.Bold);
 
             var chartArea = new WinFormsChartArea();
             chartArea.AxisX.MajorGrid.Enabled = false;
@@ -433,14 +416,12 @@ namespace Billiard.WinForm.Forms.ThongKe
 
         private void UpdateLineChart(WinFormsChart chart, string title, List<Tuple<string, decimal>> data, Color color)
         {
-            if (chart == null) return;
-
             chart.Series.Clear();
             chart.ChartAreas.Clear();
             chart.Titles.Clear();
 
-            var titleObj = chart.Titles.Add(title);
-            titleObj.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            chart.Titles.Add(title);
+            chart.Titles[0].Font = new Font("Segoe UI", 12F, FontStyle.Bold);
 
             var chartArea = new WinFormsChartArea();
             chartArea.AxisX.MajorGrid.Enabled = false;
@@ -468,14 +449,12 @@ namespace Billiard.WinForm.Forms.ThongKe
 
         private void UpdateHorizontalBarChart(WinFormsChart chart, string title, List<Tuple<string, decimal>> data, Color color)
         {
-            if (chart == null) return;
-
             chart.Series.Clear();
             chart.ChartAreas.Clear();
             chart.Titles.Clear();
 
-            var titleObj = chart.Titles.Add(title);
-            titleObj.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            chart.Titles.Add(title);
+            chart.Titles[0].Font = new Font("Segoe UI", 12F, FontStyle.Bold);
 
             var chartArea = new WinFormsChartArea();
             chartArea.AxisY.MajorGrid.Enabled = false;
@@ -500,15 +479,13 @@ namespace Billiard.WinForm.Forms.ThongKe
 
         private void UpdateDoughnutChart(WinFormsChart chart, string title, List<Tuple<string, decimal>> data)
         {
-            if (chart == null) return;
-
             chart.Series.Clear();
             chart.ChartAreas.Clear();
             chart.Titles.Clear();
             chart.Legends.Clear();
 
-            var titleObj = chart.Titles.Add(title);
-            titleObj.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            chart.Titles.Add(title);
+            chart.Titles[0].Font = new Font("Segoe UI", 12F, FontStyle.Bold);
 
             var chartArea = new WinFormsChartArea();
             chart.ChartAreas.Add(chartArea);
@@ -551,15 +528,13 @@ namespace Billiard.WinForm.Forms.ThongKe
 
         private void UpdatePieChart(WinFormsChart chart, string title, List<Tuple<string, decimal>> data)
         {
-            if (chart == null) return;
-
             chart.Series.Clear();
             chart.ChartAreas.Clear();
             chart.Titles.Clear();
             chart.Legends.Clear();
 
-            var titleObj = chart.Titles.Add(title);
-            titleObj.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            chart.Titles.Add(title);
+            chart.Titles[0].Font = new Font("Segoe UI", 12F, FontStyle.Bold);
 
             var chartArea = new WinFormsChartArea();
             chart.ChartAreas.Add(chartArea);
@@ -600,9 +575,7 @@ namespace Billiard.WinForm.Forms.ThongKe
 
             chart.Series.Add(series);
         }
-        #endregion
 
-        #region Helper Methods
         private string FormatCurrency(decimal value)
         {
             return value.ToString("N0", CultureInfo.GetCultureInfo("vi-VN")) + " đ";
@@ -618,34 +591,21 @@ namespace Billiard.WinForm.Forms.ThongKe
 
         private async void TabControl_SelectedIndexChanged(object sender, EventArgs e)
         {
-            try
+            if (tabControl.SelectedTab == tabDichVu)
             {
-                if (tabControl.SelectedTab == tabDichVu)
-                {
-                    await LoadTopDichVu();
-                    await LoadLoaiDichVu();
-                    await LoadLoaiBan();
-                }
-                else if (tabControl.SelectedTab == tabKhachHang)
-                {
-                    await LoadTopKhachHang();
-                }
-                else if (tabControl.SelectedTab == tabKhac)
-                {
-                    await LoadSoSanh();
-                }
+                await LoadTopDichVu();
+                await LoadLoaiDichVu();
+                await LoadLoaiBan();
             }
-            catch (Exception ex)
+            else if (tabControl.SelectedTab == tabKhachHang)
             {
-                MessageBox.Show($"Lỗi khi chuyển tab: {ex.Message}", "Lỗi",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                await LoadTopKhachHang();
+            }
+            else if (tabControl.SelectedTab == tabKhac)
+            {
+                await LoadSoSanh();
             }
         }
         #endregion
-
-        private void panelDoanhThu7Ngay_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
     }
 }

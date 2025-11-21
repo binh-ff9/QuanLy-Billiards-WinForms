@@ -113,7 +113,7 @@
             lblUserRole.ForeColor = Color.FromArgb(173, 181, 189);
             lblUserRole.Location = new Point(91, 50);
             lblUserRole.Name = "lblUserRole";
-            lblUserRole.Size = new Size(75, 20);
+            lblUserRole.Size = new Size(91, 25);
             lblUserRole.TabIndex = 2;
             lblUserRole.Text = "Nhân viên";
             // 
@@ -125,7 +125,7 @@
             lblUserName.ForeColor = Color.White;
             lblUserName.Location = new Point(91, 20);
             lblUserName.Name = "lblUserName";
-            lblUserName.Size = new Size(102, 25);
+            lblUserName.Size = new Size(117, 30);
             lblUserName.TabIndex = 1;
             lblUserName.Text = "Nhân viên";
             // 
@@ -149,7 +149,7 @@
             lblTitle.ForeColor = Color.White;
             lblTitle.Location = new Point(20, 25);
             lblTitle.Name = "lblTitle";
-            lblTitle.Size = new Size(384, 41);
+            lblTitle.Size = new Size(461, 48);
             lblTitle.TabIndex = 0;
             lblTitle.Text = "🎱 Quản Lý Quán Bi-a Pro";
             // 
@@ -383,7 +383,7 @@
             pnlSidebar.Location = new Point(0, 257);
             pnlSidebar.MinimumSize = new Size(200, 0);
             pnlSidebar.Name = "pnlSidebar";
-            pnlSidebar.Size = new Size(250, 641);
+            pnlSidebar.Size = new Size(250, 1253);
             pnlSidebar.TabIndex = 2;
             // 
             // btnQuanLyBan
@@ -521,7 +521,7 @@
             btnCaiDat.FlatStyle = FlatStyle.Flat;
             btnCaiDat.Font = new Font("Segoe UI", 11F);
             btnCaiDat.ForeColor = Color.White;
-            btnCaiDat.Location = new Point(10, 581);
+            btnCaiDat.Location = new Point(10, 1193);
             btnCaiDat.Name = "btnCaiDat";
             btnCaiDat.Padding = new Padding(10, 0, 0, 0);
             btnCaiDat.Size = new Size(230, 50);
@@ -539,7 +539,7 @@
             pnlMain.Dock = DockStyle.Fill;
             pnlMain.Location = new Point(250, 257);
             pnlMain.Name = "pnlMain";
-            pnlMain.Size = new Size(1150, 641);
+            pnlMain.Size = new Size(1150, 1253);
             pnlMain.TabIndex = 3;
             // 
             // pnlDetail
@@ -547,18 +547,18 @@
             pnlDetail.BackColor = Color.White;
             pnlDetail.BorderStyle = BorderStyle.FixedSingle;
             pnlDetail.Dock = DockStyle.Right;
-            pnlDetail.Location = new Point(1100, 257);
+            pnlDetail.Location = new Point(800, 257);
             pnlDetail.MinimumSize = new Size(300, 0);
             pnlDetail.Name = "pnlDetail";
-            pnlDetail.Size = new Size(300, 641);
+            pnlDetail.Size = new Size(600, 1253);
             pnlDetail.TabIndex = 4;
             pnlDetail.Visible = false;
             // 
             // MainForm
             // 
-            AutoScaleDimensions = new SizeF(8F, 20F);
+            AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1400, 898);
+            ClientSize = new Size(1400, 1510);
             Controls.Add(pnlDetail);
             Controls.Add(pnlMain);
             Controls.Add(pnlSidebar);
@@ -622,6 +622,6 @@
         private System.Windows.Forms.Button btnNhanVien;
         private System.Windows.Forms.Button btnCaiDat;
         private System.Windows.Forms.Panel pnlMain;
-        private System.Windows.Forms.Panel pnlDetail;
+        public System.Windows.Forms.Panel pnlDetail;
     }
 }
