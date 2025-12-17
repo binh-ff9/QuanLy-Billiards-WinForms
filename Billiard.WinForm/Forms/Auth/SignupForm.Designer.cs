@@ -27,7 +27,6 @@
             lblTitle = new Label();
             btnBackToLogin = new Button();
             btnSignup = new Button();
-            // Password fields with toggle
             pnlXacNhanMatKhau = new Panel();
             txtXacNhanMatKhau = new TextBox();
             btnToggleConfirm = new Button();
@@ -48,8 +47,8 @@
             pnlDecoration.SuspendLayout();
             pnlRight.SuspendLayout();
             pnlMain.SuspendLayout();
-            pnlMatKhau.SuspendLayout();
             pnlXacNhanMatKhau.SuspendLayout();
+            pnlMatKhau.SuspendLayout();
             SuspendLayout();
             // 
             // pnlLeft
@@ -77,10 +76,10 @@
             lblDecoSubtitle.Dock = DockStyle.Bottom;
             lblDecoSubtitle.Font = new Font("Segoe UI", 11F);
             lblDecoSubtitle.ForeColor = Color.White;
-            lblDecoSubtitle.Location = new Point(0, 297);
+            lblDecoSubtitle.Location = new Point(0, 306);
             lblDecoSubtitle.Name = "lblDecoSubtitle";
             lblDecoSubtitle.Padding = new Padding(30);
-            lblDecoSubtitle.Size = new Size(340, 403);
+            lblDecoSubtitle.Size = new Size(340, 394);
             lblDecoSubtitle.TabIndex = 1;
             lblDecoSubtitle.Text = "✨ Đặc quyền thành viên:\r\n\r\n🎁 Tích điểm mỗi lần chơi\r\n💎 Ưu đãi theo rank\r\n🎉 Khuyến mãi đặc biệt\r\n🎯 Đặt bàn trước online\r\n⚡ Thanh toán nhanh chóng\r\n📊 Theo dõi lịch sử chơi";
             // 
@@ -143,7 +142,7 @@
             btnClose.FlatStyle = FlatStyle.Flat;
             btnClose.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
             btnClose.ForeColor = Color.Gray;
-            btnClose.Location = new Point(407, 12);
+            btnClose.Location = new Point(407, 2);
             btnClose.Name = "btnClose";
             btnClose.Size = new Size(40, 46);
             btnClose.TabIndex = 10;
@@ -158,166 +157,52 @@
             // 
             lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
             lblTitle.ForeColor = Color.MidnightBlue;
-            lblTitle.Location = new Point(41, 24);
+            lblTitle.Location = new Point(41, 21);
             lblTitle.Name = "lblTitle";
             lblTitle.Size = new Size(373, 50);
             lblTitle.TabIndex = 13;
-            lblTitle.Text = "ĐĂNG KÝ THÀNH VIÊN";
+            lblTitle.Text = "ĐĂNG KÝ";
             lblTitle.TextAlign = ContentAlignment.MiddleCenter;
             // 
-            // lblTenKH
+            // btnBackToLogin
             // 
-            lblTenKH.AutoSize = true;
-            lblTenKH.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblTenKH.ForeColor = Color.FromArgb(51, 65, 85);
-            lblTenKH.Location = new Point(41, 90);
-            lblTenKH.Name = "lblTenKH";
-            lblTenKH.Size = new Size(155, 28);
-            lblTenKH.TabIndex = 2;
-            lblTenKH.Text = "👤 Họ và Tên *";
+            btnBackToLogin.BackColor = Color.FromArgb(241, 245, 249);
+            btnBackToLogin.Cursor = Cursors.Hand;
+            btnBackToLogin.FlatAppearance.BorderSize = 0;
+            btnBackToLogin.FlatStyle = FlatStyle.Flat;
+            btnBackToLogin.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            btnBackToLogin.ForeColor = Color.FromArgb(51, 65, 85);
+            btnBackToLogin.Location = new Point(41, 650);
+            btnBackToLogin.Name = "btnBackToLogin";
+            btnBackToLogin.Size = new Size(380, 45);
+            btnBackToLogin.TabIndex = 7;
+            btnBackToLogin.Text = "← Đã có tài khoản? Đăng nhập";
+            btnBackToLogin.UseVisualStyleBackColor = false;
+            btnBackToLogin.Click += BtnBackToLogin_Click;
             // 
-            // txtTenKH
+            // btnSignup
             // 
-            txtTenKH.BorderStyle = BorderStyle.FixedSingle;
-            txtTenKH.Font = new Font("Segoe UI", 11F);
-            txtTenKH.Location = new Point(41, 120);
-            txtTenKH.Name = "txtTenKH";
-            txtTenKH.PlaceholderText = "Nguyễn Văn A";
-            txtTenKH.Size = new Size(380, 37);
-            txtTenKH.TabIndex = 0;
+            btnSignup.BackColor = Color.SeaGreen;
+            btnSignup.Cursor = Cursors.Hand;
+            btnSignup.FlatAppearance.BorderSize = 0;
+            btnSignup.FlatStyle = FlatStyle.Flat;
+            btnSignup.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            btnSignup.ForeColor = Color.White;
+            btnSignup.Location = new Point(41, 580);
+            btnSignup.Name = "btnSignup";
+            btnSignup.Size = new Size(380, 50);
+            btnSignup.TabIndex = 6;
+            btnSignup.Text = "Đăng ký";
+            btnSignup.UseVisualStyleBackColor = false;
+            btnSignup.Click += BtnSignup_Click;
             // 
-            // lblSDT
-            // 
-            lblSDT.AutoSize = true;
-            lblSDT.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblSDT.ForeColor = Color.FromArgb(51, 65, 85);
-            lblSDT.Location = new Point(41, 170);
-            lblSDT.Name = "lblSDT";
-            lblSDT.Size = new Size(187, 28);
-            lblSDT.TabIndex = 4;
-            lblSDT.Text = "📱 Số điện thoại *";
-            // 
-            // txtSDT
-            // 
-            txtSDT.BorderStyle = BorderStyle.FixedSingle;
-            txtSDT.Font = new Font("Segoe UI", 11F);
-            txtSDT.Location = new Point(41, 200);
-            txtSDT.MaxLength = 11;
-            txtSDT.Name = "txtSDT";
-            txtSDT.PlaceholderText = "0909123456";
-            txtSDT.Size = new Size(380, 37);
-            txtSDT.TabIndex = 1;
-            // 
-            // lblEmail
-            // 
-            lblEmail.AutoSize = true;
-            lblEmail.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblEmail.ForeColor = Color.FromArgb(51, 65, 85);
-            lblEmail.Location = new Point(41, 250);
-            lblEmail.Name = "lblEmail";
-            lblEmail.Size = new Size(113, 28);
-            lblEmail.TabIndex = 6;
-            lblEmail.Text = "📧 Email *";
-            // 
-            // txtEmail
-            // 
-            txtEmail.BorderStyle = BorderStyle.FixedSingle;
-            txtEmail.Font = new Font("Segoe UI", 11F);
-            txtEmail.Location = new Point(41, 280);
-            txtEmail.Name = "txtEmail";
-            txtEmail.PlaceholderText = "email@example.com";
-            txtEmail.Size = new Size(380, 37);
-            txtEmail.TabIndex = 2;
-            // 
-            // lblNgaySinh
-            // 
-            lblNgaySinh.AutoSize = true;
-            lblNgaySinh.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblNgaySinh.ForeColor = Color.FromArgb(51, 65, 85);
-            lblNgaySinh.Location = new Point(41, 330);
-            lblNgaySinh.Name = "lblNgaySinh";
-            lblNgaySinh.Size = new Size(244, 28);
-            lblNgaySinh.TabIndex = 8;
-            lblNgaySinh.Text = "🎂 Ngày sinh (tùy chọn)";
-            // 
-            // dtpNgaySinh
-            // 
-            dtpNgaySinh.Font = new Font("Segoe UI", 11F);
-            dtpNgaySinh.Format = DateTimePickerFormat.Short;
-            dtpNgaySinh.Location = new Point(41, 360);
-            dtpNgaySinh.Name = "dtpNgaySinh";
-            dtpNgaySinh.Size = new Size(380, 37);
-            dtpNgaySinh.TabIndex = 3;
-            // 
-            // lblMatKhau
-            // 
-            lblMatKhau.AutoSize = true;
-            lblMatKhau.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblMatKhau.ForeColor = Color.FromArgb(51, 65, 85);
-            lblMatKhau.Location = new Point(41, 410);
-            lblMatKhau.Name = "lblMatKhau";
-            lblMatKhau.Size = new Size(151, 28);
-            lblMatKhau.TabIndex = 10;
-            lblMatKhau.Text = "🔒 Mật khẩu *";
-            // 
-            // pnlMatKhau - Container for password with eye icon
-            // 
-            pnlMatKhau.BackColor = Color.White;
-            pnlMatKhau.BorderStyle = BorderStyle.FixedSingle;
-            pnlMatKhau.Controls.Add(txtMatKhau);
-            pnlMatKhau.Controls.Add(btnTogglePassword);
-            pnlMatKhau.Location = new Point(41, 440);
-            pnlMatKhau.Name = "pnlMatKhau";
-            pnlMatKhau.Size = new Size(380, 42);
-            pnlMatKhau.TabIndex = 4;
-            // 
-            // txtMatKhau
-            // 
-            txtMatKhau.BorderStyle = BorderStyle.None;
-            txtMatKhau.Font = new Font("Segoe UI", 11F);
-            txtMatKhau.Location = new Point(8, 8);
-            txtMatKhau.Name = "txtMatKhau";
-            txtMatKhau.PlaceholderText = "Tối thiểu 6 ký tự";
-            txtMatKhau.Size = new Size(325, 30);
-            txtMatKhau.TabIndex = 0;
-            txtMatKhau.UseSystemPasswordChar = true;
-            // 
-            // btnTogglePassword
-            // 
-            btnTogglePassword.BackColor = Color.Transparent;
-            btnTogglePassword.Cursor = Cursors.Hand;
-            btnTogglePassword.FlatAppearance.BorderSize = 0;
-            btnTogglePassword.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 240, 240);
-            btnTogglePassword.FlatStyle = FlatStyle.Flat;
-            btnTogglePassword.Font = new Font("Segoe UI", 11F);
-            btnTogglePassword.ForeColor = Color.Gray;
-            btnTogglePassword.Location = new Point(335, 2);
-            btnTogglePassword.Name = "btnTogglePassword";
-            btnTogglePassword.Size = new Size(40, 36);
-            btnTogglePassword.TabIndex = 1;
-            btnTogglePassword.TabStop = false;
-            btnTogglePassword.Text = "👁";
-            btnTogglePassword.UseVisualStyleBackColor = false;
-            btnTogglePassword.Click += BtnTogglePassword_Click;
-            // 
-            // lblXacNhanMatKhau
-            // 
-            lblXacNhanMatKhau.AutoSize = true;
-            lblXacNhanMatKhau.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblXacNhanMatKhau.ForeColor = Color.FromArgb(51, 65, 85);
-            lblXacNhanMatKhau.Location = new Point(41, 495);
-            lblXacNhanMatKhau.Name = "lblXacNhanMatKhau";
-            lblXacNhanMatKhau.Size = new Size(243, 28);
-            lblXacNhanMatKhau.TabIndex = 12;
-            lblXacNhanMatKhau.Text = "🔐 Xác nhận mật khẩu *";
-            // 
-            // pnlXacNhanMatKhau - Container for confirm password with eye icon
+            // pnlXacNhanMatKhau
             // 
             pnlXacNhanMatKhau.BackColor = Color.White;
             pnlXacNhanMatKhau.BorderStyle = BorderStyle.FixedSingle;
             pnlXacNhanMatKhau.Controls.Add(txtXacNhanMatKhau);
             pnlXacNhanMatKhau.Controls.Add(btnToggleConfirm);
-            pnlXacNhanMatKhau.Location = new Point(41, 525);
+            pnlXacNhanMatKhau.Location = new Point(41, 515);
             pnlXacNhanMatKhau.Name = "pnlXacNhanMatKhau";
             pnlXacNhanMatKhau.Size = new Size(380, 42);
             pnlXacNhanMatKhau.TabIndex = 5;
@@ -352,37 +237,151 @@
             btnToggleConfirm.UseVisualStyleBackColor = false;
             btnToggleConfirm.Click += BtnToggleConfirm_Click;
             // 
-            // btnSignup
+            // lblXacNhanMatKhau
             // 
-            btnSignup.BackColor = Color.SeaGreen;
-            btnSignup.Cursor = Cursors.Hand;
-            btnSignup.FlatAppearance.BorderSize = 0;
-            btnSignup.FlatStyle = FlatStyle.Flat;
-            btnSignup.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            btnSignup.ForeColor = Color.White;
-            btnSignup.Location = new Point(41, 590);
-            btnSignup.Name = "btnSignup";
-            btnSignup.Size = new Size(380, 50);
-            btnSignup.TabIndex = 6;
-            btnSignup.Text = "Đăng ký";
-            btnSignup.UseVisualStyleBackColor = false;
-            btnSignup.Click += BtnSignup_Click;
+            lblXacNhanMatKhau.AutoSize = true;
+            lblXacNhanMatKhau.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblXacNhanMatKhau.ForeColor = Color.FromArgb(51, 65, 85);
+            lblXacNhanMatKhau.Location = new Point(41, 485);
+            lblXacNhanMatKhau.Name = "lblXacNhanMatKhau";
+            lblXacNhanMatKhau.Size = new Size(209, 28);
+            lblXacNhanMatKhau.TabIndex = 12;
+            lblXacNhanMatKhau.Text = "Xác nhận mật khẩu *";
             // 
-            // btnBackToLogin
+            // pnlMatKhau
             // 
-            btnBackToLogin.BackColor = Color.FromArgb(241, 245, 249);
-            btnBackToLogin.Cursor = Cursors.Hand;
-            btnBackToLogin.FlatAppearance.BorderSize = 0;
-            btnBackToLogin.FlatStyle = FlatStyle.Flat;
-            btnBackToLogin.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            btnBackToLogin.ForeColor = Color.FromArgb(51, 65, 85);
-            btnBackToLogin.Location = new Point(41, 660);
-            btnBackToLogin.Name = "btnBackToLogin";
-            btnBackToLogin.Size = new Size(380, 45);
-            btnBackToLogin.TabIndex = 7;
-            btnBackToLogin.Text = "← Đã có tài khoản? Đăng nhập";
-            btnBackToLogin.UseVisualStyleBackColor = false;
-            btnBackToLogin.Click += BtnBackToLogin_Click;
+            pnlMatKhau.BackColor = Color.White;
+            pnlMatKhau.BorderStyle = BorderStyle.FixedSingle;
+            pnlMatKhau.Controls.Add(txtMatKhau);
+            pnlMatKhau.Controls.Add(btnTogglePassword);
+            pnlMatKhau.Location = new Point(41, 430);
+            pnlMatKhau.Name = "pnlMatKhau";
+            pnlMatKhau.Size = new Size(380, 42);
+            pnlMatKhau.TabIndex = 4;
+            // 
+            // txtMatKhau
+            // 
+            txtMatKhau.BorderStyle = BorderStyle.None;
+            txtMatKhau.Font = new Font("Segoe UI", 11F);
+            txtMatKhau.Location = new Point(8, 8);
+            txtMatKhau.Name = "txtMatKhau";
+            txtMatKhau.PlaceholderText = "Tối thiểu 6 ký tự";
+            txtMatKhau.Size = new Size(325, 30);
+            txtMatKhau.TabIndex = 0;
+            txtMatKhau.UseSystemPasswordChar = true;
+            // 
+            // btnTogglePassword
+            // 
+            btnTogglePassword.BackColor = Color.Transparent;
+            btnTogglePassword.Cursor = Cursors.Hand;
+            btnTogglePassword.FlatAppearance.BorderSize = 0;
+            btnTogglePassword.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 240, 240);
+            btnTogglePassword.FlatStyle = FlatStyle.Flat;
+            btnTogglePassword.Font = new Font("Segoe UI", 11F);
+            btnTogglePassword.ForeColor = Color.Gray;
+            btnTogglePassword.Location = new Point(335, 2);
+            btnTogglePassword.Name = "btnTogglePassword";
+            btnTogglePassword.Size = new Size(40, 36);
+            btnTogglePassword.TabIndex = 1;
+            btnTogglePassword.TabStop = false;
+            btnTogglePassword.Text = "👁";
+            btnTogglePassword.UseVisualStyleBackColor = false;
+            btnTogglePassword.Click += BtnTogglePassword_Click;
+            // 
+            // lblMatKhau
+            // 
+            lblMatKhau.AutoSize = true;
+            lblMatKhau.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblMatKhau.ForeColor = Color.FromArgb(51, 65, 85);
+            lblMatKhau.Location = new Point(41, 400);
+            lblMatKhau.Name = "lblMatKhau";
+            lblMatKhau.Size = new Size(117, 28);
+            lblMatKhau.TabIndex = 10;
+            lblMatKhau.Text = "Mật khẩu *";
+            // 
+            // dtpNgaySinh
+            // 
+            dtpNgaySinh.Font = new Font("Segoe UI", 11F);
+            dtpNgaySinh.Format = DateTimePickerFormat.Short;
+            dtpNgaySinh.Location = new Point(41, 350);
+            dtpNgaySinh.Name = "dtpNgaySinh";
+            dtpNgaySinh.Size = new Size(380, 37);
+            dtpNgaySinh.TabIndex = 3;
+            // 
+            // lblNgaySinh
+            // 
+            lblNgaySinh.AutoSize = true;
+            lblNgaySinh.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblNgaySinh.ForeColor = Color.FromArgb(51, 65, 85);
+            lblNgaySinh.Location = new Point(41, 320);
+            lblNgaySinh.Name = "lblNgaySinh";
+            lblNgaySinh.Size = new Size(107, 28);
+            lblNgaySinh.TabIndex = 8;
+            lblNgaySinh.Text = "Ngày sinh";
+            // 
+            // txtEmail
+            // 
+            txtEmail.BorderStyle = BorderStyle.FixedSingle;
+            txtEmail.Font = new Font("Segoe UI", 11F);
+            txtEmail.Location = new Point(41, 270);
+            txtEmail.Name = "txtEmail";
+            txtEmail.PlaceholderText = "email@example.com";
+            txtEmail.Size = new Size(380, 37);
+            txtEmail.TabIndex = 2;
+            // 
+            // lblEmail
+            // 
+            lblEmail.AutoSize = true;
+            lblEmail.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblEmail.ForeColor = Color.FromArgb(51, 65, 85);
+            lblEmail.Location = new Point(41, 240);
+            lblEmail.Name = "lblEmail";
+            lblEmail.Size = new Size(79, 28);
+            lblEmail.TabIndex = 6;
+            lblEmail.Text = "Email *";
+            // 
+            // txtSDT
+            // 
+            txtSDT.BorderStyle = BorderStyle.FixedSingle;
+            txtSDT.Font = new Font("Segoe UI", 11F);
+            txtSDT.Location = new Point(41, 190);
+            txtSDT.MaxLength = 11;
+            txtSDT.Name = "txtSDT";
+            txtSDT.PlaceholderText = "0909123456";
+            txtSDT.Size = new Size(380, 37);
+            txtSDT.TabIndex = 1;
+            // 
+            // lblSDT
+            // 
+            lblSDT.AutoSize = true;
+            lblSDT.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblSDT.ForeColor = Color.FromArgb(51, 65, 85);
+            lblSDT.Location = new Point(41, 160);
+            lblSDT.Name = "lblSDT";
+            lblSDT.Size = new Size(153, 28);
+            lblSDT.TabIndex = 4;
+            lblSDT.Text = "Số điện thoại *";
+            // 
+            // txtTenKH
+            // 
+            txtTenKH.BorderStyle = BorderStyle.FixedSingle;
+            txtTenKH.Font = new Font("Segoe UI", 11F);
+            txtTenKH.Location = new Point(41, 110);
+            txtTenKH.Name = "txtTenKH";
+            txtTenKH.PlaceholderText = "Nguyễn Văn A";
+            txtTenKH.Size = new Size(380, 37);
+            txtTenKH.TabIndex = 0;
+            // 
+            // lblTenKH
+            // 
+            lblTenKH.AutoSize = true;
+            lblTenKH.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblTenKH.ForeColor = Color.FromArgb(51, 65, 85);
+            lblTenKH.Location = new Point(41, 80);
+            lblTenKH.Name = "lblTenKH";
+            lblTenKH.Size = new Size(121, 28);
+            lblTenKH.TabIndex = 2;
+            lblTenKH.Text = "Họ và Tên *";
             // 
             // SignupForm
             // 
@@ -402,10 +401,10 @@
             pnlRight.ResumeLayout(false);
             pnlMain.ResumeLayout(false);
             pnlMain.PerformLayout();
-            pnlMatKhau.ResumeLayout(false);
-            pnlMatKhau.PerformLayout();
             pnlXacNhanMatKhau.ResumeLayout(false);
             pnlXacNhanMatKhau.PerformLayout();
+            pnlMatKhau.ResumeLayout(false);
+            pnlMatKhau.PerformLayout();
             ResumeLayout(false);
         }
 

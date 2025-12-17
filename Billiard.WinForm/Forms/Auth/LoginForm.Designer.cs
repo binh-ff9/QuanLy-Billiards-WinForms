@@ -23,11 +23,10 @@
             lblDecoTitle = new Label();
             pnlRight = new Panel();
             pnlMain = new Panel();
+            btnClose = new Button();
             lblSignup = new Label();
             lblForgotPassword = new Label();
             btnLogin = new Button();
-            chkRemember = new CheckBox();
-            // Password field with toggle
             pnlPassword = new Panel();
             txtPassword = new TextBox();
             btnTogglePassword = new Button();
@@ -36,7 +35,6 @@
             lblUsername = new Label();
             lblSubtitle = new Label();
             lblTitle = new Label();
-            btnClose = new Button();
             pnlLeft.SuspendLayout();
             pnlDecoration.SuspendLayout();
             pnlRight.SuspendLayout();
@@ -93,7 +91,6 @@
             // 
             pnlRight.BackColor = Color.White;
             pnlRight.Controls.Add(pnlMain);
-            pnlRight.Controls.Add(btnClose);
             pnlRight.Dock = DockStyle.Fill;
             pnlRight.Location = new Point(394, 0);
             pnlRight.Name = "pnlRight";
@@ -102,28 +99,47 @@
             // 
             // pnlMain
             // 
+            pnlMain.Controls.Add(btnClose);
             pnlMain.Controls.Add(lblSignup);
             pnlMain.Controls.Add(lblForgotPassword);
             pnlMain.Controls.Add(btnLogin);
-            pnlMain.Controls.Add(chkRemember);
             pnlMain.Controls.Add(pnlPassword);
             pnlMain.Controls.Add(lblPassword);
             pnlMain.Controls.Add(txtUsername);
             pnlMain.Controls.Add(lblUsername);
             pnlMain.Controls.Add(lblSubtitle);
             pnlMain.Controls.Add(lblTitle);
-            pnlMain.Location = new Point(21, 25);
+            pnlMain.Location = new Point(21, 12);
             pnlMain.Name = "pnlMain";
-            pnlMain.Size = new Size(400, 500);
+            pnlMain.Size = new Size(423, 535);
             pnlMain.TabIndex = 0;
             pnlMain.Paint += PnlMain_Paint;
+            // 
+            // btnClose
+            // 
+            btnClose.BackColor = Color.Transparent;
+            btnClose.Cursor = Cursors.Hand;
+            btnClose.FlatAppearance.BorderSize = 0;
+            btnClose.FlatStyle = FlatStyle.Flat;
+            btnClose.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
+            btnClose.ForeColor = Color.Gray;
+            btnClose.Location = new Point(385, -12);
+            btnClose.Name = "btnClose";
+            btnClose.Size = new Size(50, 49);
+            btnClose.TabIndex = 10;
+            btnClose.TabStop = false;
+            btnClose.Text = "✕";
+            btnClose.UseVisualStyleBackColor = false;
+            btnClose.Click += BtnClose_Click;
+            btnClose.MouseEnter += BtnClose_MouseEnter;
+            btnClose.MouseLeave += BtnClose_MouseLeave;
             // 
             // lblSignup
             // 
             lblSignup.Cursor = Cursors.Hand;
             lblSignup.Font = new Font("Segoe UI", 9.5F, FontStyle.Underline);
             lblSignup.ForeColor = Color.FromArgb(99, 102, 241);
-            lblSignup.Location = new Point(50, 455);
+            lblSignup.Location = new Point(51, 468);
             lblSignup.Name = "lblSignup";
             lblSignup.Size = new Size(300, 25);
             lblSignup.TabIndex = 7;
@@ -136,7 +152,7 @@
             lblForgotPassword.Cursor = Cursors.Hand;
             lblForgotPassword.Font = new Font("Segoe UI", 9F, FontStyle.Underline);
             lblForgotPassword.ForeColor = Color.FromArgb(99, 102, 241);
-            lblForgotPassword.Location = new Point(50, 425);
+            lblForgotPassword.Location = new Point(51, 438);
             lblForgotPassword.Name = "lblForgotPassword";
             lblForgotPassword.Size = new Size(300, 25);
             lblForgotPassword.TabIndex = 6;
@@ -152,7 +168,7 @@
             btnLogin.FlatStyle = FlatStyle.Flat;
             btnLogin.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             btnLogin.ForeColor = Color.White;
-            btnLogin.Location = new Point(50, 365);
+            btnLogin.Location = new Point(51, 378);
             btnLogin.Name = "btnLogin";
             btnLogin.Size = new Size(300, 50);
             btnLogin.TabIndex = 3;
@@ -162,26 +178,13 @@
             btnLogin.MouseEnter += BtnLogin_MouseEnter;
             btnLogin.MouseLeave += BtnLogin_MouseLeave;
             // 
-            // chkRemember
-            // 
-            chkRemember.AutoSize = true;
-            chkRemember.Font = new Font("Segoe UI", 9F);
-            chkRemember.ForeColor = Color.FromArgb(100, 116, 139);
-            chkRemember.Location = new Point(50, 330);
-            chkRemember.Name = "chkRemember";
-            chkRemember.Size = new Size(156, 29);
-            chkRemember.TabIndex = 2;
-            chkRemember.TabStop = false;
-            chkRemember.Text = "💾 Ghi nhớ tôi";
-            chkRemember.UseVisualStyleBackColor = true;
-            // 
-            // pnlPassword - Container for password field with eye icon
+            // pnlPassword
             // 
             pnlPassword.BackColor = Color.White;
             pnlPassword.BorderStyle = BorderStyle.FixedSingle;
             pnlPassword.Controls.Add(txtPassword);
             pnlPassword.Controls.Add(btnTogglePassword);
-            pnlPassword.Location = new Point(50, 280);
+            pnlPassword.Location = new Point(51, 294);
             pnlPassword.Name = "pnlPassword";
             pnlPassword.Size = new Size(300, 42);
             pnlPassword.TabIndex = 1;
@@ -198,7 +201,7 @@
             txtPassword.UseSystemPasswordChar = true;
             txtPassword.KeyPress += TxtPassword_KeyPress;
             // 
-            // btnTogglePassword - Eye icon button
+            // btnTogglePassword
             // 
             btnTogglePassword.BackColor = Color.Transparent;
             btnTogglePassword.Cursor = Cursors.Hand;
@@ -221,17 +224,17 @@
             lblPassword.AutoSize = true;
             lblPassword.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             lblPassword.ForeColor = Color.FromArgb(51, 65, 85);
-            lblPassword.Location = new Point(50, 250);
+            lblPassword.Location = new Point(51, 264);
             lblPassword.Name = "lblPassword";
-            lblPassword.Size = new Size(151, 28);
+            lblPassword.Size = new Size(117, 28);
             lblPassword.TabIndex = 5;
-            lblPassword.Text = "🔒 Mật khẩu *";
+            lblPassword.Text = "Mật khẩu *";
             // 
             // txtUsername
             // 
             txtUsername.BorderStyle = BorderStyle.FixedSingle;
             txtUsername.Font = new Font("Segoe UI", 11F);
-            txtUsername.Location = new Point(50, 200);
+            txtUsername.Location = new Point(51, 209);
             txtUsername.Name = "txtUsername";
             txtUsername.PlaceholderText = "Nhập SĐT hoặc Email";
             txtUsername.Size = new Size(300, 37);
@@ -243,17 +246,17 @@
             lblUsername.AutoSize = true;
             lblUsername.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             lblUsername.ForeColor = Color.FromArgb(51, 65, 85);
-            lblUsername.Location = new Point(50, 170);
+            lblUsername.Location = new Point(51, 179);
             lblUsername.Name = "lblUsername";
-            lblUsername.Size = new Size(260, 28);
+            lblUsername.Size = new Size(226, 28);
             lblUsername.TabIndex = 2;
-            lblUsername.Text = "📱 Số điện thoại / Email *";
+            lblUsername.Text = "Số điện thoại / Email *";
             // 
             // lblSubtitle
             // 
             lblSubtitle.Font = new Font("Segoe UI", 10F);
             lblSubtitle.ForeColor = Color.FromArgb(100, 116, 139);
-            lblSubtitle.Location = new Point(50, 110);
+            lblSubtitle.Location = new Point(51, 121);
             lblSubtitle.Name = "lblSubtitle";
             lblSubtitle.Size = new Size(300, 50);
             lblSubtitle.TabIndex = 1;
@@ -264,32 +267,13 @@
             // 
             lblTitle.Font = new Font("Segoe UI", 20F, FontStyle.Bold);
             lblTitle.ForeColor = Color.MidnightBlue;
-            lblTitle.Location = new Point(10, 18);
+            lblTitle.Location = new Point(10, 13);
             lblTitle.Margin = new Padding(0, 0, 3, 0);
             lblTitle.Name = "lblTitle";
-            lblTitle.Size = new Size(383, 92);
+            lblTitle.Size = new Size(383, 121);
             lblTitle.TabIndex = 0;
             lblTitle.Text = "CHÀO MỪNG\r\nĐẾN BILLARD PRO";
             lblTitle.TextAlign = ContentAlignment.MiddleCenter;
-            // 
-            // btnClose
-            // 
-            btnClose.BackColor = Color.Transparent;
-            btnClose.Cursor = Cursors.Hand;
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.FlatStyle = FlatStyle.Flat;
-            btnClose.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
-            btnClose.ForeColor = Color.Gray;
-            btnClose.Location = new Point(420, 3);
-            btnClose.Name = "btnClose";
-            btnClose.Size = new Size(40, 46);
-            btnClose.TabIndex = 10;
-            btnClose.TabStop = false;
-            btnClose.Text = "✕";
-            btnClose.UseVisualStyleBackColor = false;
-            btnClose.Click += BtnClose_Click;
-            btnClose.MouseEnter += BtnClose_MouseEnter;
-            btnClose.MouseLeave += BtnClose_MouseLeave;
             // 
             // LoginForm
             // 
@@ -330,7 +314,6 @@
         private Panel pnlPassword;
         private TextBox txtPassword;
         private Button btnTogglePassword;
-        private CheckBox chkRemember;
         private Button btnLogin;
         private Label lblForgotPassword;
         private Label lblSignup;
