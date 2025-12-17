@@ -40,23 +40,36 @@ namespace Billiard.WinForm
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            // Load configuration
-            var builder = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-            Configuration = builder.Build();
+            try
+            {
+                var builder = new ConfigurationBuilder()
+                    .SetBasePath(AppDomain.CurrentDomain.BaseDirectory) // ✅ Dùng BaseDirectory thay vì GetCurrentDirectory
+                    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
-            // Setup Dependency Injection
+                Configuration = builder.Build();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"❌ Không thể load cấu hình!\n\n" +
+                    $"Lỗi: {ex.Message}\n\n" +
+                    $"Vui lòng kiểm tra file appsettings.json",
+                    "Lỗi Cấu Hình",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+
             var serviceCollection = new ServiceCollection();
             ConfigureServices(serviceCollection);
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            // Run LoginForm
             Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
         {
+            services.AddSingleton<IConfiguration>(Configuration);
             // DbContext - GIỮ NGUYÊN TRANSIENT
             services.AddTransient<BilliardDbContext>(provider =>
             {

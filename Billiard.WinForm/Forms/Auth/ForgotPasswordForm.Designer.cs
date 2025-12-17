@@ -119,15 +119,15 @@
             pnlInfo.BorderStyle = BorderStyle.FixedSingle;
             pnlInfo.Controls.Add(lblInfoIcon);
             pnlInfo.Controls.Add(lblInfoText);
-            pnlInfo.Location = new Point(50, 224);
+            pnlInfo.Location = new Point(50, 235);
             pnlInfo.Name = "pnlInfo";
-            pnlInfo.Size = new Size(300, 100);
+            pnlInfo.Size = new Size(300, 89);
             pnlInfo.TabIndex = 6;
             // 
             // lblInfoIcon
             // 
             lblInfoIcon.Font = new Font("Segoe UI", 24F);
-            lblInfoIcon.Location = new Point(10, 20);
+            lblInfoIcon.Location = new Point(9, 10);
             lblInfoIcon.Name = "lblInfoIcon";
             lblInfoIcon.Size = new Size(60, 60);
             lblInfoIcon.TabIndex = 0;
@@ -157,7 +157,7 @@
             btnBack.Name = "btnBack";
             btnBack.Size = new Size(300, 45);
             btnBack.TabIndex = 2;
-            btnBack.Text = "← Quay lại Đăng nhập";
+            btnBack.Text = "Quay lại Đăng nhập";
             btnBack.UseVisualStyleBackColor = false;
             btnBack.Click += BtnBack_Click;
             // 
@@ -173,7 +173,7 @@
             btnSendOTP.Name = "btnSendOTP";
             btnSendOTP.Size = new Size(300, 50);
             btnSendOTP.TabIndex = 1;
-            btnSendOTP.Text = "📧 Gửi mã OTP";
+            btnSendOTP.Text = "Gửi mã OTP";
             btnSendOTP.UseVisualStyleBackColor = false;
             btnSendOTP.Click += BtnSendOTP_Click;
             // 
@@ -229,9 +229,10 @@
             btnClose.FlatStyle = FlatStyle.Flat;
             btnClose.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
             btnClose.ForeColor = Color.Gray;
-            btnClose.Location = new Point(457, 0);
+            btnClose.Location = new Point(457, 9);
+            btnClose.Margin = new Padding(0, 0, 0, 0);
             btnClose.Name = "btnClose";
-            btnClose.Size = new Size(40, 64);
+            btnClose.Size = new Size(40, 50);
             btnClose.TabIndex = 5;
             btnClose.TabStop = false;
             btnClose.Text = "✕";

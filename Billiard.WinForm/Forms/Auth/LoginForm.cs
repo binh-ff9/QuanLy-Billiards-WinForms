@@ -6,6 +6,7 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Billiard.WinForm.Forms.Users;
@@ -18,32 +19,293 @@ namespace Billiard.WinForm.Forms.Auth
         private readonly AuthService _authService;
         private bool _isLoggingIn;
 
+        // Label để hiển thị lỗi validation
+        private Label lblUsernameError;
+        private Label lblPasswordError;
+
+        // Danh sách các đuôi email phổ biến
+        private readonly string[] _commonEmailDomains = new[]
+        {
+            "@gmail.com", "@yahoo.com", "@outlook.com", "@hotmail.com",
+            "@icloud.com", "@aol.com", "@protonmail.com", "@zoho.com",
+            "@mail.com", "@gmx.com", "@yandex.com", "@tutanota.com"
+        };
+
         public LoginForm(BilliardDbContext context, AuthService authService)
         {
             _context = context;
             _authService = authService;
             InitializeComponent();
             InitializeUI();
+            InitializeValidationLabels();
         }
 
         private void InitializeUI()
         {
             this.StartPosition = FormStartPosition.CenterScreen;
-            lblTitle.Text = "🎱 CHÀO MỪNG ĐẾN BIA CLUB";
-            lblSubtitle.Text = "Đăng nhập để trải nghiệm dịch vụ tốt nhất";
-            lblUsername.Text = "📱 Số điện thoại / Email *";
-            txtUsername.PlaceholderText = "Nhập SĐT hoặc Email";
             lblSignup.Visible = true;
+        }
+
+        private void InitializeValidationLabels()
+        {
+            // Tạo label thông báo lỗi cho username
+            lblUsernameError = new Label
+            {
+                AutoSize = false,
+                Size = new Size(300, 20),
+                Location = new Point(51, 249), // Ngay dưới txtUsername
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(220, 38, 38), // Red-600
+                Text = "",
+                Visible = false
+            };
+            pnlMain.Controls.Add(lblUsernameError);
+            lblUsernameError.BringToFront();
+
+            // Tạo label thông báo lỗi cho password
+            lblPasswordError = new Label
+            {
+                AutoSize = false,
+                Size = new Size(300, 20),
+                Location = new Point(51, 339), // Ngay dưới pnlPassword
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(220, 38, 38), // Red-600
+                Text = "",
+                Visible = false
+            };
+            pnlMain.Controls.Add(lblPasswordError);
+            lblPasswordError.BringToFront();
+
+            // Thêm sự kiện TextChanged để xóa lỗi khi user nhập lại
+            txtUsername.TextChanged += (s, e) => ClearUsernameError();
+            txtPassword.TextChanged += (s, e) => ClearPasswordError();
         }
 
         private void LoginForm_Load(object sender, EventArgs e)
         {
             txtUsername.Select();
-
-            // Debug log
             Debug.WriteLine("=== LoginForm Loaded ===");
             Debug.WriteLine($"AuthService: {(_authService != null ? "OK" : "NULL")}");
             Debug.WriteLine($"DbContext: {(_context != null ? "OK" : "NULL")}");
+        }
+
+        // Kiểm tra định dạng email với đuôi phổ biến
+        private bool IsValidEmail(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return false;
+
+            try
+            {
+                // Pattern email chuẩn
+                string pattern = @"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$";
+                if (!Regex.IsMatch(email, pattern))
+                    return false;
+
+                // Kiểm tra có đuôi email phổ biến không
+                string lowerEmail = email.ToLower();
+                foreach (var domain in _commonEmailDomains)
+                {
+                    if (lowerEmail.EndsWith(domain))
+                        return true;
+                }
+
+                // Nếu không phải đuôi phổ biến nhưng có @, vẫn chấp nhận (có thể là email doanh nghiệp)
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // Lấy gợi ý đuôi email phổ biến
+        private string GetEmailSuggestion(string email)
+        {
+            if (string.IsNullOrWhiteSpace(email) || !email.Contains("@"))
+                return "";
+
+            string[] parts = email.Split('@');
+            if (parts.Length != 2)
+                return "";
+
+            string localPart = parts[0];
+            string domainPart = parts[1].ToLower();
+
+            // Tìm domain phổ biến gần giống nhất
+            foreach (var commonDomain in _commonEmailDomains)
+            {
+                string domain = commonDomain.Substring(1); // Bỏ @
+                if (domain.StartsWith(domainPart) ||
+                    IsStringsSimilar(domain, domainPart))
+                {
+                    return $"{localPart}{commonDomain}";
+                }
+            }
+
+            return "";
+        }
+
+        // So sánh độ tương đồng của 2 chuỗi
+        private bool IsStringsSimilar(string s1, string s2)
+        {
+            if (s1.Length < 3 || s2.Length < 3)
+                return false;
+
+            // Kiểm tra xem s2 có chứa 3 ký tự đầu của s1 không
+            string prefix = s1.Substring(0, Math.Min(3, s1.Length));
+            return s2.StartsWith(prefix);
+        }
+
+        // Kiểm tra định dạng số điện thoại 
+        private bool IsValidPhoneNumber(string phone)
+        {
+            if (string.IsNullOrWhiteSpace(phone))
+                return false;
+
+            // Loại bỏ khoảng trắng và dấu gạch ngang
+            phone = phone.Replace(" ", "").Replace("-", "");
+
+            // - Bắt đầu bằng 0 hoặc +84
+            // - Theo sau là 9 hoặc 10 số
+            string pattern = @"^(0|\+84)(3|5|7|8|9)[0-9]{8}$";
+            return Regex.IsMatch(phone, pattern);
+        }
+
+        private bool ValidateUsername()
+        {
+            string username = txtUsername.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                ShowUsernameError("Vui lòng nhập số điện thoại hoặc email!");
+                return false;
+            }
+
+            // Kiểm tra xem là email hay SĐT
+            bool isEmail = username.Contains("@");
+            bool isValid = false;
+            string errorMessage = "";
+
+            if (isEmail)
+            {
+                isValid = IsValidEmail(username);
+                if (!isValid)
+                {
+                    string suggestion = GetEmailSuggestion(username);
+                    errorMessage = "Email không đúng định dạng!";
+
+                    if (!string.IsNullOrEmpty(suggestion))
+                    {
+                        errorMessage += $" Ý bạn là: {suggestion}?";
+                    }
+                }
+            }
+            else
+            {
+                isValid = IsValidPhoneNumber(username);
+                if (!isValid)
+                    errorMessage = "Số điện thoại không đúng định dạng! (VD: 0912345678)";
+            }
+
+            if (!isValid)
+            {
+                ShowUsernameError(errorMessage);
+                return false;
+            }
+
+            ClearUsernameError();
+            return true;
+        }
+
+        private bool ValidatePassword()
+        {
+            string password = txtPassword.Text;
+
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                ShowPasswordError("Vui lòng nhập mật khẩu!");
+                return false;
+            }
+
+            if (password.Length < 6)
+            {
+                ShowPasswordError("Mật khẩu phải có ít nhất 6 ký tự!");
+                return false;
+            }
+
+            if (password.Length > 50)
+            {
+                ShowPasswordError("Mật khẩu không được quá 50 ký tự!");
+                return false;
+            }
+
+            ClearPasswordError();
+            return true;
+        }
+
+        // Hiển thị lỗi validation cho username
+        private void ShowUsernameError(string message)
+        {
+            lblUsernameError.Text = message;
+            lblUsernameError.Visible = true;
+            txtUsername.BackColor = Color.FromArgb(254, 242, 242); // Red-50
+
+            // Tạo viền đỏ cho textbox
+            txtUsername.BorderStyle = BorderStyle.FixedSingle;
+        }
+
+        // Xóa thông báo lỗi username
+        private void ClearUsernameError()
+        {
+            lblUsernameError.Visible = false;
+            txtUsername.BackColor = Color.White;
+            txtUsername.BorderStyle = BorderStyle.FixedSingle;
+        }
+
+        // Hiển thị lỗi validation cho password
+        private void ShowPasswordError(string message)
+        {
+            lblPasswordError.Text = message;
+            lblPasswordError.Visible = true;
+            pnlPassword.BackColor = Color.FromArgb(254, 242, 242); // Red-50
+            pnlPassword.BorderStyle = BorderStyle.FixedSingle;
+
+            // Thay đổi viền của panel thành màu đỏ
+            pnlPassword.BackColor = Color.White;
+            pnlPassword.Paint += (s, e) =>
+            {
+                using (Pen pen = new Pen(Color.FromArgb(220, 38, 38), 2))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, pnlPassword.Width - 1, pnlPassword.Height - 1);
+                }
+            };
+            pnlPassword.Invalidate();
+        }
+
+        // Xóa thông báo lỗi password
+        private void ClearPasswordError()
+        {
+            lblPasswordError.Visible = false;
+            pnlPassword.BackColor = Color.White;
+            pnlPassword.BorderStyle = BorderStyle.FixedSingle;
+
+            // Xóa custom paint
+            pnlPassword.Paint -= (s, e) =>
+            {
+                using (Pen pen = new Pen(Color.FromArgb(220, 38, 38), 2))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, pnlPassword.Width - 1, pnlPassword.Height - 1);
+                }
+            };
+            pnlPassword.Invalidate();
+        }
+
+        // Toggle password visibility
+        private void BtnTogglePassword_Click(object sender, EventArgs e)
+        {
+            txtPassword.UseSystemPasswordChar = !txtPassword.UseSystemPasswordChar;
+            btnTogglePassword.Text = txtPassword.UseSystemPasswordChar ? "👁" : "🙈";
         }
 
         private async void BtnLogin_Click(object sender, EventArgs e)
@@ -54,6 +316,22 @@ namespace Billiard.WinForm.Forms.Auth
             {
                 _isLoggingIn = true;
 
+                // Validate username và password trước
+                bool isUsernameValid = ValidateUsername();
+                bool isPasswordValid = ValidatePassword();
+
+                if (!isUsernameValid)
+                {
+                    txtUsername.Focus();
+                    return;
+                }
+
+                if (!isPasswordValid)
+                {
+                    txtPassword.Focus();
+                    return;
+                }
+
                 string username = txtUsername.Text.Trim();
                 string password = txtPassword.Text;
 
@@ -62,24 +340,8 @@ namespace Billiard.WinForm.Forms.Auth
                 Debug.WriteLine($"Password Length: {password.Length}");
                 Debug.WriteLine($"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
-                // Validate inputs
-                if (string.IsNullOrWhiteSpace(username))
-                {
-                    Debug.WriteLine("ERROR: Username is empty");
-                    ShowError("Vui lòng nhập thông tin đăng nhập!", txtUsername);
-                    return;
-                }
-
-                if (string.IsNullOrWhiteSpace(password))
-                {
-                    Debug.WriteLine("ERROR: Password is empty");
-                    ShowError("Vui lòng nhập mật khẩu!", txtPassword);
-                    return;
-                }
-
                 SetLoadingState(true);
 
-                // Debug: Test database connection
                 try
                 {
                     bool canConnect = await _context.Database.CanConnectAsync();
@@ -90,8 +352,6 @@ namespace Billiard.WinForm.Forms.Auth
                     Debug.WriteLine($"Database Connection Error: {dbEx.Message}");
                 }
 
-                
-                // Use AuthService to login
                 Debug.WriteLine("Calling AuthService.LoginAsync...");
                 var result = await _authService.LoginAsync(username, password);
 
@@ -107,10 +367,7 @@ namespace Billiard.WinForm.Forms.Auth
                     Debug.WriteLine($"Failure Reason: {result.Message}");
 
                     MessageBox.Show(
-                        result.Message + "\n\n" +
-                        "🔍 Debug Info:\n" +
-                        $"• Username: {username}\n" +
-                        $"• Kiểm tra Console để xem chi tiết",
+                        result.Message,
                         "Đăng nhập thất bại",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Error);
@@ -122,7 +379,6 @@ namespace Billiard.WinForm.Forms.Auth
 
                 Debug.WriteLine("LOGIN SUCCESS!");
 
-                // Check user type and open appropriate form
                 if (result.UserType == UserType.NhanVien)
                 {
                     Debug.WriteLine("User Type: NHAN VIEN");
@@ -137,7 +393,6 @@ namespace Billiard.WinForm.Forms.Auth
                     mainForm.ChucVu = nhanVien.MaNhomNavigation?.TenNhom ?? "Nhân viên";
 
                     Debug.WriteLine("Opening MainForm...");
-
                     mainForm.Show();
                     mainForm.FormClosed += (s, args) => {
                         Debug.WriteLine("MainForm closed, showing LoginForm");
@@ -160,7 +415,6 @@ namespace Billiard.WinForm.Forms.Auth
                     UserSession.Sdt = khachHang.Sdt;
 
                     var clientForm = Program.GetService<ClientMainForm>();
-
                     clientForm.Show();
 
                     MessageBox.Show(
@@ -173,24 +427,13 @@ namespace Billiard.WinForm.Forms.Auth
 
                     clientForm.FormClosed += (s, args) =>
                     {
-                        UserSession.Logout(); // Xóa session
-                        this.Show();          // Hiện lại form đăng nhập
+                        UserSession.Logout();
+                        this.Show();
                         ResetForm();
                         txtUsername.Focus();
                     };
 
-                    this.Hide(); // Ẩn form đăng nhập đi
-
-
-                    //// TODO: Open CustomerMainForm when implemented
-                    //Debug.WriteLine("WARNING: CustomerMainForm not implemented yet");
-                    //MessageBox.Show(
-                    //    "Giao diện khách hàng đang được phát triển.\n" +
-                    //    "Vui lòng sử dụng tài khoản nhân viên để truy cập hệ thống.",
-                    //    "Thông báo",
-                    //    MessageBoxButtons.OK,
-                    //    MessageBoxIcon.Information);
-
+                    this.Hide();
                     ResetForm();
                 }
             }
@@ -205,9 +448,7 @@ namespace Billiard.WinForm.Forms.Auth
                 }
 
                 MessageBox.Show(
-                    $"Lỗi: {ex.Message}\n\n" +
-                    $"Chi tiết:\n{ex.StackTrace}\n\n" +
-                    $"Kiểm tra Output Window để xem log đầy đủ",
+                    $"Lỗi: {ex.Message}",
                     "Lỗi",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -225,7 +466,7 @@ namespace Billiard.WinForm.Forms.Auth
             btnLogin.Enabled = !isLoading;
             txtUsername.Enabled = !isLoading;
             txtPassword.Enabled = !isLoading;
-            btnLogin.Text = isLoading ? "⏳ Đang đăng nhập..." : "✅ Đăng nhập";
+            btnLogin.Text = isLoading ? "Đang đăng nhập..." : "Đăng nhập";
             this.Cursor = isLoading ? Cursors.WaitCursor : Cursors.Default;
         }
 
@@ -233,7 +474,10 @@ namespace Billiard.WinForm.Forms.Auth
         {
             txtUsername.Clear();
             txtPassword.Clear();
-            chkRemember.Checked = false;
+            txtPassword.UseSystemPasswordChar = true;
+            btnTogglePassword.Text = "👁";
+            ClearUsernameError();
+            ClearPasswordError();
             txtUsername.Focus();
             Debug.WriteLine("Form reset");
         }
@@ -248,17 +492,32 @@ namespace Billiard.WinForm.Forms.Auth
         private void LblForgotPassword_Click(object sender, EventArgs e)
         {
             Debug.WriteLine("Opening ForgotPasswordForm");
-            var forgotForm = new ForgotPasswordForm(_context, _authService);
-            forgotForm.ShowDialog();
+            this.Hide();
+
+            var emailService = Program.GetService<EmailService>();
+            var forgotForm = new ForgotPasswordForm(_context, _authService, emailService);
+
+            forgotForm.FormClosed += (s, args) =>
+            {
+                this.Show();
+                txtUsername.Focus();
+            };
+
+            forgotForm.Show();
         }
 
         private void LblSignup_Click(object sender, EventArgs e)
         {
             Debug.WriteLine("Opening SignupForm");
+            this.Hide();
             var signupForm = new SignupForm(_context, _authService);
-            if (signupForm.ShowDialog() == DialogResult.OK)
+            var result = signupForm.ShowDialog();
+            this.Show();
+            txtUsername.Focus();
+
+            if (result == DialogResult.OK)
             {
-                txtUsername.Focus();
+                Debug.WriteLine("Signup successful - returned to login");
             }
         }
 
@@ -287,13 +546,11 @@ namespace Billiard.WinForm.Forms.Auth
             if (e.KeyChar == (char)Keys.Enter)
             {
                 e.Handled = true;
-                txtPassword.Focus();
+                if (ValidateUsername())
+                {
+                    txtPassword.Focus();
+                }
             }
-        }
-
-        private void ChkShowPassword_CheckedChanged(object sender, EventArgs e)
-        {
-            txtPassword.UseSystemPasswordChar = !chkShowPassword.Checked;
         }
 
         #region UI Effects
