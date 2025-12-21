@@ -13,6 +13,10 @@ using HoaDonEntity = Billiard.DAL.Entities.HoaDon;
 
 namespace Billiard.WinForm.Forms.QLBan
 {
+    /// <summary>
+    /// Control hiển thị chi tiết bàn - chỉ chứa logic hiển thị
+    /// Tất cả business logic được xử lý trong QLBanForm
+    /// </summary>
     public partial class BanChiTietControl : UserControl
     {
         private readonly BanBiaService _banBiaService;
@@ -21,12 +25,16 @@ namespace Billiard.WinForm.Forms.QLBan
         private readonly int _maNV;
         private Panel pnlContent;
         private bool _isLoading = false;
+
+        // Events để thông báo cho parent form
         public event EventHandler OnDataChanged;
+        public event EventHandler<BanBium> OnBanUpdated;
 
         private const int PADDING = 20;
         private const int CARD_SPACING = 15;
         private const int MIN_PANEL_WIDTH = 400;
         private const int SECTION_SPACING = 20;
+        private const int TOP_SPACING = 25; // Khoảng cách từ top
 
         public BanChiTietControl(BanBiaService banBiaService, HoaDonService hoaDonService, BanBium ban, int maNV)
         {
@@ -38,6 +46,7 @@ namespace Billiard.WinForm.Forms.QLBan
             InitializeComponent();
             InitializeLayout();
         }
+
         private void InitializeLayout()
         {
             pnlContent = new Panel
@@ -45,7 +54,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 AutoScroll = true,
                 Dock = DockStyle.Fill,
                 BackColor = Color.FromArgb(248, 250, 252),
-                Padding = new Padding(PADDING + 10, PADDING, PADDING + 5, PADDING), // Thêm 10px bên trái
+                Padding = new Padding(PADDING + 10, TOP_SPACING, PADDING + 5, PADDING), // Thêm spacing top
                 AutoSize = false
             };
 
@@ -59,6 +68,9 @@ namespace Billiard.WinForm.Forms.QLBan
             await LoadBanDetail();
         }
 
+        /// <summary>
+        /// Load hoặc refresh dữ liệu chi tiết bàn - OPTIMIZED
+        /// </summary>
         public async Task LoadBanDetail()
         {
             if (_isLoading) return;
@@ -68,43 +80,32 @@ namespace Billiard.WinForm.Forms.QLBan
             {
                 this.Cursor = Cursors.WaitCursor;
 
-                pnlContent.SuspendLayout();
-                pnlContent.Controls.Clear();
-
-                _ban = await _banBiaService.GetTableByIdAsync(_ban.MaBan);
-                if (_ban == null)
+                // Lấy thông tin bàn mới nhất
+                var newBan = await _banBiaService.GetTableByIdAsync(_ban.MaBan);
+                if (newBan == null)
                 {
                     ShowError("Không tìm thấy thông tin bàn");
                     return;
                 }
 
-                int availableWidth = Math.Max(MIN_PANEL_WIDTH, pnlContent.ClientSize.Width - (PADDING * 2) - 20);
-                int yPos = 0;
+                // Check if data actually changed
+                bool hasChanges = HasDataChanged(_ban, newBan);
+                _ban = newBan;
 
-                yPos = AddHeader(yPos, availableWidth);
-                yPos += SECTION_SPACING;
-
-                switch (_ban.TrangThai)
+                if (!hasChanges && pnlContent.Controls.Count > 0)
                 {
-                    case "Đang chơi":
-                        yPos = await AddPlayingContent(yPos, availableWidth);
-                        break;
-                    case "Đã đặt":
-                        yPos = AddReservedContent(yPos, availableWidth);
-                        break;
-                    case "Trống":
-                        yPos = AddAvailableContent(yPos, availableWidth);
-                        break;
+                    // Chỉ update các phần cần thiết thay vì clear toàn bộ
+                    await UpdateExistingControls();
+                    this.Cursor = Cursors.Default;
+                    return;
                 }
 
-                yPos += 20;
-
-                pnlContent.ResumeLayout();
+                // Full reload nếu có thay đổi lớn
+                await FullReloadContent();
                 this.Cursor = Cursors.Default;
             }
             catch (Exception ex)
             {
-                pnlContent.ResumeLayout();
                 this.Cursor = Cursors.Default;
                 ShowError($"Lỗi khi tải dữ liệu: {ex.Message}");
             }
@@ -114,14 +115,160 @@ namespace Billiard.WinForm.Forms.QLBan
             }
         }
 
-        #region Header
+        private bool HasDataChanged(BanBium oldBan, BanBium newBan)
+        {
+            if (oldBan.TrangThai != newBan.TrangThai) return true;
+            if (oldBan.GioBatDau != newBan.GioBatDau) return true;
+            if (oldBan.MaKh != newBan.MaKh) return true;
+            return false;
+        }
 
-        private int AddHeader(int yPos, int panelWidth)
+        private async Task UpdateExistingControls()
+        {
+            // Update header
+            UpdateHeaderIfExists();
+
+            // Update timer for playing tables
+            if (_ban.TrangThai == "Đang chơi")
+            {
+                await UpdateTimerIfExists();
+                await UpdatePaymentInfoIfExists();
+            }
+
+            OnBanUpdated?.Invoke(this, _ban);
+        }
+
+        private void UpdateHeaderIfExists()
+        {
+            foreach (Control ctrl in pnlContent.Controls)
+            {
+                if (ctrl is Panel pnl && pnl.Controls.Count > 0)
+                {
+                    var lblStatus = pnl.Controls.OfType<Label>()
+                        .FirstOrDefault(l => l.Text == "Trống" || l.Text == "Đang chơi" || l.Text == "Đã đặt");
+
+                    if (lblStatus != null)
+                    {
+                        lblStatus.Text = _ban.TrangThai;
+                        lblStatus.BackColor = GetStatusColor(_ban.TrangThai);
+                        return;
+                    }
+                }
+            }
+        }
+
+        private async Task UpdateTimerIfExists()
+        {
+            var hoaDon = await _banBiaService.GetActiveInvoiceAsync(_ban.MaBan);
+            if (hoaDon?.ThoiGianBatDau == null) return;
+
+            var duration = DateTime.Now - hoaDon.ThoiGianBatDau.Value;
+
+            foreach (Control ctrl in pnlContent.Controls)
+            {
+                if (ctrl is Panel pnl && pnl.BackColor == Color.FromArgb(220, 38, 38))
+                {
+                    var lblTime = pnl.Controls.OfType<Label>()
+                        .FirstOrDefault(l => l.Font.Size > 12);
+
+                    if (lblTime != null)
+                    {
+                        lblTime.Text = $"{(int)duration.TotalHours:D2}h {duration.Minutes:D2}m";
+                        return;
+                    }
+                }
+            }
+        }
+
+        private async Task UpdatePaymentInfoIfExists()
+        {
+            var hoaDon = await _banBiaService.GetActiveInvoiceAsync(_ban.MaBan);
+            if (hoaDon == null) return;
+
+            var duration = DateTime.Now - hoaDon.ThoiGianBatDau.Value;
+            var tongPhut = (int)Math.Ceiling(duration.TotalMinutes);
+            var soGio = (decimal)tongPhut / 60m;
+            var giaGioDecimal = _ban.MaLoaiNavigation?.GiaGio ?? 0;
+            var tienBan = soGio * giaGioDecimal;
+
+            var tienDichVu = await _banBiaService.GetInvoiceDetailsAsync(hoaDon.MaHd)
+                .ContinueWith(t => t.Result.Sum(ct => ct.ThanhTien));
+
+            var giamGia = hoaDon.GiamGia ?? 0;
+            var tamTinh = tienBan + tienDichVu - giamGia;
+            var tongCong = Math.Ceiling((tamTinh ?? 0m) / 1000m) * 1000m;
+
+            // Find and update payment panel
+            foreach (Control ctrl in pnlContent.Controls)
+            {
+                if (ctrl is Panel pnl)
+                {
+                    var titleLabel = pnl.Controls.OfType<Label>()
+                        .FirstOrDefault(l => l.Text == "CHI TIẾT THANH TOÁN");
+
+                    if (titleLabel != null)
+                    {
+                        // Update total amount label
+                        var totalPanel = pnl.Controls.OfType<Panel>()
+                            .FirstOrDefault(p => p.BackColor == Color.FromArgb(239, 246, 255));
+
+                        if (totalPanel != null)
+                        {
+                            var lblTotal = totalPanel.Controls.OfType<Label>()
+                                .FirstOrDefault(l => l.Font.Bold && l.Text.Contains("đ"));
+
+                            if (lblTotal != null)
+                            {
+                                lblTotal.Text = $"{tongCong:N0}đ";
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        private async Task FullReloadContent()
+        {
+            pnlContent.SuspendLayout();
+            pnlContent.Controls.Clear();
+
+            OnBanUpdated?.Invoke(this, _ban);
+
+            int availableWidth = Math.Max(MIN_PANEL_WIDTH, pnlContent.ClientSize.Width - (PADDING * 2) - 20);
+            int yPos = 0;
+
+            // Render header
+            yPos = RenderHeader(yPos, availableWidth);
+            yPos += SECTION_SPACING;
+
+            // Render content dựa trên trạng thái
+            switch (_ban.TrangThai)
+            {
+                case "Đang chơi":
+                    yPos = await RenderPlayingContent(yPos, availableWidth);
+                    break;
+                case "Đã đặt":
+                    yPos = RenderReservedContent(yPos, availableWidth);
+                    break;
+                case "Trống":
+                    yPos = RenderAvailableContent(yPos, availableWidth);
+                    break;
+            }
+
+            yPos += 20;
+
+            pnlContent.ResumeLayout();
+        }
+
+        #region Render Methods
+
+        private int RenderHeader(int yPos, int panelWidth)
         {
             var pnlHeader = new Panel
             {
-                Location = new Point(0, yPos),
-                Size = new Size(panelWidth, 85),
+                Location = new Point(15, yPos+20),
+                Size = new Size(panelWidth, 90),
                 BackColor = Color.White
             };
 
@@ -137,7 +284,7 @@ namespace Billiard.WinForm.Forms.QLBan
             var lblTableName = new Label
             {
                 Text = _ban.TenBan,
-                Font = new Font("Segoe UI", 15F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 Location = new Point(15, 12),
                 AutoSize = true,
@@ -147,7 +294,7 @@ namespace Billiard.WinForm.Forms.QLBan
             var lblSubtitle = new Label
             {
                 Text = $"{_ban.MaLoaiNavigation?.TenLoai ?? ""}",
-                Font = new Font("Segoe UI", 9F),
+                Font = new Font("Segoe UI", 8),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(15, 42),
                 AutoSize = true
@@ -156,7 +303,7 @@ namespace Billiard.WinForm.Forms.QLBan
             var lblArea = new Label
             {
                 Text = $"{_ban.MaKhuVucNavigation?.TenKhuVuc ?? ""}",
-                Font = new Font("Segoe UI", 9F),
+                Font = new Font("Segoe UI", 8),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(15, 60),
                 AutoSize = true
@@ -165,12 +312,12 @@ namespace Billiard.WinForm.Forms.QLBan
             var lblStatus = new Label
             {
                 Text = _ban.TrangThai,
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = GetStatusColor(_ban.TrangThai),
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Size = new Size(90, 30),
+                Size = new Size(100, 30),
                 Location = new Point(panelWidth - 105, 28)
             };
 
@@ -180,11 +327,7 @@ namespace Billiard.WinForm.Forms.QLBan
             return yPos + 85;
         }
 
-        #endregion
-
-        #region Playing Content
-
-        private async Task<int> AddPlayingContent(int yPos, int panelWidth)
+        private async Task<int> RenderPlayingContent(int yPos, int panelWidth)
         {
             var hoaDon = await _banBiaService.GetActiveInvoiceAsync(_ban.MaBan);
             if (hoaDon == null)
@@ -195,31 +338,31 @@ namespace Billiard.WinForm.Forms.QLBan
 
             var duration = DateTime.Now - hoaDon.ThoiGianBatDau.Value;
 
-            yPos = AddTimerCard(duration, yPos, panelWidth);
+            yPos = RenderTimerCard(duration, yPos, panelWidth);
             yPos += CARD_SPACING;
 
-            yPos = AddCustomerInfoCard(hoaDon, yPos, panelWidth);
+            yPos = RenderCustomerInfoCard(hoaDon, yPos, panelWidth);
             yPos += CARD_SPACING;
 
-            yPos = await AddPaymentInfo(hoaDon, duration, yPos, panelWidth);
+            yPos = await RenderPaymentInfo(hoaDon, duration, yPos, panelWidth);
             yPos += CARD_SPACING;
 
-            yPos = await AddServiceListWithScroll(hoaDon.MaHd, yPos, panelWidth);
+            yPos = await RenderServiceList(hoaDon.MaHd, yPos, panelWidth);
             yPos += SECTION_SPACING;
 
-            yPos = AddPlayingButtons(yPos, panelWidth);
+            yPos = RenderPlayingButtons(yPos, panelWidth);
 
             return yPos;
         }
 
-        private int AddTimerCard(TimeSpan duration, int yPos, int panelWidth)
+        private int RenderTimerCard(TimeSpan duration, int yPos, int panelWidth)
         {
             var hours = (int)duration.TotalHours;
             var minutes = duration.Minutes;
 
             var pnlTimer = new Panel
             {
-                Location = new Point(0, yPos),
+                Location = new Point(15, yPos+20),
                 Size = new Size(panelWidth, 75),
                 BackColor = Color.FromArgb(220, 38, 38)
             };
@@ -227,7 +370,7 @@ namespace Billiard.WinForm.Forms.QLBan
             var lblLabel = new Label
             {
                 Text = "THỜI GIAN CHƠI",
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = Color.FromArgb(254, 202, 202),
                 Location = new Point(15, 12),
                 AutoSize = true,
@@ -237,7 +380,7 @@ namespace Billiard.WinForm.Forms.QLBan
             var lblTime = new Label
             {
                 Text = $"{hours:D2}h {minutes:D2}m",
-                Font = new Font("Segoe UI", 22F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 14, FontStyle.Bold),
                 ForeColor = Color.White,
                 Location = new Point(15, 32),
                 AutoSize = true,
@@ -250,10 +393,10 @@ namespace Billiard.WinForm.Forms.QLBan
             return yPos + 75;
         }
 
-        private int AddCustomerInfoCard(HoaDonEntity hoaDon, int yPos, int panelWidth)
+        private int RenderCustomerInfoCard(HoaDonEntity hoaDon, int yPos, int panelWidth)
         {
             var pnlCustomer = CreateModernCard(panelWidth);
-            pnlCustomer.Location = new Point(0, yPos);
+            pnlCustomer.Location = new Point(15, yPos + 20);
 
             int cardY = 12;
 
@@ -272,7 +415,7 @@ namespace Billiard.WinForm.Forms.QLBan
             var customerPhone = hoaDon.MaKhNavigation?.Sdt ?? "Không có";
             var startTime = hoaDon.ThoiGianBatDau.Value.ToString("HH:mm, dd/MM/yyyy");
 
-            cardY = AddInfoRow(pnlCustomer, "Tên khách", customerName, cardY, panelWidth);
+            cardY = AddInfoRow(pnlCustomer, "Tên khách", customerName, cardY + 15, panelWidth);
             cardY = AddInfoRow(pnlCustomer, "Điện thoại", customerPhone, cardY, panelWidth);
             cardY = AddInfoRow(pnlCustomer, "Bắt đầu", startTime, cardY, panelWidth);
 
@@ -283,7 +426,7 @@ namespace Billiard.WinForm.Forms.QLBan
             return yPos + cardY;
         }
 
-        private async Task<int> AddPaymentInfo(HoaDonEntity hoaDon, TimeSpan duration, int yPos, int panelWidth)
+        private async Task<int> RenderPaymentInfo(HoaDonEntity hoaDon, TimeSpan duration, int yPos, int panelWidth)
         {
             var tongPhut = (int)Math.Ceiling(duration.TotalMinutes);
             var soGio = (decimal)tongPhut / 60m;
@@ -299,7 +442,7 @@ namespace Billiard.WinForm.Forms.QLBan
             var chenhLech = tongCong - tamTinh;
 
             var pnlPayment = CreateModernCard(panelWidth);
-            pnlPayment.Location = new Point(0, yPos);
+            pnlPayment.Location = new Point(15, yPos + 20);
 
             int cardY = 12;
 
@@ -358,12 +501,12 @@ namespace Billiard.WinForm.Forms.QLBan
             var lblTotalValue = new Label
             {
                 Text = $"{tongCong:N0}đ",
-                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 ForeColor = Color.FromArgb(220, 38, 38),
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleRight,
                 Size = new Size(panelWidth - 160, 26),
-                Location = new Point(panelWidth - 170, 8)
+                Location = new Point(panelWidth - 270, 8)
             };
 
             pnlTotal.Controls.AddRange(new Control[] { lblTotalLabel, lblTotalValue });
@@ -376,7 +519,7 @@ namespace Billiard.WinForm.Forms.QLBan
             return yPos + cardY;
         }
 
-        private async Task<int> AddServiceListWithScroll(int maHd, int yPos, int panelWidth)
+        private async Task<int> RenderServiceList(int maHd, int yPos, int panelWidth)
         {
             var chiTietList = await _banBiaService.GetInvoiceDetailsAsync(maHd);
 
@@ -385,7 +528,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 Text = $"DỊCH VỤ ĐÃ GỌI ({chiTietList.Count})",
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(0, yPos),
+                Location = new Point(15, yPos + 20),
                 AutoSize = true
             };
             pnlContent.Controls.Add(lblHeader);
@@ -395,7 +538,7 @@ namespace Billiard.WinForm.Forms.QLBan
             {
                 var pnlServicesContainer = new Panel
                 {
-                    Location = new Point(0, yPos),
+                    Location = new Point(15, yPos + 20),
                     Size = new Size(panelWidth, 220),
                     BackColor = Color.White,
                     AutoScroll = true,
@@ -405,7 +548,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 int serviceY = 8;
                 foreach (var item in chiTietList)
                 {
-                    serviceY = AddServiceItem(pnlServicesContainer, item, serviceY, panelWidth - 25);
+                    serviceY = RenderServiceItem(pnlServicesContainer, item, serviceY, panelWidth - 25);
                 }
 
                 pnlContent.Controls.Add(pnlServicesContainer);
@@ -414,7 +557,7 @@ namespace Billiard.WinForm.Forms.QLBan
             else
             {
                 var pnlEmpty = CreateModernCard(panelWidth);
-                pnlEmpty.Location = new Point(0, yPos);
+                pnlEmpty.Location = new Point(15, yPos + 20);
                 pnlEmpty.Height = 65;
                 pnlEmpty.BackColor = Color.FromArgb(249, 250, 251);
 
@@ -435,12 +578,12 @@ namespace Billiard.WinForm.Forms.QLBan
             return yPos;
         }
 
-        private int AddServiceItem(Panel parentPanel, ChiTietHoaDonEntity item, int yPos, int panelWidth)
+        private int RenderServiceItem(Panel parentPanel, ChiTietHoaDonEntity item, int yPos, int panelWidth)
         {
             var pnlService = new Panel
             {
-                Location = new Point(8, yPos),
-                Size = new Size(panelWidth, 58),
+                Location = new Point(10, yPos),
+                Size = new Size(panelWidth-20, 60),
                 BackColor = Color.FromArgb(248, 250, 252)
             };
 
@@ -469,17 +612,17 @@ namespace Billiard.WinForm.Forms.QLBan
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(220, 38, 38),
                 AutoSize = false,
-                Size = new Size(95, 22),
-                Location = new Point(panelWidth - 140, 14),
+                Size = new Size(95, 25),
+                Location = new Point(panelWidth - 150, 14),
                 TextAlign = ContentAlignment.MiddleRight
             };
 
             var btnDelete = new Button
             {
-                Text = "Xóa",
+                Text = "X",
                 Font = new Font("Segoe UI", 8F, FontStyle.Bold),
-                Size = new Size(40, 28),
-                Location = new Point(panelWidth - 45, 15),
+                Size = new Size(35, 28),
+                Location = new Point(panelWidth - 55, 15),
                 BackColor = Color.FromArgb(239, 68, 68),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
@@ -492,19 +635,19 @@ namespace Billiard.WinForm.Forms.QLBan
             pnlService.Controls.AddRange(new Control[] { lblName, lblQuantity, lblPrice, btnDelete });
             parentPanel.Controls.Add(pnlService);
 
-            return yPos + 62;
+            return yPos + 72;
         }
 
-        private int AddPlayingButtons(int yPos, int panelWidth)
+        private int RenderPlayingButtons(int yPos, int panelWidth)
         {
             var btnThemDV = CreateModernButton("Thêm dịch vụ", Color.FromArgb(59, 130, 246), panelWidth);
-            btnThemDV.Location = new Point(0, yPos);
+            btnThemDV.Location = new Point(15, yPos + 20);
             btnThemDV.Click += BtnThemDV_Click;
             pnlContent.Controls.Add(btnThemDV);
             yPos += 48;
 
             var btnThanhToan = CreateModernButton("Thanh toán", Color.FromArgb(34, 197, 94), panelWidth);
-            btnThanhToan.Location = new Point(0, yPos);
+            btnThanhToan.Location = new Point(15, yPos + 20);
             btnThanhToan.Click += BtnThanhToan_Click;
             pnlContent.Controls.Add(btnThanhToan);
             yPos += 48;
@@ -512,14 +655,10 @@ namespace Billiard.WinForm.Forms.QLBan
             return yPos;
         }
 
-        #endregion
-
-        #region Reserved Content
-
-        private int AddReservedContent(int yPos, int panelWidth)
+        private int RenderReservedContent(int yPos, int panelWidth)
         {
             var pnlReserved = CreateModernCard(panelWidth);
-            pnlReserved.Location = new Point(0, yPos);
+            pnlReserved.Location = new Point(15, yPos + 20);
             pnlReserved.BackColor = Color.FromArgb(254, 252, 232);
 
             int cardY = 12;
@@ -560,20 +699,20 @@ namespace Billiard.WinForm.Forms.QLBan
             pnlContent.Controls.Add(pnlReserved);
             yPos += cardY + CARD_SPACING;
 
-            yPos = AddReservedButtons(yPos, panelWidth);
+            yPos = RenderReservedButtons(yPos, panelWidth);
             return yPos;
         }
 
-        private int AddReservedButtons(int yPos, int panelWidth)
+        private int RenderReservedButtons(int yPos, int panelWidth)
         {
             var btnConfirm = CreateModernButton("Xác nhận khách đến", Color.FromArgb(34, 197, 94), panelWidth);
-            btnConfirm.Location = new Point(0, yPos);
+            btnConfirm.Location = new Point(15, yPos + 20);
             btnConfirm.Click += BtnConfirm_Click;
             pnlContent.Controls.Add(btnConfirm);
             yPos += 48;
 
             var btnCancel = CreateModernButton("Hủy đặt bàn", Color.FromArgb(239, 68, 68), panelWidth);
-            btnCancel.Location = new Point(0, yPos);
+            btnCancel.Location = new Point(15, yPos + 20);
             btnCancel.Click += BtnCancel_Click;
             pnlContent.Controls.Add(btnCancel);
             yPos += 48;
@@ -581,14 +720,10 @@ namespace Billiard.WinForm.Forms.QLBan
             return yPos;
         }
 
-        #endregion
-
-        #region Available Content
-
-        private int AddAvailableContent(int yPos, int panelWidth)
+        private int RenderAvailableContent(int yPos, int panelWidth)
         {
             var pnlAvailable = CreateModernCard(panelWidth);
-            pnlAvailable.Location = new Point(0, yPos);
+            pnlAvailable.Location = new Point(15, yPos + 20);
             pnlAvailable.BackColor = Color.FromArgb(240, 253, 244);
 
             int cardY = 12;
@@ -624,14 +759,14 @@ namespace Billiard.WinForm.Forms.QLBan
             pnlContent.Controls.Add(pnlAvailable);
             yPos += cardY + CARD_SPACING;
 
-            yPos = AddAvailableButtons(yPos, panelWidth);
+            yPos = RenderAvailableButtons(yPos, panelWidth);
             return yPos;
         }
 
-        private int AddAvailableButtons(int yPos, int panelWidth)
+        private int RenderAvailableButtons(int yPos, int panelWidth)
         {
             var btnBatDau = CreateModernButton("Bắt đầu chơi", Color.FromArgb(34, 197, 94), panelWidth);
-            btnBatDau.Location = new Point(0, yPos);
+            btnBatDau.Location = new Point(15, yPos + 20);
             btnBatDau.Click += BtnBatDau_Click;
             pnlContent.Controls.Add(btnBatDau);
             yPos += 48;
@@ -671,7 +806,7 @@ namespace Billiard.WinForm.Forms.QLBan
             var pnlRow = new Panel
             {
                 Location = new Point(12, yPos),
-                Size = new Size(panelWidth - 24, 26),
+                Size = new Size(panelWidth - 24, 35),
                 BackColor = Color.Transparent
             };
 
@@ -688,10 +823,10 @@ namespace Billiard.WinForm.Forms.QLBan
             var lblValue = new Label
             {
                 Text = value,
-                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
                 AutoSize = false,
-                Size = new Size((panelWidth - 40) / 2, 22),
+                Size = new Size((panelWidth - 30) / 2, 26),
                 Location = new Point((panelWidth - 40) / 2 + 8, 5),
                 TextAlign = ContentAlignment.TopRight
             };
