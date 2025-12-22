@@ -20,7 +20,11 @@ namespace Billiard.WinForm.Forms.QLBan
         private TextBox txtSearch;
         private Label lblSelectedCount;
         private Dictionary<int, int> _selectedServices = new Dictionary<int, int>();
-        private Panel pnlBottom; // Thêm biến cho pnlBottom để dễ truy cập
+        private Panel pnlBottom;
+
+        // Debounce search
+        private System.Windows.Forms.Timer _searchDebounceTimer;
+        private const int SEARCH_DEBOUNCE_MS = 300;
 
         public ThemDichVuForm(DichVuService dichVuService, HoaDonService hoaDonService, int maHoaDon)
         {
@@ -30,12 +34,25 @@ namespace Billiard.WinForm.Forms.QLBan
 
             InitializeComponent();
             InitializeCustomComponents();
+            InitializeSearchDebounce();
             this.Load += ThemDichVuForm_Load;
+        }
+
+        private void InitializeSearchDebounce()
+        {
+            _searchDebounceTimer = new System.Windows.Forms.Timer
+            {
+                Interval = SEARCH_DEBOUNCE_MS
+            };
+            _searchDebounceTimer.Tick += (s, e) =>
+            {
+                _searchDebounceTimer.Stop();
+                ApplyFiltersOptimized();
+            };
         }
 
         private void InitializeCustomComponents()
         {
-            // Form settings - Responsive
             this.Text = "Thêm dịch vụ";
             this.Size = new Size(950, 700);
             this.MinimumSize = new Size(800, 600);
@@ -44,12 +61,14 @@ namespace Billiard.WinForm.Forms.QLBan
             this.MaximizeBox = true;
             this.MinimizeBox = true;
 
-            // Handle resize to recalculate card layout and button positions
+            // Enable double buffering
+            this.DoubleBuffered = true;
+
             this.Resize += (s, e) =>
             {
                 if (_allServices != null && _allServices.Count > 0)
                 {
-                    ApplyFilters();
+                    ApplyFiltersOptimized();
                 }
                 UpdateBottomButtonPositions();
             };
@@ -65,7 +84,7 @@ namespace Billiard.WinForm.Forms.QLBan
 
             var lblTitle = new Label
             {
-                Text = "📋 Thêm dịch vụ",
+                Text = "Thêm dịch vụ",
                 Font = new Font("Segoe UI", 14F, FontStyle.Bold),
                 ForeColor = Color.White,
                 Dock = DockStyle.Left,
@@ -86,7 +105,7 @@ namespace Billiard.WinForm.Forms.QLBan
             {
                 Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI", 11F),
-                PlaceholderText = "🔍 Tìm kiếm dịch vụ..."
+                PlaceholderText = "Tìm kiếm dịch vụ..."
             };
             txtSearch.TextChanged += TxtSearch_TextChanged;
             pnlSearch.Controls.Add(txtSearch);
@@ -128,7 +147,7 @@ namespace Billiard.WinForm.Forms.QLBan
 
             pnlCategory.Controls.Add(flpCategory);
 
-            // Services Panel
+            // Services Panel - Enable double buffering
             flpServices = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -136,9 +155,13 @@ namespace Billiard.WinForm.Forms.QLBan
                 BackColor = Color.White,
                 Padding = new Padding(15)
             };
+            // Enable double buffering cho FlowLayoutPanel
+            typeof(Panel).InvokeMember("DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null, flpServices, new object[] { true });
 
-            // Bottom Panel - Responsive buttons
-            pnlBottom = new Panel // Gán giá trị cho biến pnlBottom
+            // Bottom Panel
+            pnlBottom = new Panel
             {
                 Dock = DockStyle.Bottom,
                 Height = 70,
@@ -146,7 +169,6 @@ namespace Billiard.WinForm.Forms.QLBan
                 Padding = new Padding(20, 15, 20, 15)
             };
 
-            // Label hiển thị số dịch vụ đã chọn
             lblSelectedCount = new Label
             {
                 Text = "Chưa chọn dịch vụ nào",
@@ -159,7 +181,7 @@ namespace Billiard.WinForm.Forms.QLBan
 
             var btnConfirm = new Button
             {
-                Text = "✅ Xác nhận thêm",
+                Text = "Xác nhận thêm",
                 Width = 180,
                 Height = 40,
                 BackColor = Color.FromArgb(34, 197, 94),
@@ -169,13 +191,12 @@ namespace Billiard.WinForm.Forms.QLBan
                 Cursor = Cursors.Hand,
                 Anchor = AnchorStyles.Right | AnchorStyles.Top
             };
-            // btnConfirm.Location được set trong UpdateBottomButtonPositions
             btnConfirm.FlatAppearance.BorderSize = 0;
             btnConfirm.Click += BtnConfirm_Click;
 
             var btnCancel = new Button
             {
-                Text = "❌ Hủy",
+                Text = "Hủy",
                 Width = 120,
                 Height = 40,
                 BackColor = Color.FromArgb(239, 68, 68),
@@ -185,24 +206,20 @@ namespace Billiard.WinForm.Forms.QLBan
                 Cursor = Cursors.Hand,
                 Anchor = AnchorStyles.Right | AnchorStyles.Top
             };
-            // btnCancel.Location được set trong UpdateBottomButtonPositions
             btnCancel.FlatAppearance.BorderSize = 0;
             btnCancel.Click += (s, e) => this.DialogResult = DialogResult.Cancel;
 
             pnlBottom.Controls.AddRange(new Control[] { lblSelectedCount, btnCancel, btnConfirm });
 
-            // Add all panels to form
             this.Controls.Add(flpServices);
             this.Controls.Add(pnlCategory);
             this.Controls.Add(pnlSearch);
             this.Controls.Add(pnlHeader);
             this.Controls.Add(pnlBottom);
 
-            // Cần gọi một lần khi form load xong để căn chỉnh vị trí ban đầu
             this.Load += (s, e) => UpdateBottomButtonPositions();
         }
 
-        // Phương thức riêng để cập nhật vị trí các nút ở dưới cùng
         private void UpdateBottomButtonPositions()
         {
             if (pnlBottom != null)
@@ -216,14 +233,10 @@ namespace Billiard.WinForm.Forms.QLBan
                     int topPadding = 15;
                     int panelWidth = pnlBottom.ClientSize.Width;
 
-                    // Confirm button (căn phải)
                     btnConfirm.Location = new Point(panelWidth - btnConfirm.Width - rightPadding, topPadding);
-
-                    // Cancel button (căn phải, bên trái confirm)
                     btnCancel.Location = new Point(btnConfirm.Location.X - btnCancel.Width - 10, topPadding);
                 }
 
-                // Căn chỉnh label số lượng
                 if (lblSelectedCount != null)
                 {
                     lblSelectedCount.Location = new Point(20, (pnlBottom.Height - lblSelectedCount.Height) / 2);
@@ -249,7 +262,6 @@ namespace Billiard.WinForm.Forms.QLBan
             btn.FlatAppearance.BorderSize = 0;
             btn.Click += CategoryButton_Click;
 
-            // Hover effect
             btn.MouseEnter += (s, e) =>
             {
                 if (btn.BackColor != Color.FromArgb(99, 102, 241))
@@ -272,42 +284,68 @@ namespace Billiard.WinForm.Forms.QLBan
         {
             try
             {
-                this.Cursor = Cursors.WaitCursor;
+                // Hiển thị loading state
+                ShowLoadingState();
+
                 await LoadServices();
-                this.Cursor = Cursors.Default;
             }
             catch (Exception ex)
             {
-                this.Cursor = Cursors.Default;
                 MessageBox.Show($"Lỗi khi tải dịch vụ: {ex.Message}", "Lỗi",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private async System.Threading.Tasks.Task LoadServices()
+        private void ShowLoadingState()
         {
-            // Đảm bảo _dichVuService không trả về null, nếu có lỗi DB, nó sẽ ném ra exception và được catch
-            _allServices = _dichVuService.GetAllDichVu()
-                .Where(d => d.TrangThai == "Còn hàng")
-                .ToList();
+            flpServices.Controls.Clear();
 
-            ApplyFilters();
+            var pnlLoading = new Panel
+            {
+                Width = flpServices.ClientSize.Width - 40,
+                Height = 200,
+                BackColor = Color.White,
+                Margin = new Padding(20)
+            };
+
+            var lblLoading = new Label
+            {
+                Text = "⏳ Đang tải dịch vụ...",
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                AutoSize = true
+            };
+            lblLoading.Location = new Point((pnlLoading.Width - lblLoading.Width) / 2, 80);
+
+            pnlLoading.Controls.Add(lblLoading);
+            flpServices.Controls.Add(pnlLoading);
         }
 
-        private void ApplyFilters()
+        private async System.Threading.Tasks.Task LoadServices()
+        {
+            // Load trong background thread
+            _allServices = await System.Threading.Tasks.Task.Run(() =>
+            {
+                return _dichVuService.GetAllDichVu()
+                    .Where(d => d.TrangThai == "Còn hàng")
+                    .ToList();
+            });
+
+            ApplyFiltersOptimized();
+        }
+
+        private void ApplyFiltersOptimized()
         {
             flpServices.SuspendLayout();
             flpServices.Controls.Clear();
 
             var filtered = _allServices.AsEnumerable();
 
-            // Category filter
             if (_currentCategory != "all")
             {
                 filtered = filtered.Where(d => d.Loai == _currentCategory);
             }
 
-            // Search filter
             var searchText = txtSearch.Text.Trim().ToLower();
             if (!string.IsNullOrEmpty(searchText))
             {
@@ -322,14 +360,20 @@ namespace Billiard.WinForm.Forms.QLBan
             }
             else
             {
+                // Batch create cards
+                var cards = new List<Panel>(services.Count);
                 foreach (var service in services)
                 {
                     var card = CreateServiceCard(service);
-                    flpServices.Controls.Add(card);
+                    cards.Add(card);
                 }
+
+                // Add all at once
+                flpServices.Controls.AddRange(cards.ToArray());
             }
 
-            flpServices.ResumeLayout();
+            flpServices.ResumeLayout(false);
+            flpServices.PerformLayout();
         }
 
         private void ShowEmptyState()
@@ -365,21 +409,9 @@ namespace Billiard.WinForm.Forms.QLBan
                 AutoSize = true
             };
 
-            // Center positioning
-            lblIcon.Location = new Point(
-                (pnlEmpty.Width - lblIcon.Width) / 2,
-                50
-            );
-
-            lblText.Location = new Point(
-                (pnlEmpty.Width - lblText.Width) / 2,
-                140
-            );
-
-            lblHint.Location = new Point(
-                (pnlEmpty.Width - lblHint.Width) / 2,
-                175
-            );
+            lblIcon.Location = new Point((pnlEmpty.Width - lblIcon.Width) / 2, 50);
+            lblText.Location = new Point((pnlEmpty.Width - lblText.Width) / 2, 140);
+            lblHint.Location = new Point((pnlEmpty.Width - lblHint.Width) / 2, 175);
 
             pnlEmpty.Controls.AddRange(new Control[] { lblIcon, lblText, lblHint });
             flpServices.Controls.Add(pnlEmpty);
@@ -387,9 +419,8 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private Panel CreateServiceCard(DichVu service)
         {
-            // Đảm bảo cardWidth được tính toán lại khi form resize
-            int cardWidth = (flpServices.ClientSize.Width / 2) - 50; // Cố gắng hiển thị 2 cột, trừ padding
-            if (cardWidth < 300) cardWidth = flpServices.ClientSize.Width - 30; // Chuyển sang 1 cột nếu quá hẹp
+            int cardWidth = (flpServices.ClientSize.Width / 2) - 50;
+            if (cardWidth < 300) cardWidth = flpServices.ClientSize.Width - 30;
 
             var card = new Panel
             {
@@ -408,7 +439,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 }
             };
 
-            // Image
+            // Image - Load asynchronously nếu cần
             var picImage = new PictureBox
             {
                 Size = new Size(100, 100),
@@ -419,26 +450,11 @@ namespace Billiard.WinForm.Forms.QLBan
 
             if (!string.IsNullOrEmpty(service.HinhAnh))
             {
-                try
-                {
-                    // Lỗi tiềm ẩn: đường dẫn hình ảnh có thể sai
-                    var projectRoot = AppDomain.CurrentDomain.BaseDirectory; // Dùng BaseDirectory để dễ dàng hơn trong môi trường runtime
-                    var imagePath = System.IO.Path.Combine(projectRoot, "Images", "services", service.HinhAnh); // Giả định thư mục Images/services là nơi chứa ảnh
-
-                    if (System.IO.File.Exists(imagePath))
-                    {
-                        using (var img = Image.FromFile(imagePath))
-                        {
-                            picImage.Image = new Bitmap(img);
-                        }
-                    }
-                }
-                catch { }
+                LoadServiceImageAsync(picImage, service.HinhAnh);
             }
 
-            // Service Info - Tính toán vị trí động
             int infoStartX = 120;
-            int availableWidth = cardWidth - infoStartX - 20; // 20px padding bên phải
+            int availableWidth = cardWidth - infoStartX - 20;
 
             var lblName = new Label
             {
@@ -453,15 +469,13 @@ namespace Billiard.WinForm.Forms.QLBan
 
             var lblPrice = new Label
             {
-                Text = $"{service.Gia:N0} đ / {service.DonVi}", // Thêm đơn vị tính
+                Text = $"{service.Gia:N0} đ / {service.DonVi}",
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(220, 38, 38),
                 Location = new Point(infoStartX, 50),
                 AutoSize = true
             };
 
-            // Quantity Controls - Responsive positioning
-            // Khởi tạo số lượng từ _selectedServices nếu đã chọn, nếu chưa thì là 1
             var currentQty = _selectedServices.ContainsKey(service.MaDv) ? _selectedServices[service.MaDv] : 1;
 
             var btnMinus = new Button
@@ -508,20 +522,26 @@ namespace Billiard.WinForm.Forms.QLBan
             btnPlus.FlatAppearance.BorderSize = 0;
             btnPlus.Click += BtnPlus_Click;
 
-            // Nút Thêm - Căn phải
             var btnAddWidth = Math.Min(80, availableWidth - 130);
             var btnAdd = new Button
             {
-                Text = _selectedServices.ContainsKey(service.MaDv) ? "✓ Đã chọn" : "Thêm",
-                Width = btnAddWidth,
+                Text = _selectedServices.ContainsKey(service.MaDv) ? "Đã chọn" : "Thêm",
+                // Bật AutoSize để nút tự giãn theo chữ
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                // Thiết lập Padding để nút trông cân đối khi giãn ra
+                Padding = new Padding(10, 0, 10, 0),
                 Height = 32,
-                Location = new Point(cardWidth - btnAddWidth - 15, 78),
+                // Vị trí X tạm thời, chúng ta sẽ xử lý việc neo (anchor) ở dưới
+                Location = new Point(cardWidth - 95, 78),
                 BackColor = _selectedServices.ContainsKey(service.MaDv) ? Color.FromArgb(34, 197, 94) : Color.FromArgb(99, 102, 241),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
-                Tag = service.MaDv
+                Tag = service.MaDv,
+                // Neo vào bên phải để khi giãn ra không đè lên phần số lượng
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             btnAdd.FlatAppearance.BorderSize = 0;
             btnAdd.Click += BtnAddService_Click;
@@ -533,6 +553,36 @@ namespace Billiard.WinForm.Forms.QLBan
             });
 
             return card;
+        }
+
+        private async void LoadServiceImageAsync(PictureBox picImage, string hinhAnh)
+        {
+            try
+            {
+                var projectRoot = AppDomain.CurrentDomain.BaseDirectory;
+                var imagePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", hinhAnh);
+
+                if (System.IO.File.Exists(imagePath))
+                {
+                    // Load image asynchronously
+                    var img = await System.Threading.Tasks.Task.Run(() =>
+                    {
+                        using (var original = Image.FromFile(imagePath))
+                        {
+                            return new Bitmap(original);
+                        }
+                    });
+
+                    if (picImage != null && !picImage.IsDisposed)
+                    {
+                        picImage.Image = img;
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore image loading errors
+            }
         }
 
         private void BtnMinus_Click(object sender, EventArgs e)
@@ -550,12 +600,10 @@ namespace Billiard.WinForm.Forms.QLBan
                     currentQty--;
                     txtQty.Text = currentQty.ToString();
 
-                    // Cập nhật lại số lượng trong selectedServices nếu nút 'Đã chọn'
                     var btnAdd = card.Controls.OfType<Button>().FirstOrDefault(b => b.Text.Contains("Đã chọn"));
-                    if (btnAdd != null)
+                    if (btnAdd != null && _selectedServices.ContainsKey(maDv))
                     {
-                        if (_selectedServices.ContainsKey(maDv))
-                            _selectedServices[maDv] = currentQty;
+                        _selectedServices[maDv] = currentQty;
                         UpdateSelectedCount();
                     }
                 }
@@ -577,12 +625,10 @@ namespace Billiard.WinForm.Forms.QLBan
                     currentQty++;
                     txtQty.Text = currentQty.ToString();
 
-                    // Cập nhật lại số lượng trong selectedServices nếu nút 'Đã chọn'
                     var btnAdd = card.Controls.OfType<Button>().FirstOrDefault(b => b.Text.Contains("Đã chọn"));
-                    if (btnAdd != null)
+                    if (btnAdd != null && _selectedServices.ContainsKey(maDv))
                     {
-                        if (_selectedServices.ContainsKey(maDv))
-                            _selectedServices[maDv] = currentQty;
+                        _selectedServices[maDv] = currentQty;
                         UpdateSelectedCount();
                     }
                 }
@@ -595,28 +641,31 @@ namespace Billiard.WinForm.Forms.QLBan
             var maDv = (int)btn.Tag;
             var card = btn.Parent as Panel;
             var txtQty = card.Controls.Find($"qty_{maDv}", false).FirstOrDefault() as TextBox;
-            var service = card.Tag as DichVu;
 
-            if (txtQty != null && service != null)
+            if (txtQty == null) return;
+
+            if (_selectedServices.ContainsKey(maDv))
             {
-                var qty = int.Parse(txtQty.Text);
-
-                // Nếu đã tồn tại, cộng dồn
-                if (_selectedServices.ContainsKey(maDv))
-                    _selectedServices[maDv] += qty;
-                else
-                    _selectedServices[maDv] = qty;
-
-                // Cập nhật label hiển thị số dịch vụ đã chọn
-                UpdateSelectedCount();
-
-                // Visual feedback
-                btn.BackColor = Color.FromArgb(34, 197, 94);
-                btn.Text = "✓ Đã chọn"; // Thay đổi thành 'Đã chọn' để chỉ trạng thái thêm vào giỏ hàng tạm
-
-                // Không cần delay nữa, chỉ cần thay đổi text và màu để biểu thị là đã thêm vào giỏ hàng
-                // Sau đó nếu người dùng thay đổi số lượng, nút sẽ vẫn là 'Đã chọn' và số lượng được cập nhật trong _selectedServices (xử lý ở Plus/Minus)
+                // Bỏ chọn
+                _selectedServices.Remove(maDv);
+                btn.BackColor = Color.FromArgb(99, 102, 241);
+                btn.Text = "Thêm";
+                txtQty.Text = "1";
             }
+            else
+            {
+                // Thêm mới
+                var qty = int.Parse(txtQty.Text);
+                _selectedServices[maDv] = qty;
+                btn.BackColor = Color.FromArgb(34, 197, 94);
+                btn.Text = "Đã chọn";
+            }
+
+            // Căn chỉnh lại vị trí X để nút luôn bám lề phải card sau khi thay đổi kích thước
+            // Khoảng cách lề phải là 15px
+            btn.Location = new Point(card.Width - btn.Width - 15, btn.Location.Y);
+
+            UpdateSelectedCount();
         }
 
         private void UpdateSelectedCount()
@@ -631,7 +680,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 else
                 {
                     var totalQty = _selectedServices.Values.Sum();
-                    lblSelectedCount.Text = $"🛒 Đã chọn: {_selectedServices.Count} dịch vụ ({totalQty} món)";
+                    lblSelectedCount.Text = $"Đã chọn: {_selectedServices.Count} dịch vụ ({totalQty} món)";
                     lblSelectedCount.ForeColor = Color.FromArgb(99, 102, 241);
                 }
             }
@@ -646,75 +695,90 @@ namespace Billiard.WinForm.Forms.QLBan
                 return;
             }
 
+            var totalQty = _selectedServices.Values.Sum();
             var result = MessageBox.Show(
-                $"Xác nhận thêm {_selectedServices.Count} dịch vụ vào hóa đơn?",
+                $"Xác nhận thêm {_selectedServices.Count} dịch vụ ({totalQty} món) vào hóa đơn?",
                 "Xác nhận",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question);
 
-            if (result == DialogResult.Yes)
+            if (result != DialogResult.Yes)
+                return;
+
+            this.Enabled = false;
+
+            try
             {
-                try
+                var failedServices = new List<(string Name, string Reason)>();
+                var successCount = 0;
+                var totalItems = 0;
+
+                foreach (var item in _selectedServices)
                 {
-                    this.Cursor = Cursors.WaitCursor;
-
-                    var failedServices = new List<string>();
-                    var successCount = 0;
-
-                    // Lặp qua danh sách dịch vụ đã chọn
-                    foreach (var item in _selectedServices)
+                    try
                     {
                         var success = await _hoaDonService.AddServiceToInvoiceAsync(
                             _maHoaDon, item.Key, item.Value);
 
                         if (success)
+                        {
                             successCount++;
+                            totalItems += item.Value;
+                        }
                         else
                         {
                             var service = _allServices.FirstOrDefault(s => s.MaDv == item.Key);
                             if (service != null)
-                                failedServices.Add(service.TenDv);
+                            {
+                                failedServices.Add((service.TenDv, "Có thể hết hàng hoặc lỗi hệ thống"));
+                            }
                         }
                     }
-
-                    this.Cursor = Cursors.Default;
-
-                    if (successCount > 0 && failedServices.Count == 0)
+                    catch (Exception ex)
                     {
-                        MessageBox.Show(
-                            $"Đã thêm thành công {successCount} dịch vụ!",
-                            "Thành công",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Information);
-
-                        this.DialogResult = DialogResult.OK;
-                    }
-                    else if (successCount > 0 && failedServices.Count > 0)
-                    {
-                        MessageBox.Show(
-                            $"Đã thêm {successCount} dịch vụ thành công.\n" +
-                            $"Không thể thêm (có thể do hết hàng): {string.Join(", ", failedServices)}",
-                            "Thông báo",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Warning);
-
-                        this.DialogResult = DialogResult.OK; // Vẫn cho phép thoát nếu có món được thêm
-                    }
-                    else
-                    {
-                        MessageBox.Show(
-                            $"Không thể thêm bất kỳ dịch vụ nào (có thể do hết hàng hoặc lỗi hệ thống).",
-                            "Lỗi",
-                            MessageBoxButtons.OK,
-                            MessageBoxIcon.Error);
+                        var service = _allServices.FirstOrDefault(s => s.MaDv == item.Key);
+                        if (service != null)
+                        {
+                            failedServices.Add((service.TenDv, ex.Message));
+                        }
                     }
                 }
-                catch (Exception ex)
+
+                this.Enabled = true;
+
+                if (successCount > 0 && failedServices.Count == 0)
                 {
-                    this.Cursor = Cursors.Default;
-                    MessageBox.Show($"Lỗi khi thêm dịch vụ: {ex.Message}", "Lỗi",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
                 }
+                else if (successCount > 0 && failedServices.Count > 0)
+                {
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
+                }
+                else
+                {
+                    var failedList = string.Join("\n• ",
+                        failedServices.Select(f => $"{f.Name} ({f.Reason})"));
+
+                    MessageBox.Show(
+                        $"Không thể thêm bất kỳ dịch vụ nào!\n\n" +
+                        $"Chi tiết:\n• {failedList}",
+                        "Lỗi",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                this.Enabled = true;
+
+                MessageBox.Show(
+                    $"Lỗi nghiêm trọng khi thêm dịch vụ:\n\n{ex.Message}\n\n" +
+                    $"Vui lòng thử lại hoặc liên hệ quản trị viên.",
+                    "Lỗi",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
@@ -723,7 +787,6 @@ namespace Billiard.WinForm.Forms.QLBan
             var clickedBtn = sender as Button;
             _currentCategory = clickedBtn.Tag.ToString();
 
-            // Update button styles
             foreach (Control ctrl in clickedBtn.Parent.Controls)
             {
                 if (ctrl is Button btn)
@@ -741,12 +804,24 @@ namespace Billiard.WinForm.Forms.QLBan
                 }
             }
 
-            ApplyFilters();
+            ApplyFiltersOptimized();
         }
 
         private void TxtSearch_TextChanged(object sender, EventArgs e)
         {
-            ApplyFilters();
+            // Debounce search
+            _searchDebounceTimer.Stop();
+            _searchDebounceTimer.Start();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _searchDebounceTimer?.Stop();
+                _searchDebounceTimer?.Dispose();
+            }
+            base.Dispose(disposing);
         }
     }
 }

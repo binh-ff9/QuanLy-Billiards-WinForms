@@ -400,6 +400,7 @@ namespace Billiard.BLL.Services.QLBan
         public async Task<List<ChiTietHoaDon>> GetInvoiceDetailsAsync(int maHd)
         {
             return await _context.ChiTietHoaDons
+                .AsNoTracking()
                 .Include(ct => ct.MaDvNavigation)
                 .Where(ct => ct.MaHd == maHd)
                 .ToListAsync();

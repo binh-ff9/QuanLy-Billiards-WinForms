@@ -93,57 +93,61 @@ namespace Billiard.BLL.Services.HoaDonServices
         /// </summary>
         public async Task<bool> AddServiceToInvoiceAsync(int maHd, int maDv, int soLuong)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
-            try
+            return await Task.Run(() =>
             {
-                var hoaDon = await _context.HoaDons.FindAsync(maHd);
-                if (hoaDon == null || hoaDon.TrangThai != "Đang chơi")
-                    return false;
-
-                var dichVu = await _context.DichVus.FindAsync(maDv);
-                if (dichVu == null || dichVu.TrangThai != "Còn hàng")
-                    return false;
-
-                // Kiểm tra xem dịch vụ đã có trong hóa đơn chưa
-                var chiTiet = await _context.ChiTietHoaDons
-                    .FirstOrDefaultAsync(ct => ct.MaHd == maHd && ct.MaDv == maDv);
-
-                if (chiTiet != null)
+                using (var context = new BilliardDbContext())
                 {
-                    // Cập nhật số lượng
-                    chiTiet.SoLuong += soLuong;
-                    chiTiet.ThanhTien = chiTiet.SoLuong * dichVu.Gia;
-                }
-                else
-                {
-                    // Thêm mới
-                    chiTiet = new ChiTietHoaDon
+                    using (var transaction = context.Database.BeginTransaction())
                     {
-                        MaHd = maHd,
-                        MaDv = maDv,
-                        SoLuong = soLuong,
-                        ThanhTien = soLuong * dichVu.Gia
-                    };
-                    _context.ChiTietHoaDons.Add(chiTiet);
+                        try
+                        {
+                            // Kiểm tra dịch vụ đã tồn tại trong hóa đơn chưa
+                            var existing = context.ChiTietHoaDons
+                                .FirstOrDefault(ct => ct.MaHd == maHd && ct.MaDv == maDv);
+
+                            if (existing != null)
+                            {
+                                // Nếu đã tồn tại, cộng thêm số lượng
+                                existing.SoLuong += soLuong;
+
+                                // Cập nhật thành tiền
+                                var dichVu = context.DichVus.Find(maDv);
+                                if (dichVu != null)
+                                {
+                                    existing.ThanhTien = existing.SoLuong * dichVu.Gia;
+                                }
+                            }
+                            else
+                            {
+                                // Nếu chưa có, thêm mới
+                                var dichVu = context.DichVus.Find(maDv);
+                                if (dichVu == null) return false;
+
+                                var chiTiet = new ChiTietHoaDon
+                                {
+                                    MaHd = maHd,
+                                    MaDv = maDv,
+                                    SoLuong = soLuong,
+                                    ThanhTien = soLuong * dichVu.Gia
+                                };
+
+                                context.ChiTietHoaDons.Add(chiTiet);
+                            }
+
+                            context.SaveChanges();
+                            transaction.Commit();
+
+                            return true;
+                        }
+                        catch (Exception ex)
+                        {
+                            transaction.Rollback();
+                            System.Diagnostics.Debug.WriteLine($"Error: {ex.Message}");
+                            return false;
+                        }
+                    }
                 }
-
-                // Cập nhật tổng tiền dịch vụ
-                var tongTienDv = await _context.ChiTietHoaDons
-                    .Where(ct => ct.MaHd == maHd)
-                    .SumAsync(ct => ct.ThanhTien);
-
-                hoaDon.TienDichVu = tongTienDv;
-
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                return true;
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                return false;
-            }
+            });
         }
 
         /// <summary>
