@@ -419,33 +419,38 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private Panel CreateServiceCard(DichVu service)
         {
-            int cardWidth = (flpServices.ClientSize.Width / 2) - 50;
-            if (cardWidth < 300) cardWidth = flpServices.ClientSize.Width - 30;
+            int paddingTotal = flpServices.Padding.Left + flpServices.Padding.Right;
+            int scrollBarWidth = 25;
+            int availableWidth = flpServices.ClientSize.Width - paddingTotal - scrollBarWidth;
+
+            int cardWidth = (availableWidth / 4) - 20;
+
+            if (cardWidth < 180) cardWidth = (availableWidth / 2) - 20; 
 
             var card = new Panel
             {
                 Width = cardWidth,
-                Height = 120,
+                Height = 270, 
                 Margin = new Padding(10),
-                BackColor = Color.FromArgb(248, 250, 252),
+                BackColor = Color.White,
                 Tag = service
             };
 
             card.Paint += (s, e) =>
             {
-                using (var pen = new Pen(Color.FromArgb(226, 232, 240), 2))
+                using (var pen = new Pen(Color.FromArgb(226, 232, 240), 1))
                 {
                     e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
                 }
             };
 
-            // Image - Load asynchronously nếu cần
+            // 1. Hình ảnh (Giảm chiều cao xuống để phù hợp tổng thể 280)
             var picImage = new PictureBox
             {
-                Size = new Size(100, 100),
-                Location = new Point(10, 10),
+                Size = new Size(cardWidth - 16, 120),
+                Location = new Point(8, 8),
                 SizeMode = PictureBoxSizeMode.Zoom,
-                BackColor = Color.White
+                BackColor = Color.FromArgb(248, 250, 252)
             };
 
             if (!string.IsNullOrEmpty(service.HinhAnh))
@@ -453,40 +458,42 @@ namespace Billiard.WinForm.Forms.QLBan
                 LoadServiceImageAsync(picImage, service.HinhAnh);
             }
 
-            int infoStartX = 120;
-            int availableWidth = cardWidth - infoStartX - 20;
-
+            // 2. Tên dịch vụ (Giới hạn 2 dòng, font nhỏ hơn một chút)
             var lblName = new Label
             {
                 Text = service.TenDv,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(infoStartX, 12),
-                AutoSize = false,
-                Size = new Size(availableWidth, 40),
+                Location = new Point(8, 130),
+                Size = new Size(cardWidth - 16, 25),
+                TextAlign = ContentAlignment.TopCenter,
                 AutoEllipsis = true
             };
 
+            // 3. Giá tiền
             var lblPrice = new Label
             {
-                Text = $"{service.Gia:N0} đ / {service.DonVi}",
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                Text = $"{service.Gia:N0} đ",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(220, 38, 38),
-                Location = new Point(infoStartX, 50),
-                AutoSize = true
+                Location = new Point(8, 150),
+                Size = new Size(cardWidth - 16, 25),
+                TextAlign = ContentAlignment.MiddleCenter
             };
 
             var currentQty = _selectedServices.ContainsKey(service.MaDv) ? _selectedServices[service.MaDv] : 1;
 
+            // 4. Bộ điều khiển số lượng (Nhỏ gọn hơn)
+            int controlsY = 180;
+            int centerShift = (cardWidth - (28 + 40 + 28)) / 2;
+
             var btnMinus = new Button
             {
                 Text = "−",
-                Width = 32,
-                Height = 32,
-                Location = new Point(infoStartX, 78),
-                BackColor = Color.FromArgb(226, 232, 240),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Width = 28,
+                Height = 28,
+                Location = new Point(centerShift, controlsY+2),
+                BackColor = Color.FromArgb(241, 245, 249),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
                 Tag = service.MaDv
@@ -496,12 +503,12 @@ namespace Billiard.WinForm.Forms.QLBan
 
             var txtQty = new TextBox
             {
-                Width = 45,
-                Height = 32,
-                Location = new Point(infoStartX + 37, 78),
+                Width = 40,
+                Height = 28,
+                Location = new Point(centerShift + 28, controlsY + 1),
                 Text = currentQty.ToString(),
                 TextAlign = HorizontalAlignment.Center,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 ReadOnly = true,
                 Name = $"qty_{service.MaDv}"
             };
@@ -509,12 +516,10 @@ namespace Billiard.WinForm.Forms.QLBan
             var btnPlus = new Button
             {
                 Text = "+",
-                Width = 32,
-                Height = 32,
-                Location = new Point(infoStartX + 87, 78),
-                BackColor = Color.FromArgb(226, 232, 240),
-                ForeColor = Color.FromArgb(51, 65, 85),
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Width = 28,
+                Height = 28,
+                Location = new Point(centerShift + 70, controlsY+2),
+                BackColor = Color.FromArgb(241, 245, 249),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
                 Tag = service.MaDv
@@ -522,36 +527,23 @@ namespace Billiard.WinForm.Forms.QLBan
             btnPlus.FlatAppearance.BorderSize = 0;
             btnPlus.Click += BtnPlus_Click;
 
-            var btnAddWidth = Math.Min(80, availableWidth - 130);
+            // 5. Nút bấm (Sát dưới cùng)
             var btnAdd = new Button
             {
                 Text = _selectedServices.ContainsKey(service.MaDv) ? "Đã chọn" : "Thêm",
-                // Bật AutoSize để nút tự giãn theo chữ
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                // Thiết lập Padding để nút trông cân đối khi giãn ra
-                Padding = new Padding(10, 0, 10, 0),
-                Height = 32,
-                // Vị trí X tạm thời, chúng ta sẽ xử lý việc neo (anchor) ở dưới
-                Location = new Point(cardWidth - 95, 78),
+                Size = new Size(cardWidth - 24, 32),
+                Location = new Point(12, 225),
                 BackColor = _selectedServices.ContainsKey(service.MaDv) ? Color.FromArgb(34, 197, 94) : Color.FromArgb(99, 102, 241),
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
                 Cursor = Cursors.Hand,
-                Tag = service.MaDv,
-                // Neo vào bên phải để khi giãn ra không đè lên phần số lượng
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
+                Tag = service.MaDv
             };
             btnAdd.FlatAppearance.BorderSize = 0;
             btnAdd.Click += BtnAddService_Click;
 
-            card.Controls.AddRange(new Control[]
-            {
-                picImage, lblName, lblPrice,
-                btnMinus, txtQty, btnPlus, btnAdd
-            });
-
+            card.Controls.AddRange(new Control[] { picImage, lblName, lblPrice, btnMinus, txtQty, btnPlus, btnAdd });
             return card;
         }
 

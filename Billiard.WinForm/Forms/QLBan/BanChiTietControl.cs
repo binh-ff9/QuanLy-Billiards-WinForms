@@ -22,6 +22,7 @@ namespace Billiard.WinForm.Forms.QLBan
         private Panel pnlContent;
         private bool _isLoading = false;
         private System.Threading.CancellationTokenSource _cts;
+        private readonly GioHoatDongService _gioHoatDongService;
 
         public event EventHandler OnDataChanged;
         public event EventHandler<BanBium> OnBanUpdated;
@@ -38,6 +39,7 @@ namespace Billiard.WinForm.Forms.QLBan
             _hoaDonService = hoaDonService;
             _ban = ban;
             _maNV = maNV;
+            _gioHoatDongService = new GioHoatDongService(); 
 
             InitializeComponent();
             InitializeLayout();
@@ -54,10 +56,16 @@ namespace Billiard.WinForm.Forms.QLBan
                 AutoSize = false
             };
 
+            // Enable double buffering
+            typeof(Panel).InvokeMember("DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic,
+                null, pnlContent, new object[] { true });
+
             this.Controls.Add(pnlContent);
             this.BackColor = Color.FromArgb(248, 250, 252);
         }
-
         protected override async void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
@@ -68,7 +76,6 @@ namespace Billiard.WinForm.Forms.QLBan
         {
             if (_isLoading) return;
 
-            // Cancel previous loading if any
             _cts?.Cancel();
             _cts = new System.Threading.CancellationTokenSource();
             var token = _cts.Token;
@@ -76,7 +83,6 @@ namespace Billiard.WinForm.Forms.QLBan
             _isLoading = true;
             try
             {
-                // Lấy thông tin bàn mới nhất từ database
                 var newBan = await Task.Run(() => _banBiaService.GetTableByIdAsync(_ban.MaBan), token);
 
                 if (token.IsCancellationRequested) return;
@@ -87,33 +93,18 @@ namespace Billiard.WinForm.Forms.QLBan
                     return;
                 }
 
-                // QUAN TRỌNG: Luôn cập nhật _ban với dữ liệu mới nhất
                 _ban = newBan;
 
-                // Nếu forceReload = true, LUÔN reload toàn bộ UI
-                if (forceReload)
+                // QUAN TRỌNG: Không reload nếu không cần thiết
+                if (!forceReload && !HasDataChanged(_ban, newBan) && pnlContent.Controls.Count > 0)
                 {
-                    await FullReloadContentOptimized(token);
+                    await UpdateExistingControlsAsync();
                     return;
                 }
 
-                // Logic cũ - kiểm tra thay đổi trước khi reload
-                bool hasChanges = HasDataChanged(_ban, newBan);
-
-                if (!hasChanges && pnlContent.Controls.Count > 0)
-                {
-                    // Vẫn cần update một số controls động như timer
-                    await UpdateExistingControls();
-                    return;
-                }
-
-                // Có thay đổi hoặc chưa có UI -> reload toàn bộ
                 await FullReloadContentOptimized(token);
             }
-            catch (OperationCanceledException)
-            {
-                // Bị cancel, không làm gì
-            }
+            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
                 ShowError($"Lỗi khi tải dữ liệu: {ex.Message}");
@@ -123,7 +114,18 @@ namespace Billiard.WinForm.Forms.QLBan
                 _isLoading = false;
             }
         }
+        private async Task UpdateExistingControlsAsync()
+        {
+            UpdateHeaderIfExists();
 
+            if (_ban.TrangThai == "Đang chơi")
+            {
+                await UpdateTimerIfExists();
+                await UpdatePaymentInfoIfExists();
+            }
+
+            OnBanUpdated?.Invoke(this, _ban);
+        }
         private bool HasDataChanged(BanBium oldBan, BanBium newBan)
         {
             if (oldBan.TrangThai != newBan.TrangThai) return true;
@@ -237,7 +239,7 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private async Task FullReloadContentOptimized(System.Threading.CancellationToken token)
         {
-            // Tạo nội dung mới trong background
+            // Tạo nội dung mới OFF-SCREEN
             var newContent = new Panel
             {
                 AutoScroll = true,
@@ -246,19 +248,17 @@ namespace Billiard.WinForm.Forms.QLBan
                 AutoSize = false,
                 Location = pnlContent.Location,
                 Size = pnlContent.Size,
-                Dock = DockStyle.Fill
+                Dock = DockStyle.Fill,
+                Visible = false // QUAN TRỌNG: Ẩn khi tạo
             };
-
-            OnBanUpdated?.Invoke(this, _ban);
 
             int availableWidth = Math.Max(MIN_PANEL_WIDTH, pnlContent.ClientSize.Width - (PADDING * 2) - 20);
             int yPos = 0;
 
-            // Render header
+            // Build UI trong background
             yPos = RenderHeader(newContent, yPos, availableWidth);
             yPos += SECTION_SPACING;
 
-            // Render content dựa trên trạng thái
             switch (_ban.TrangThai)
             {
                 case "Đang chơi":
@@ -272,24 +272,23 @@ namespace Billiard.WinForm.Forms.QLBan
                     break;
             }
 
-            yPos += 20;
-
             if (token.IsCancellationRequested) return;
 
-            // Swap panels nhanh chóng
-            this.SuspendLayout();
-
+            // ATOMIC SWAP - Nhanh chóng không flickering
             var oldContent = pnlContent;
+
+            this.SuspendLayout();
             this.Controls.Remove(oldContent);
-
             pnlContent = newContent;
+            pnlContent.Visible = true; // Hiện sau khi add
             this.Controls.Add(pnlContent);
-
             this.ResumeLayout(false);
-            this.PerformLayout();
 
-            // Dispose old content sau
+            // Dispose cũ sau khi đã swap
+            await Task.Delay(50); // Cho UI settle
             oldContent?.Dispose();
+
+            OnBanUpdated?.Invoke(this, _ban);
         }
 
         #region Render Methods - Modified to accept panel parameter
@@ -357,7 +356,67 @@ namespace Billiard.WinForm.Forms.QLBan
 
             return yPos + 85;
         }
+        private int RenderOvertimeWarning(Panel targetPanel, int yPos, int panelWidth, DateTime gioBatDau)
+        {
+            var soGioToiDa = _gioHoatDongService.LaySoGioHoatDongToiDa();
+            var gioDongCua = _gioHoatDongService.LayThoiDiemDongCuaTheoBanBatDau(gioBatDau);
+            var soGioThucTe = (DateTime.Now - gioBatDau).TotalHours;
 
+            var pnlWarning = new Panel
+            {
+                Location = new Point(15, yPos + 20),
+                Size = new Size(panelWidth, 110),
+                BackColor = Color.FromArgb(153, 27, 27) // Đỏ đậm hơn cả đóng cửa
+            };
+
+            // Icon lớn hơn
+            var lblIcon = new Label
+            {
+                Text = "⛔",
+                Font = new Font("Segoe UI", 40F),
+                ForeColor = Color.White,
+                Location = new Point(15, 15),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlWarning.Controls.Add(lblIcon);
+
+            // Warning text
+            var lblWarning = new Label
+            {
+                Text = $"BÀN ĐÃ CHƠI QUÁ {soGioToiDa} TIẾNG!\n" +
+                       $"(Từ {gioBatDau:HH:mm dd/MM} - {soGioThucTe:F1}h)\n" +
+                       $"THANH TOÁN NGAY LẬP TỨC!",
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(85, 15),
+                Size = new Size(panelWidth - 100, 80),
+                BackColor = Color.Transparent
+            };
+            pnlWarning.Controls.Add(lblWarning);
+
+            // Animation mạnh hơn
+            var timer = new System.Windows.Forms.Timer { Interval = 400 };
+            var isHighlight = false;
+            timer.Tick += (s, e) =>
+            {
+                if (pnlWarning.IsDisposed)
+                {
+                    timer.Stop();
+                    timer.Dispose();
+                    return;
+                }
+
+                isHighlight = !isHighlight;
+                pnlWarning.BackColor = isHighlight
+                    ? Color.FromArgb(220, 38, 38)
+                    : Color.FromArgb(153, 27, 27);
+            };
+            timer.Start();
+
+            targetPanel.Controls.Add(pnlWarning);
+            return yPos + 110;
+        }
         private async Task<int> RenderPlayingContent(Panel targetPanel, int yPos, int panelWidth, System.Threading.CancellationToken token)
         {
             var hoaDon = await _banBiaService.GetActiveInvoiceAsync(_ban.MaBan);
@@ -371,26 +430,237 @@ namespace Billiard.WinForm.Forms.QLBan
 
             var duration = DateTime.Now - hoaDon.ThoiGianBatDau.Value;
 
-            yPos = RenderTimerCard(targetPanel, duration, yPos, panelWidth);
+            // ============================================================
+            // DECLARE VARIABLES FIRST (BEFORE ANY if statements)
+            // ============================================================
+            var isQuaGioChoPhep = _gioHoatDongService.KiemTraBanQuaGioChoPhep(hoaDon.ThoiGianBatDau.Value);
+            var isDaDongCua = _gioHoatDongService.DaDenGioDongCua();
+            var isSapDongCua = _gioHoatDongService.SapDenGioDongCua();
+
+            // ============================================================
+            // NOW USE THE VARIABLES
+            // ============================================================
+            if (isQuaGioChoPhep)
+            {
+                // Hiển thị cảnh báo QUÁ GIỜ (ưu tiên cao nhất)
+                yPos = RenderOvertimeWarning(targetPanel, yPos, panelWidth, hoaDon.ThoiGianBatDau.Value);
+                yPos += CARD_SPACING;
+            }
+            else
+            {
+                // Hiển thị cảnh báo ĐÃ ĐÓNG CỬA
+                if (isDaDongCua && hoaDon.ThoiGianBatDau < _gioHoatDongService.LayThoiDiemDongCua())
+                {
+                    yPos = RenderClosedWarning(targetPanel, yPos, panelWidth);
+                    yPos += CARD_SPACING;
+                }
+                // Hiển thị cảnh báo SẮP ĐÓNG CỬA (còn <= 5 phút)
+                else if (isSapDongCua)
+                {
+                    yPos = RenderClosingSoonWarning(targetPanel, yPos, panelWidth);
+                    yPos += CARD_SPACING;
+                }
+            }
+
+            // Timer Card
+            yPos = RenderTimerCard(targetPanel, duration, yPos, panelWidth,
+                isQuaGioChoPhep || isDaDongCua || isSapDongCua);
             yPos += CARD_SPACING;
 
+            // Customer Info Card
             yPos = RenderCustomerInfoCard(targetPanel, hoaDon, yPos, panelWidth);
             yPos += CARD_SPACING;
 
+            // Payment Info
             yPos = await RenderPaymentInfo(targetPanel, hoaDon, duration, yPos, panelWidth, token);
             yPos += CARD_SPACING;
 
             if (token.IsCancellationRequested) return yPos;
 
+            // Service List
             yPos = await RenderServiceList(targetPanel, hoaDon.MaHd, yPos, panelWidth, token);
             yPos += SECTION_SPACING;
 
-            yPos = RenderPlayingButtons(targetPanel, yPos, panelWidth);
+            // Buttons
+            yPos = RenderPlayingButtons(targetPanel, yPos, panelWidth, isQuaGioChoPhep || isDaDongCua);
 
             return yPos;
         }
+        private int RenderClosingSoonWarning(Panel targetPanel, int yPos, int panelWidth)
+        {
+            var phutConLai = _gioHoatDongService.TinhSoPhutConLaiDenDongCua();
+            var gioDongCua = _gioHoatDongService.LayThoiDiemDongCua();
 
-        private int RenderTimerCard(Panel targetPanel, TimeSpan duration, int yPos, int panelWidth)
+            var pnlWarning = new Panel
+            {
+                Location = new Point(15, yPos + 20),
+                Size = new Size(panelWidth, 90),
+                BackColor = Color.FromArgb(234, 179, 8) // Vàng
+            };
+
+            // Icon
+            var lblIcon = new Label
+            {
+                Text = "⚠️",
+                Font = new Font("Segoe UI", 32F),
+                ForeColor = Color.White,
+                Location = new Point(15, 15),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlWarning.Controls.Add(lblIcon);
+
+            // Warning text
+            var lblWarning = new Label
+            {
+                Text = $"SẮP ĐÓNG CỬA!\nCòn {phutConLai} phút - Vui lòng chuẩn bị thanh toán\n(Đóng cửa lúc {gioDongCua:HH:mm})",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(80, 12),
+                Size = new Size(panelWidth - 100, 70),
+                BackColor = Color.Transparent
+            };
+            pnlWarning.Controls.Add(lblWarning);
+
+            // Blinking animation
+            var timer = new System.Windows.Forms.Timer { Interval = 800 };
+            var isHighlight = false;
+            timer.Tick += (s, e) =>
+            {
+                if (pnlWarning.IsDisposed)
+                {
+                    timer.Stop();
+                    timer.Dispose();
+                    return;
+                }
+
+                isHighlight = !isHighlight;
+                pnlWarning.BackColor = isHighlight
+                    ? Color.FromArgb(251, 191, 36)
+                    : Color.FromArgb(234, 179, 8);
+            };
+            timer.Start();
+
+            targetPanel.Controls.Add(pnlWarning);
+            return yPos + 90;
+        }
+        private int RenderClosedWarning(Panel targetPanel, int yPos, int panelWidth)
+        {
+            var gioDongCua = _gioHoatDongService.LayThoiDiemDongCua();
+
+            var pnlWarning = new Panel
+            {
+                Location = new Point(15, yPos + 20),
+                Size = new Size(panelWidth, 100),
+                BackColor = Color.FromArgb(220, 38, 38) // Đỏ đậm
+            };
+
+            // Icon
+            var lblIcon = new Label
+            {
+                Text = "🚨",
+                Font = new Font("Segoe UI", 36F),
+                ForeColor = Color.White,
+                Location = new Point(15, 18),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlWarning.Controls.Add(lblIcon);
+
+            // Warning text
+            var lblWarning = new Label
+            {
+                Text = $"QUÁN ĐÃ ĐÓNG CỬA!\nVui lòng THANH TOÁN NGAY\n(Đã đóng cửa lúc {gioDongCua:HH:mm})",
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(85, 18),
+                Size = new Size(panelWidth - 100, 70),
+                BackColor = Color.Transparent
+            };
+            pnlWarning.Controls.Add(lblWarning);
+
+            // Pulsing animation
+            var timer = new System.Windows.Forms.Timer { Interval = 600 };
+            var isHighlight = false;
+            timer.Tick += (s, e) =>
+            {
+                if (pnlWarning.IsDisposed)
+                {
+                    timer.Stop();
+                    timer.Dispose();
+                    return;
+                }
+
+                isHighlight = !isHighlight;
+                pnlWarning.BackColor = isHighlight
+                    ? Color.FromArgb(239, 68, 68)
+                    : Color.FromArgb(220, 38, 38);
+            };
+            timer.Start();
+
+            targetPanel.Controls.Add(pnlWarning);
+            return yPos + 100;
+        }
+        private int RenderUrgentWarning(Panel targetPanel, int yPos, int panelWidth)
+        {
+            var gioDongCua = _gioHoatDongService.LayThoiDiemDongCua();
+
+            var pnlWarning = new Panel
+            {
+                Location = new Point(15, yPos + 20),
+                Size = new Size(panelWidth, 90),
+                BackColor = Color.FromArgb(220, 38, 38)
+            };
+
+            // Icon
+            var lblIcon = new Label
+            {
+                Text = "⚠️",
+                Font = new Font("Segoe UI", 32F),
+                ForeColor = Color.White,
+                Location = new Point(15, 15),
+                AutoSize = true,
+                BackColor = Color.Transparent
+            };
+            pnlWarning.Controls.Add(lblIcon);
+
+            // Warning text
+            var lblWarning = new Label
+            {
+                Text = $"ĐÃ ĐẾN GIỜ ĐÓNG CỬA!\nVui lòng thanh toán NGAY\n(Đã đóng cửa lúc {gioDongCua:HH:mm})",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.White,
+                Location = new Point(80, 12),
+                Size = new Size(panelWidth - 100, 70),
+                BackColor = Color.Transparent
+            };
+            pnlWarning.Controls.Add(lblWarning);
+
+            // Pulsing animation
+            var timer = new System.Windows.Forms.Timer { Interval = 500 };
+            var isHighlight = false;
+            timer.Tick += (s, e) =>
+            {
+                if (pnlWarning.IsDisposed)
+                {
+                    timer.Stop();
+                    timer.Dispose();
+                    return;
+                }
+
+                isHighlight = !isHighlight;
+                pnlWarning.BackColor = isHighlight
+                    ? Color.FromArgb(239, 68, 68)
+                    : Color.FromArgb(220, 38, 38);
+            };
+            timer.Start();
+
+            targetPanel.Controls.Add(pnlWarning);
+            return yPos + 90;
+        }
+
+
+        private int RenderTimerCard(Panel targetPanel, TimeSpan duration, int yPos, int panelWidth, bool isDenGioDongCua)
         {
             var hours = (int)duration.TotalHours;
             var minutes = duration.Minutes;
@@ -399,14 +669,18 @@ namespace Billiard.WinForm.Forms.QLBan
             {
                 Location = new Point(15, yPos + 20),
                 Size = new Size(panelWidth, 75),
-                BackColor = Color.FromArgb(220, 38, 38)
+                BackColor = isDenGioDongCua
+                    ? Color.FromArgb(153, 27, 27) // Đỏ đậm hơn khi đóng cửa
+                    : Color.FromArgb(220, 38, 38)
             };
 
             var lblLabel = new Label
             {
-                Text = "THỜI GIAN CHƠI",
+                Text = isDenGioDongCua ? "⚠️ THỜI GIAN TẠM TÍNH" : "THỜI GIAN CHƠI",
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                ForeColor = Color.FromArgb(254, 202, 202),
+                ForeColor = isDenGioDongCua
+                    ? Color.FromArgb(254, 202, 202)
+                    : Color.FromArgb(254, 202, 202),
                 Location = new Point(15, 12),
                 AutoSize = true,
                 BackColor = Color.Transparent
@@ -483,6 +757,57 @@ namespace Billiard.WinForm.Forms.QLBan
 
             int cardY = 12;
 
+            // ============================================================
+            // THÊM: KIỂM TRA VÀ HIỂN THỊ BADGE TẠM TÍNH
+            // ============================================================
+            var gioDongCua = _gioHoatDongService.LayThoiDiemDongCua();
+            var isDenGioDongCua = DateTime.Now >= gioDongCua && hoaDon.ThoiGianBatDau < gioDongCua;
+
+            if (isDenGioDongCua)
+            {
+                // Badge cảnh báo tạm tính
+                var pnlWarning = new Panel
+                {
+                    Location = new Point(12, cardY),
+                    Size = new Size(panelWidth - 24, 45),
+                    BackColor = Color.FromArgb(254, 243, 199) // Vàng nhạt
+                };
+
+                var lblWarningIcon = new Label
+                {
+                    Text = "⚠️",
+                    Font = new Font("Segoe UI", 18F),
+                    Location = new Point(10, 8),
+                    AutoSize = true,
+                    BackColor = Color.Transparent
+                };
+
+                var lblWarningText = new Label
+                {
+                    Text = "TẠM TÍNH - Đã đến giờ đóng cửa\nVui lòng thanh toán ngay",
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(146, 64, 14), // Cam đậm
+                    Location = new Point(50, 8),
+                    Size = new Size(panelWidth - 80, 35),
+                    BackColor = Color.Transparent
+                };
+
+                pnlWarning.Controls.AddRange(new Control[] { lblWarningIcon, lblWarningText });
+                pnlPayment.Controls.Add(pnlWarning);
+                cardY += 55;
+
+                // Tính lại tiền bàn theo giờ đóng cửa
+                var thoiGianThucTe = gioDongCua - hoaDon.ThoiGianBatDau.Value;
+                tongPhut = (int)Math.Ceiling(thoiGianThucTe.TotalMinutes);
+                soGio = (decimal)tongPhut / 60m;
+                tienBan = soGio * giaGioDecimal;
+
+                tamTinh = tienBan + tienDichVu - giamGia;
+                tongCong = Math.Ceiling((tamTinh ?? 0m) / 1000m) * 1000m;
+                chenhLech = tongCong - tamTinh;
+            }
+            // ============================================================
+
             var lblTitle = new Label
             {
                 Text = "CHI TIẾT THANH TOÁN",
@@ -523,14 +848,18 @@ namespace Billiard.WinForm.Forms.QLBan
             {
                 Location = new Point(12, cardY),
                 Size = new Size(panelWidth - 24, 42),
-                BackColor = Color.FromArgb(239, 246, 255)
+                BackColor = isDenGioDongCua
+                    ? Color.FromArgb(254, 226, 226)  // Đỏ nhạt nếu tạm tính
+                    : Color.FromArgb(239, 246, 255)   // Xanh nhạt bình thường
             };
 
             var lblTotalLabel = new Label
             {
-                Text = "TỔNG CỘNG",
+                Text = isDenGioDongCua ? "TỔNG TẠM TÍNH" : "TỔNG CỘNG",
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 64, 175),
+                ForeColor = isDenGioDongCua
+                    ? Color.FromArgb(153, 27, 27)    // Đỏ đậm
+                    : Color.FromArgb(30, 64, 175),   // Xanh đậm
                 Location = new Point(10, 11),
                 AutoSize = true
             };
@@ -555,7 +884,6 @@ namespace Billiard.WinForm.Forms.QLBan
 
             return yPos + cardY;
         }
-
         private async Task<int> RenderServiceList(Panel targetPanel, int maHd, int yPos, int panelWidth, System.Threading.CancellationToken token)
         {
             // QUAN TRỌNG: LUÔN lấy dữ liệu MỚI NHẤT từ database
@@ -683,17 +1011,57 @@ namespace Billiard.WinForm.Forms.QLBan
 
             return yPos + 72;
         }
-        private int RenderPlayingButtons(Panel targetPanel, int yPos, int panelWidth)
+        private int RenderPlayingButtons(Panel targetPanel, int yPos, int panelWidth, bool isDenGioDongCua)
         {
             var btnThemDV = CreateModernButton("Thêm dịch vụ", Color.FromArgb(59, 130, 246), panelWidth);
             btnThemDV.Location = new Point(15, yPos + 20);
             btnThemDV.Click += BtnThemDV_Click;
+
+            // Vô hiệu hóa khi đóng cửa
+            if (isDenGioDongCua)
+            {
+                btnThemDV.Enabled = false;
+                btnThemDV.BackColor = Color.FromArgb(148, 163, 184);
+                btnThemDV.Text = "⚠️ Không thể thêm dịch vụ (Đã đóng cửa)";
+            }
+
             targetPanel.Controls.Add(btnThemDV);
             yPos += 48;
 
-            var btnThanhToan = CreateModernButton("Thanh toán", Color.FromArgb(34, 197, 94), panelWidth);
+            var btnThanhToan = CreateModernButton(
+                isDenGioDongCua ? "⚠️ THANH TOÁN NGAY" : "Thanh toán",
+                Color.FromArgb(34, 197, 94),
+                panelWidth
+            );
             btnThanhToan.Location = new Point(15, yPos + 20);
             btnThanhToan.Click += BtnThanhToan_Click;
+
+            // Highlight nút thanh toán khi đóng cửa
+            if (isDenGioDongCua)
+            {
+                btnThanhToan.BackColor = Color.FromArgb(220, 38, 38);
+                btnThanhToan.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+
+                // Pulsing effect
+                var timer = new System.Windows.Forms.Timer { Interval = 500 };
+                var isHighlight = false;
+                timer.Tick += (s, e) =>
+                {
+                    if (btnThanhToan.IsDisposed)
+                    {
+                        timer.Stop();
+                        timer.Dispose();
+                        return;
+                    }
+
+                    isHighlight = !isHighlight;
+                    btnThanhToan.BackColor = isHighlight
+                        ? Color.FromArgb(239, 68, 68)
+                        : Color.FromArgb(220, 38, 38);
+                };
+                timer.Start();
+            }
+
             targetPanel.Controls.Add(btnThanhToan);
             yPos += 48;
 
@@ -976,72 +1344,102 @@ namespace Billiard.WinForm.Forms.QLBan
             var result = MessageBox.Show("Bạn có chắc muốn xóa dịch vụ này?", "Xác nhận",
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
-            if (result == DialogResult.Yes)
-            {
-                try
-                {
-                    var success = await _hoaDonService.RemoveServiceFromInvoiceAsync(chiTietId);
-                    if (success)
-                    {
-                        MessageBox.Show("Đã xóa dịch vụ thành công!", "Thông báo",
-                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+            if (result != DialogResult.Yes) return;
 
-                        // Đợi database commit
-                        await Task.Delay(200);
-
-                        // Lấy dữ liệu mới từ database
-                        var newBan = await _banBiaService.GetTableByIdAsync(_ban.MaBan);
-                        if (newBan != null)
-                        {
-                            _ban = newBan;
-                        }
-
-                        // Force reload để lấy danh sách dịch vụ mới
-                        await LoadBanDetail(forceReload: true);
-
-                        // Trigger event
-                        OnDataChanged?.Invoke(this, EventArgs.Empty);
-                    }
-                    else
-                    {
-                        ShowError("Không thể xóa dịch vụ!");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    ShowError($"Lỗi: {ex.Message}");
-                }
-            }
-        }
-
-
-        private async void BtnBatDau_Click(object sender, EventArgs e)
-        {
             try
             {
+                // Disable button để tránh double-click
+                btn.Enabled = false;
                 this.Cursor = Cursors.WaitCursor;
-                var result = await _banBiaService.StartTableAsync(_ban.MaBan, _maNV);
-                this.Cursor = Cursors.Default;
 
-                if (result)
+                var success = await _hoaDonService.RemoveServiceFromInvoiceAsync(chiTietId);
+
+                if (success)
                 {
-                    MessageBox.Show($"Đã bắt đầu chơi tại {_ban.TenBan}", "Thành công",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // Đợi DB commit
+                    await Task.Delay(100);
 
+                    // Cập nhật data
+                    var newBan = await _banBiaService.GetTableByIdAsync(_ban.MaBan);
+                    if (newBan != null) _ban = newBan;
+
+                    // Force reload để lấy dữ liệu mới
+                    await LoadBanDetail(forceReload: true);
                     OnDataChanged?.Invoke(this, EventArgs.Empty);
-                    await LoadBanDetail();
+
+                    MessageBox.Show("Đã xóa dịch vụ!", "Thành công",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 else
                 {
-                    ShowError("Không thể bắt đầu chơi! Vui lòng kiểm tra lại.");
+                    ShowError("Không thể xóa dịch vụ!");
                 }
             }
             catch (Exception ex)
             {
-                this.Cursor = Cursors.Default;
                 ShowError($"Lỗi: {ex.Message}");
             }
+            finally
+            {
+                btn.Enabled = true;
+                this.Cursor = Cursors.Default;
+            }
         }
+        private async void BtnBatDau_Click(object sender, EventArgs e)
+{
+    try
+    {
+        this.Cursor = Cursors.WaitCursor;
+        
+        // Lần gọi đầu tiên - kiểm tra cảnh báo
+        var result = await _banBiaService.StartTableAsync(_ban.MaBan, _maNV);
+        
+        this.Cursor = Cursors.Default;
+
+        // Nếu cần xác nhận từ user
+        if (result.needConfirmation)
+        {
+            var confirmResult = MessageBox.Show(
+                result.message,
+                "Cảnh báo",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning);
+
+            if (confirmResult == DialogResult.Yes)
+            {
+                // Gọi lại với skipWarning = true
+                this.Cursor = Cursors.WaitCursor;
+                result = await _banBiaService.StartTableAsync(_ban.MaBan, _maNV, skipWarning: true);
+                this.Cursor = Cursors.Default;
+            }
+            else
+            {
+                return; // User hủy
+            }
+        }
+
+        if (result.isSuccess)
+        {
+            MessageBox.Show($"Đã bắt đầu chơi tại {_ban.TenBan}", "Thành công",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            OnDataChanged?.Invoke(this, EventArgs.Empty);
+            await LoadBanDetail();
+        }
+        else
+        {
+            if (!result.needConfirmation) // Chỉ hiện error nếu không phải confirmation
+            {
+                ShowError(result.message);
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        this.Cursor = Cursors.Default;
+        ShowError($"Lỗi: {ex.Message}");
+    }
+}
 
         private async void BtnCancel_Click(object sender, EventArgs e)
         {
@@ -1144,7 +1542,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 var hoaDon = await _banBiaService.GetActiveInvoiceAsync(_ban.MaBan);
                 if (hoaDon == null)
                 {
-                    ShowError("Không tìm thấy hóa đơn đang hoạt động!");
+                    ShowError("Không tìm thấy hóa đơn!");
                     return;
                 }
 
@@ -1156,38 +1554,29 @@ namespace Billiard.WinForm.Forms.QLBan
 
                     if (result == DialogResult.OK)
                     {
-                        try
-                        {
-                            // QUAN TRỌNG: Đợi một chút để đảm bảo database đã commit
-                            await Task.Delay(200);
+                        this.Cursor = Cursors.WaitCursor;
 
-                            // Lấy dữ liệu bàn mới nhất từ database
-                            var newBan = await _banBiaService.GetTableByIdAsync(_ban.MaBan);
-                            if (newBan != null)
-                            {
-                                _ban = newBan;
-                            }
+                        // Đợi DB commit
+                        await Task.Delay(100);
 
-                            // Force reload = true để bắt buộc refresh toàn bộ UI
-                            // Điều này sẽ gọi RenderServiceList và lấy chiTietList mới
-                            await LoadBanDetail(forceReload: true);
+                        // Lấy data mới
+                        var newBan = await _banBiaService.GetTableByIdAsync(_ban.MaBan);
+                        if (newBan != null) _ban = newBan;
 
-                            // Trigger event để parent form cũng cập nhật
-                            OnDataChanged?.Invoke(this, EventArgs.Empty);
-                        }
-                        catch (Exception ex)
-                        {
-                            ShowError($"Lỗi khi cập nhật: {ex.Message}");
-                        }
+                        // Force reload
+                        await LoadBanDetail(forceReload: true);
+                        OnDataChanged?.Invoke(this, EventArgs.Empty);
+
+                        this.Cursor = Cursors.Default;
                     }
                 }
             }
             catch (Exception ex)
             {
-                ShowError($"Lỗi khi thêm dịch vụ: {ex.Message}");
+                this.Cursor = Cursors.Default;
+                ShowError($"Lỗi: {ex.Message}");
             }
         }
-
         private async void BtnThanhToan_Click(object sender, EventArgs e)
         {
             try

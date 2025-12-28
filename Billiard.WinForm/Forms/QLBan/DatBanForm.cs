@@ -577,7 +577,6 @@ namespace Billiard.WinForm.Forms.QLBan
                     return;
                 }
 
-                // Validate số điện thoại
                 if (!System.Text.RegularExpressions.Regex.IsMatch(txtSoDienThoai.Text, @"^0\d{9,10}$"))
                 {
                     MessageBox.Show("Số điện thoại không hợp lệ!", "Thông báo",
@@ -586,7 +585,9 @@ namespace Billiard.WinForm.Forms.QLBan
                     return;
                 }
 
-                // 3. Xây dựng và Validate Thời gian
+                // ============================================================
+                // 3. XÂY DỰNG VÀ VALIDATE THỜI GIAN - LOGIC MỚI RÕ RÀNG HẠN
+                // ============================================================
                 var gioBatDau = new DateTime(
                     dtpNgayDat.Value.Year,
                     dtpNgayDat.Value.Month,
@@ -605,64 +606,85 @@ namespace Billiard.WinForm.Forms.QLBan
                     0
                 );
 
-                // Nếu giờ kết thúc nhỏ hơn giờ bắt đầu (đặt qua đêm)
+                // Xử lý đặt qua đêm (nếu giờ kết thúc <= giờ bắt đầu thì cộng thêm 1 ngày)
                 if (gioKetThuc <= gioBatDau)
                 {
                     gioKetThuc = gioKetThuc.AddDays(1);
-                    if (gioKetThuc <= gioBatDau)
-                    {
-                        MessageBox.Show("Giờ kết thúc phải sau giờ bắt đầu!", "Thông báo",
-                           MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
                 }
 
-                // Ràng buộc 3a: Thời gian đặt bàn phải sau thời gian hiện tại (không đặt cho quá khứ)
-                // Dùng AddMinutes(5) để đảm bảo không bị lỗi time-sync
+                // ============================================================
+                // RÀNG BUỘC GIỜ HOẠT ĐỘNG: 8h SÁNG → 2h SÁNG HÔM SAU
+                // ============================================================
+
+                // a) Không cho đặt cho quá khứ
                 if (gioBatDau <= DateTime.Now.AddMinutes(5))
                 {
-                    MessageBox.Show("Thời gian đặt bàn phải sau thời gian hiện tại!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(
+                        "⏰ Thời gian đặt bàn phải sau thời gian hiện tại ít nhất 5 phút!",
+                        "Lỗi thời gian",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                     return;
                 }
 
-                // Định nghĩa khung giờ hoạt động: 8:00 sáng đến 2:00 sáng hôm sau
-                var thoiDiemBatDauHoatDong = new DateTime(gioBatDau.Year, gioBatDau.Month, gioBatDau.Day, 8, 0, 0);
-                var thoiDiemKetThucHoatDong = thoiDiemBatDauHoatDong.AddDays(1).AddHours(-6); // 2:00 sáng hôm sau
+                // b) Xác định khung giờ hoạt động của ngày đặt bàn
+                // Ví dụ: Ngày 26/12/2025, giờ hoạt động là:
+                // - Từ 8:00 sáng 26/12/2025
+                // - Đến 2:00 sáng 27/12/2025
+                var ngayBatDau = gioBatDau.Date;
+                var gioMoCua = new DateTime(ngayBatDau.Year, ngayBatDau.Month, ngayBatDau.Day, 8, 0, 0);
+                var gioDongCua = gioMoCua.AddDays(1).AddHours(-6); // 2h sáng hôm sau = 8h + 18h
 
-                // Điều chỉnh thoiDiemBatDauHoatDong nếu gioBatDau nằm trong khoảng 00:00 - 02:00
-                if (gioBatDau < thoiDiemBatDauHoatDong && gioBatDau < thoiDiemKetThucHoatDong.AddDays(-1).AddHours(2))
+                // c) Nếu giờ bắt đầu nằm trong khoảng 00:00 → 02:00, 
+                //    nó thuộc ca làm việc của ngày hôm trước
+                if (gioBatDau.Hour >= 0 && gioBatDau.Hour < 2)
                 {
-                    thoiDiemBatDauHoatDong = thoiDiemBatDauHoatDong.AddDays(-1);
+                    gioMoCua = gioMoCua.AddDays(-1);
+                    gioDongCua = gioDongCua.AddDays(-1);
                 }
 
-                // Ràng buộc 3b: Giờ bắt đầu phải nằm trong khung (8:00 - 2:00 sáng hôm sau)
-                if (gioBatDau < thoiDiemBatDauHoatDong || gioBatDau >= thoiDiemKetThucHoatDong)
+                // d) Kiểm tra giờ bắt đầu có nằm trong khung giờ hoạt động không
+                if (gioBatDau < gioMoCua || gioBatDau >= gioDongCua)
                 {
-                    MessageBox.Show("Thời gian bắt đầu đặt bàn nằm ngoài khung giờ cho phép (8:00 sáng - 2:00 sáng hôm sau)!",
-                        "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(
+                        $"⚠️ Giờ bắt đầu phải nằm trong khung:\n" +
+                        $"• Từ {gioMoCua:HH:mm dd/MM/yyyy}\n" +
+                        $"• Đến {gioDongCua:HH:mm dd/MM/yyyy}\n\n" +
+                        $"(Giờ hoạt động: 8h sáng → 2h sáng hôm sau)",
+                        "Ngoài giờ hoạt động",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                     return;
                 }
 
-                // Ràng buộc 3c: Giờ kết thúc không được sau 2:00 sáng hôm sau
-                if (gioKetThuc > thoiDiemKetThucHoatDong)
+                // e) Không cho đặt bàn mới SAU 1h SÁNG (còn 1h trước khi đóng cửa)
+                var gioiHanDatMoi = gioDongCua.AddHours(-1); // 1:00 sáng
+                if (gioBatDau >= gioiHanDatMoi)
                 {
-                    MessageBox.Show("Giờ kết thúc đặt bàn không được sau 2:00 sáng hôm sau!",
-                        "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(
+                        $"⚠️ Hệ thống không cho phép đặt bàn mới sau {gioiHanDatMoi:HH:mm}!\n\n" +
+                        $"(Phải đặt trước giờ đóng cửa ít nhất 1 tiếng)",
+                        "Quá muộn để đặt bàn",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                     return;
                 }
 
-                // Ràng buộc 3d: Giới hạn đặt bàn mới (trước 1:00 sáng hôm sau)
-                var thoiDiemGioiHanDatMoi = thoiDiemBatDauHoatDong.AddDays(1).AddHours(-7); // 1:00 sáng hôm sau
-
-                if (gioBatDau >= thoiDiemGioiHanDatMoi)
+                // f) Giờ kết thúc không được vượt quá giờ đóng cửa
+                if (gioKetThuc > gioDongCua)
                 {
-                    MessageBox.Show("Hệ thống không cho phép đặt bàn mới sau 1:00 sáng hôm sau!",
-                        "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(
+                        $"⚠️ Giờ kết thúc không được sau {gioDongCua:HH:mm dd/MM/yyyy}!\n\n" +
+                        $"(Quán đóng cửa lúc 2h sáng)",
+                        "Vượt quá giờ đóng cửa",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                     return;
                 }
 
-                // 4. Kiểm tra lại tính khả dụng của bàn (Phòng trường hợp người khác vừa đặt)
+                // ============================================================
+                // 4. KIỂM TRA LẠI TÍNH KHẢ DỤNG CỦA BÀN
+                // ============================================================
                 var isReserved = await _datBanService.IsTableReservedAsync(
                     _selectedTable.MaBan,
                     gioBatDau,
@@ -671,14 +693,19 @@ namespace Billiard.WinForm.Forms.QLBan
 
                 if (isReserved)
                 {
-                    MessageBox.Show("Bàn này đã được đặt trong khoảng thời gian này! (Vui lòng chọn bàn khác hoặc làm mới)", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    await LoadAvailableTablesForReservation(); // Tải lại danh sách
+                    MessageBox.Show(
+                        "❌ Bàn này đã được đặt trong khoảng thời gian này!\n\n" +
+                        "Vui lòng chọn bàn khác hoặc làm mới danh sách.",
+                        "Bàn đã được đặt",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    await LoadAvailableTablesForReservation();
                     return;
                 }
 
-                // 5. Thực hiện Đặt bàn
-                // Sửa lỗi: Gọi đúng _datBanService và truyền đủ 6 tham số
+                // ============================================================
+                // 5. THỰC HIỆN ĐẶT BÀN
+                // ============================================================
                 var success = await _datBanService.ReserveTableAsync(
                     _selectedTable.MaBan,
                     _maKhachHang,
@@ -691,21 +718,33 @@ namespace Billiard.WinForm.Forms.QLBan
 
                 if (success)
                 {
-                    MessageBox.Show("Đặt bàn thành công!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(
+                        "✓ Đặt bàn thành công!\n\n" +
+                        $"Bàn: {_selectedTable.TenBan}\n" +
+                        $"Thời gian: {gioBatDau:HH:mm dd/MM} → {gioKetThuc:HH:mm dd/MM}",
+                        "Thành công",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+
                     this.DialogResult = DialogResult.OK;
                     this.Close();
                 }
                 else
                 {
-                    MessageBox.Show("Không thể đặt bàn. Vui lòng thử lại!", "Lỗi",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(
+                        "❌ Không thể đặt bàn. Vui lòng thử lại!",
+                        "Lỗi",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Lỗi khi đặt bàn: {ex.Message}", "Lỗi",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    $"❌ Lỗi khi đặt bàn:\n{ex.Message}",
+                    "Lỗi",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 

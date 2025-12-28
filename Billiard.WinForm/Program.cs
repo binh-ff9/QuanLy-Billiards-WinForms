@@ -94,6 +94,7 @@ namespace Billiard.WinForm
             // BanBia services (Transient)
             services.AddTransient<BanBiaService>();
             services.AddTransient<DatBanService>();
+            services.AddTransient<GioHoatDongService>();
             services.AddTransient<LoaiBanService>();
             services.AddTransient<KhuVucService>();
 
