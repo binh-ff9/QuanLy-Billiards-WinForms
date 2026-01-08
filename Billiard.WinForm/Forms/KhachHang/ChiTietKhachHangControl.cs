@@ -14,8 +14,7 @@ namespace Billiard.WinForm.Forms.KhachHang
         public event EventHandler<int> OnEditClick;
         public event EventHandler<int> OnDeleteClick;
         public event EventHandler OnCloseClick;
-
-
+        public event EventHandler<string> OnRequestViewHistory;
         private bool _isDeletedUser = false;
 
         private Button btnDeleteAction;
@@ -172,17 +171,15 @@ namespace Billiard.WinForm.Forms.KhachHang
 
             var pnlStats = new TableLayoutPanel 
             { 
-                Height = 80, 
+                Height = 70, 
                 ColumnCount = 2, 
                 RowCount = 1, 
                 Margin = new Padding(0, 0, 0, 20) ,
 
-                Width = pnlContainer.ClientSize.Width - 40,
             };
             pnlStats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             pnlStats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
          
-            tongTien = 1222;
             pnlStats.Controls.Add(CreateStatBox("💰 Tổng chi tiêu", $"{tongTien:N0}đ", Color.FromArgb(22, 163, 74)), 0, 0);
             pnlStats.Controls.Add(CreateStatBox("🏆 Số lần đến", $"{soLanDen} lần", Color.FromArgb(234, 179, 8)), 1, 0);
 
@@ -229,10 +226,7 @@ namespace Billiard.WinForm.Forms.KhachHang
 
             btnViewAll.Click += (s, e) =>
             { // Ý tưởng là ấn vào sẽ lấy id khach hang do rồi chuyển sang tab hóa đơn tự điền số điện thoại và lọc tất cả
-
-
-                //var historyForm = new LichSuGiaoDichForm(_currentMaKh);
-                //historyForm.ShowDialog(); // ShowDialog để hiện dạng popup, người dùng phải tắt form này mới quay lại được
+                OnRequestViewHistory?.Invoke(this, kh.Sdt);
             };
 
             pnlHistoryHeader.Controls.Add(lblHistoryTitle);
@@ -262,11 +256,11 @@ namespace Billiard.WinForm.Forms.KhachHang
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.FromArgb(248, 250, 252),
-                Margin = new Padding(5)
+                Margin = new Padding(0,5,0,5)
             }; // Nền xám nhạt
                                                                                                       // Có thể thêm bo góc ở đây nếu muốn
 
-            var lblVal = new Label { Text = value, Font = new Font("Segoe UI", 14, FontStyle.Bold), ForeColor = color, Dock = DockStyle.Bottom, TextAlign = ContentAlignment.MiddleCenter, Height = 30 };
+            var lblVal = new Label { Text = value, Font = new Font("Segoe UI", 14, FontStyle.Bold), ForeColor = Color.Black, Dock = DockStyle.Top, TextAlign = ContentAlignment.MiddleCenter, Height = 30 };
             var lblTit = new Label { Text = title, Font = new Font("Segoe UI", 9, FontStyle.Regular), ForeColor = Color.Gray, Dock = DockStyle.Top, TextAlign = ContentAlignment.MiddleCenter, Height = 25 };
 
             pnl.Controls.Add(lblVal);
@@ -274,15 +268,6 @@ namespace Billiard.WinForm.Forms.KhachHang
 
             return pnl;
         }
-
-        private void AddInfoRow(Panel pnl, string label, string value, int y)
-        {
-            var lblL = new Label { Text = label, ForeColor = Color.Gray, Location = new Point(0, y), AutoSize = true };
-            var lblV = new Label { Text = value, ForeColor = Color.Black, Location = new Point(100, y), AutoSize = true, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
-            pnl.Controls.Add(lblL);
-            pnl.Controls.Add(lblV);
-        }
-
         private Panel CreateHistoryRow(Billiard.DAL.Entities.HoaDon hd)
         {
             var pnl = new Panel { Height = 50, BackColor = Color.White, Margin = new Padding(0, 0, 0, 5) };

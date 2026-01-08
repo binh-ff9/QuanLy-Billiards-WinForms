@@ -21,6 +21,20 @@ namespace Billiard.WinForm.Forms.KhachHang
 
         private bool _isShowDeletedMode = false;
 
+        public event EventHandler<string> OnSwitchToHoaDonTab;
+
+        private int _currentPage = 1;
+        private int _pageSize = 8;
+        private int _totalRecords = 0;
+
+        private Panel pnlPagination;
+        private FlowLayoutPanel flowPageNumbers; // Panel chứa các nút số (1, 2, 3...)
+        private Button btnFirst; // Nút Về đầu <<
+        private Button btnLast;  // Nút Về cuối >>
+        private Button btnPrev;  // Nút Trước <
+        private Button btnNext;  // Nút Sau >
+
+
         public KhachHangForm(KhachHangService khService)
         {
             InitializeComponent();
@@ -32,8 +46,11 @@ namespace Billiard.WinForm.Forms.KhachHang
             // Đăng ký sự kiện
             this.Load += async (s, e) => await LoadDataAsync();
 
-            txtSearch.TextChanged += async (s, e) => await LoadDataAsync();
-
+            txtSearch.TextChanged += async (s, e) =>
+            {
+                _currentPage = 1;
+                await LoadDataAsync();
+            };
 
             if (btnXuatBaoCao != null) btnXuatBaoCao.Click += btnXuatBaoCao_Click;
 
@@ -46,6 +63,7 @@ namespace Billiard.WinForm.Forms.KhachHang
             _mainForm = main;
         }
 
+        #region SETUP UI
         private void SetupUI()
         {
             // Cấu hình FlowLayoutPanel đẹp bằng code
@@ -54,44 +72,292 @@ namespace Billiard.WinForm.Forms.KhachHang
             flowLayoutPanel1.BackColor = Color.FromArgb(241, 245, 249); // Màu nền xám nhạt hiện đại
             flowLayoutPanel1.Padding = new Padding(20); // Cách lề xung quanh
             flowLayoutPanel1.Dock = DockStyle.Fill;
+
+            SetupPaginationUI();
         }
+
+        private void SetupPaginationUI()
+        {
+            // 1. Panel tổng chứa thanh phân trang
+            pnlPagination = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 60, // Cao hơn chút cho thoáng
+                BackColor = Color.White,
+                Padding = new Padding(10) // Cách lề
+            };
+
+            // 2. FlowLayout ở giữa để chứa các nút số
+            flowPageNumbers = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                Anchor = AnchorStyles.None, // Căn giữa
+                BackColor = Color.Transparent
+            };
+            // Hack căn giữa FlowLayout trong Panel: Ta sẽ tính toán vị trí sau hoặc dùng TableLayout
+            // Nhưng đơn giản nhất là đặt nó vào giữa Form thủ công một chút ở sự kiện Resize
+
+            // Tạo các nút điều hướng (Style đẹp)
+            btnFirst = CreateNavButton("«", async () => await GoToPage(1));
+            btnPrev = CreateNavButton("❮", async () => await GoToPage(_currentPage - 1));
+            btnNext = CreateNavButton("❯", async () => await GoToPage(_currentPage + 1));
+
+            // Lưu ý: Nút Last sẽ cần tính toán tổng trang mới biết được, ta để placeholder
+            btnLast = CreateNavButton("»", async () =>
+            {
+                int totalPages = (int)Math.Ceiling((double)_totalRecords / _pageSize);
+                await GoToPage(totalPages);
+            });
+
+            // Thêm vào Panel (Dùng TableLayoutPanel để căn giữa cho chuẩn)
+            var containerTable = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 3,
+                RowCount = 1,
+                BackColor = Color.Transparent
+            };
+            containerTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); // Khoảng trống trái
+            containerTable.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));    // Nội dung chính
+            containerTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); // Khoảng trống phải
+
+            // Panel chứa tất cả nút: [<<] [<] [1] [2] ... [>] [>>]
+            var centerPanel = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false
+            };
+
+            centerPanel.Controls.Add(btnFirst);
+            centerPanel.Controls.Add(btnPrev);
+            centerPanel.Controls.Add(flowPageNumbers); // Các nút số sẽ được add vào đây
+            centerPanel.Controls.Add(btnNext);
+            centerPanel.Controls.Add(btnLast);
+
+            containerTable.Controls.Add(centerPanel, 1, 0); // Add vào cột giữa
+
+            pnlPagination.Controls.Add(containerTable);
+
+            this.Controls.Add(pnlPagination);
+            pnlPagination.BringToFront();
+        }
+
+        // Hàm hỗ trợ tạo nút điều hướng nhanh
+        private Button CreateNavButton(string text, Action onClick)
+        {
+            var btn = new Button
+            {
+                Text = text,
+                Size = new Size(45, 36), // Vuông vắn
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(64, 64, 64),
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(2) // Cách nhau 2px
+            };
+            btn.FlatAppearance.BorderSize = 1;
+            btn.FlatAppearance.BorderColor = Color.FromArgb(224, 224, 224); // Viền xám nhạt
+            btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(243, 244, 246); // Hover màu xám nhẹ
+
+            btn.Click += (s, e) => onClick();
+            return btn;
+        }
+
+        // Hàm chuyển trang
+        private async Task GoToPage(int page)
+        {
+            int totalPages = (int)Math.Ceiling((double)_totalRecords / _pageSize);
+            if (totalPages == 0) totalPages = 1;
+
+            if (page < 1 || page > totalPages) return;
+            if (page == _currentPage) return;
+
+            _currentPage = page;
+            await LoadDataAsync();
+        }
+        private void RenderPagination()
+        {
+            flowPageNumbers.SuspendLayout();
+            flowPageNumbers.Controls.Clear();
+
+            int totalPages = (int)Math.Ceiling((double)_totalRecords / _pageSize);
+            if (totalPages == 0) totalPages = 1;
+
+            // Cập nhật trạng thái nút điều hướng
+            btnFirst.Enabled = btnPrev.Enabled = (_currentPage > 1);
+            btnNext.Enabled = btnLast.Enabled = (_currentPage < totalPages);
+
+            // Đổi màu nút disable cho đẹp
+            StyleDisabledButton(btnFirst);
+            StyleDisabledButton(btnPrev);
+            StyleDisabledButton(btnNext);
+            StyleDisabledButton(btnLast);
+
+
+            // --- THUẬT TOÁN HIỂN THỊ TRANG ---
+            // Luôn hiện trang 1 và trang cuối.
+            // Hiện các trang xung quanh trang hiện tại (delta = 2)
+
+            int delta = 2; // Số lượng trang hiển thị bên cạnh trang hiện tại
+            int left = _currentPage - delta;
+            int right = _currentPage + delta;
+
+            // Danh sách các trang sẽ hiển thị
+            var range = new System.Collections.Generic.List<int>();
+            var rangeWithDots = new System.Collections.Generic.List<object>(); // int hoặc string "..."
+
+            for (int i = 1; i <= totalPages; i++)
+            {
+                if (i == 1 || i == totalPages || (i >= left && i <= right))
+                {
+                    range.Add(i);
+                }
+            }
+
+            // Thêm dấu "..."
+            int? prev = null;
+            foreach (var i in range)
+            {
+                if (prev != null)
+                {
+                    if (i - prev == 2)
+                    {
+                        rangeWithDots.Add(prev + 1); // Nếu cách nhau 1 số thì hiện luôn số đó (vd: 1 [2] 3)
+                    }
+                    else if (i - prev > 1)
+                    {
+                        rangeWithDots.Add("..."); // Nếu cách xa thì hiện ...
+                    }
+                }
+                rangeWithDots.Add(i);
+                prev = i;
+            }
+
+            // --- VẼ NÚT ---
+            foreach (var item in rangeWithDots)
+            {
+                if (item is string)
+                {
+                    // Vẽ label "..."
+                    var lbl = new Label
+                    {
+                        Text = "...",
+                        AutoSize = false,
+                        Size = new Size(30, 36),
+                        TextAlign = ContentAlignment.BottomCenter,
+                        Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                        ForeColor = Color.Gray,
+                        Margin = new Padding(0, 0, 0, 5) // Căn chỉnh cho khớp button
+                    };
+                    flowPageNumbers.Controls.Add(lbl);
+                }
+                else
+                {
+                    // Vẽ nút số
+                    int pageNum = (int)item;
+                    var btn = new Button
+                    {
+                        Text = pageNum.ToString(),
+                        Size = new Size(45, 36),
+                        FlatStyle = FlatStyle.Flat,
+                        Cursor = Cursors.Hand,
+                        Font = new Font("Segoe UI", 10, FontStyle.Regular),
+                        Margin = new Padding(2)
+                    };
+
+                    if (pageNum == _currentPage)
+                    {
+                        // Style cho trang hiện tại (Màu xanh, chữ trắng)
+                        btn.BackColor = Color.FromArgb(99, 102, 241); // Xanh tím Indigo
+                        btn.ForeColor = Color.White;
+                        btn.FlatAppearance.BorderSize = 0;
+                    }
+                    else
+                    {
+                        // Style cho trang khác (Màu trắng, chữ đen)
+                        btn.BackColor = Color.White;
+                        btn.ForeColor = Color.Black;
+                        btn.FlatAppearance.BorderSize = 1;
+                        btn.FlatAppearance.BorderColor = Color.FromArgb(224, 224, 224);
+                        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(243, 244, 246);
+
+                        // Sự kiện click
+                        btn.Click += async (s, e) => await GoToPage(pageNum);
+                    }
+
+                    flowPageNumbers.Controls.Add(btn);
+                }
+            }
+
+            flowPageNumbers.ResumeLayout();
+        }
+
+        private void StyleDisabledButton(Button btn)
+        {
+            if (btn.Enabled)
+            {
+                btn.BackColor = Color.White;
+                btn.ForeColor = Color.FromArgb(64, 64, 64);
+                btn.FlatAppearance.BorderColor = Color.FromArgb(224, 224, 224);
+            }
+            else
+            {
+                btn.BackColor = Color.FromArgb(248, 250, 252); // Xám rất nhạt
+                btn.ForeColor = Color.LightGray; // Chữ mờ
+                btn.FlatAppearance.BorderColor = Color.FromArgb(241, 245, 249);
+            }
+        }
+
+
+        #endregion
 
         private async Task LoadDataAsync()
         {
             try
             {
                 this.Cursor = Cursors.WaitCursor;
-                // Tạm dừng vẽ giao diện để load nhanh hơn
                 flowLayoutPanel1.SuspendLayout();
                 flowLayoutPanel1.Controls.Clear();
 
-                // 1. Lấy dữ liệu từ Service
                 string keyword = txtSearch.Text.Trim();
-                var listKH = await _khService.GetListKhachHangAsync(keyword, _currentRankFilter, _isShowDeletedMode);
+
+                // 1. GỌI SERVICE (Giả sử bạn đã sửa Service trả về Tuple như Bước 1)
+                // Nếu Service chưa sửa, bạn phải sửa Service trước nhé!
+                var result = await _khService.GetListKhachHangPagingAsync(
+                    keyword,
+                    _currentRankFilter,
+                    _isShowDeletedMode,
+                    _currentPage,
+                    _pageSize
+                );
+
+                var listKH = result.Data;      // Danh sách khách hàng trang hiện tại
+                _totalRecords = result.TotalCount; // Tổng số bản ghi tìm thấy
+
+                RenderPagination();
+                // 2. CẬP NHẬT UI PHÂN TRANG
+                //UpdatePaginationControls();
 
                 if (listKH == null || listKH.Count == 0)
                 {
-                    ShowEmptyState(); // Hiện thông báo nếu không có dữ liệu
+                    ShowEmptyState();
                 }
                 else
                 {
-                    // 2. Tạo Card cho từng khách hàng
                     foreach (var kh in listKH)
                     {
-                        // Tạo UserControl Card
                         var card = new KhachHangCard();
                         card.SetData(kh);
-                        card.Margin = new Padding(0, 0, 20, 20); // Khoảng cách giữa các thẻ
+                        card.Margin = new Padding(0, 0, 20, 20);
 
-                        // Xử lý sự kiện Click vào Card -> Hiện chi tiết
+                        // Gán sự kiện click (Giữ nguyên code cũ)
                         card.Click += (s, e) => ShowDetail(kh.MaKh);
-
-                        // Mẹo: Khi click vào các thành phần con trong card (Label, Panel...)
-                        // thì sự kiện cũng phải nổ. Code này gán đệ quy click cho mọi con.
                         foreach (Control child in card.Controls)
-                        {
                             child.Click += (s, e) => ShowDetail(kh.MaKh);
-                        }
 
                         flowLayoutPanel1.Controls.Add(card);
                     }
@@ -103,7 +369,6 @@ namespace Billiard.WinForm.Forms.KhachHang
             }
             finally
             {
-                // Tiếp tục vẽ và phục hồi con trỏ chuột
                 flowLayoutPanel1.ResumeLayout();
                 this.Cursor = Cursors.Default;
             }
@@ -152,7 +417,6 @@ namespace Billiard.WinForm.Forms.KhachHang
                         {
                             HideDetailPanel();
                         };
-
                         detailControl.OnDeleteClick += async (s, id) =>
                         {
                             string actionName = _isShowDeletedMode ? "Khôi phục" : "Xóa";
@@ -171,6 +435,11 @@ namespace Billiard.WinForm.Forms.KhachHang
                                 }
                                 MessageBox.Show("Thao tác thành công!");
                             }
+                        };
+                        detailControl.OnRequestViewHistory += (s, sdt) =>
+                        {
+                            HideDetailPanel();
+                            OnSwitchToHoaDonTab?.Invoke(this, sdt);
                         };
                         ShowRightPanel(detailControl,375);
                     }
@@ -251,6 +520,7 @@ namespace Billiard.WinForm.Forms.KhachHang
                     btn.ForeColor = Color.White;
 
                     // 3. Tải lại dữ liệu
+                    _currentPage = 1;
                     LoadDataAsync();
                 };
             }
@@ -350,7 +620,7 @@ namespace Billiard.WinForm.Forms.KhachHang
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Lỗi xuất file: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                //MessageBox.Show("Lỗi xuất file: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         // GET :: RankNAme

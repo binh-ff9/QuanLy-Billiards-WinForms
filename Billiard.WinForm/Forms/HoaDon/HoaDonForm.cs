@@ -180,6 +180,15 @@ namespace Billiard.WinForm.Forms.HoaDon
 
         }
 
+        // Hỗ trợ  bên tab Khách Hàng
+        public void FilterBySdt(string sdt)
+        {
+            txtSearch.Text = sdt;
+
+            txtSearch.Focus();
+            txtSearch.SelectAll();
+        }
+
         #endregion
 
         // Cấu hình bảng
