@@ -61,7 +61,6 @@ namespace Billiard.WinForm.Forms.KhachHang
             try
             {
                 this.Cursor = Cursors.WaitCursor;
-
                 // Tạm dừng vẽ giao diện để load nhanh hơn
                 flowLayoutPanel1.SuspendLayout();
                 flowLayoutPanel1.Controls.Clear();
@@ -126,7 +125,9 @@ namespace Billiard.WinForm.Forms.KhachHang
             flowLayoutPanel1.Controls.Add(lblEmpty);
         }
 
-        // Xem Chi Tiết
+        #region Right Panel Container
+
+        // Xem Chi Tiết Khi click on Card KhachHang
         private async void ShowDetail(int maKh)
         {
             try
@@ -135,16 +136,21 @@ namespace Billiard.WinForm.Forms.KhachHang
                 {
                     var tempService = scope.ServiceProvider.GetRequiredService<KhachHangService>();
                     var detail = await tempService.GetKhachHangDetailAsync(maKh);
-
                     if (detail != null && _mainForm != null)
                     {
                         var detailControl = new ChiTietKhachHangControl();
+
+                        detailControl.Dock = DockStyle.Fill;
+
                         detailControl.LoadData(detail);
 
                         detailControl.OnEditClick += (s, id) =>
                         {
-                            // Gọi hàm sửa (Hàm này mình viết ở dưới)
                             EditKhachHang(id);
+                        };
+                        detailControl.OnCloseClick += (s, id) =>
+                        {
+                            HideDetailPanel();
                         };
 
                         detailControl.OnDeleteClick += async (s, id) =>
@@ -163,16 +169,10 @@ namespace Billiard.WinForm.Forms.KhachHang
                                     // Nếu đang xem list Active (_isShowDeletedMode = false) -> Cần set Active = false (Xóa)
                                     await svc.ToggleStatusAsync(id, _isShowDeletedMode);
                                 }
-
-                                // Tải lại danh sách và đóng panel
-                                await LoadDataAsync();
-                                _mainForm.HideDetailPanel();
-
                                 MessageBox.Show("Thao tác thành công!");
                             }
                         };
-                        // Gọi MainForm mở Panel phải (Rộng 500px cho đẹp)
-                        _mainForm.UpdateDetailPanel("Thông tin khách hàng", detailControl, 500);
+                        ShowRightPanel(detailControl,375);
                     }
                 }
             }
@@ -182,6 +182,26 @@ namespace Billiard.WinForm.Forms.KhachHang
             }
         }
 
+
+        private void ShowRightPanel(UserControl userControl, int width = 350)
+        {
+            pnlRightContainer.Width = width;
+
+            pnlRightContainer.Controls.Clear();
+
+            pnlRightContainer.Controls.Add(userControl);
+
+            pnlRightContainer.Visible = true;
+        }
+        
+        private void HideDetailPanel()
+        {
+            pnlRightContainer.Visible = false;
+            pnlRightContainer.Controls.Clear();
+        }
+
+
+        #endregion
         private async void EditKhachHang(int maKh)
         {
             using (var scope = Program.ServiceProvider.CreateScope())
@@ -257,6 +277,7 @@ namespace Billiard.WinForm.Forms.KhachHang
 
         #endregion
 
+        #region Button Function
         private async void btnXuatBaoCao_Click(object sender, EventArgs e)
         {
             try
@@ -364,5 +385,7 @@ namespace Billiard.WinForm.Forms.KhachHang
             // 4. Đóng panel chi tiết cũ đi (vì ID cũ có thể không còn trong list mới)
             if (_mainForm != null) _mainForm.HideDetailPanel();
         }
+
+        #endregion
     }
 }

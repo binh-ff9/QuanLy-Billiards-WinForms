@@ -315,10 +315,7 @@ namespace Billiard.WinForm.Forms.HoaDon
                         {
                             var worksheet = workbook.Worksheets.Add("BaoCaoHoaDon");
 
-                            // Cách 1: Xuất thô từ DataGridView (Nhanh)
-                            // worksheet.Cell(1, 1).Value = "Báo Cáo Hóa Đơn";
-
-                            // Cách 2: Lấy từ DataSource để chuẩn dữ liệu hơn (Khuyên dùng)
+                            // Lấy từ DataSource
                             var data = dataGridViewHoaDon.DataSource as System.Collections.IList;
 
                             // Tạo Header

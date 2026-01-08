@@ -13,8 +13,14 @@ namespace Billiard.WinForm.Forms.KhachHang
 
         public event EventHandler<int> OnEditClick;
         public event EventHandler<int> OnDeleteClick;
+        public event EventHandler OnCloseClick;
+
+
         private bool _isDeletedUser = false;
+
         private Button btnDeleteAction;
+        private Button btnClose;
+
         public ChiTietKhachHangControl()
         {
             InitializeComponent();
@@ -24,14 +30,13 @@ namespace Billiard.WinForm.Forms.KhachHang
 
         private void SetupLayout()
         {
+            // --- 1. PHẦN CHÂN TRANG (Giữ nguyên như cũ) ---
             var pnlFooter = new Panel { Dock = DockStyle.Bottom, Height = 60, Padding = new Padding(10) };
 
-            // Dùng TableLayoutPanel để chia đôi 2 nút (Sửa và Xóa)
             var tblButtons = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
-            tblButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F)); // 50%
-            tblButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F)); // 50%
+            tblButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tblButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
 
-            // Nút Sửa (Code cũ, giữ nguyên, cho vào cột 0)
             var btnEdit = new Button { Text = "✏️ Chỉnh sửa", Dock = DockStyle.Fill, BackColor = Color.FromArgb(234, 179, 8), ForeColor = Color.White, Font = new Font("Segoe UI", 10, FontStyle.Bold), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand, Margin = new Padding(0, 0, 5, 0) };
             btnEdit.FlatAppearance.BorderSize = 0;
             btnEdit.Click += (s, e) => OnEditClick?.Invoke(this, _currentMaKh);
@@ -42,28 +47,52 @@ namespace Billiard.WinForm.Forms.KhachHang
 
             tblButtons.Controls.Add(btnEdit, 0, 0);
             tblButtons.Controls.Add(btnDeleteAction, 1, 0);
-
             pnlFooter.Controls.Add(tblButtons);
-            this.Controls.Add(pnlFooter);
+            this.Controls.Add(pnlFooter); // Add footer trước
 
-            //pnlFooter.Controls.Add(btnEdit);
-            //this.Controls.Add(pnlFooter); // Thêm Footer vào UserControl
 
+            // --- 2. PHẦN NỘI DUNG CHÍNH (Dock Fill) ---
             pnlContainer = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
                 AutoScroll = true,
-                Padding = new Padding(20)
+                Padding = new Padding(20) // Padding đều 4 phía
             };
 
             // Hack full width
             pnlContainer.SizeChanged += (s, e) => {
                 foreach (Control c in pnlContainer.Controls) c.Width = pnlContainer.ClientSize.Width - 40;
             };
+
             this.Controls.Add(pnlContainer);
-            pnlContainer.BringToFront();
+
+
+            // --- 3. NÚT ĐÓNG (Nằm đè lên trên - Overlay) ---
+            btnClose = new Button
+            {
+                Text = "✕",
+                Font = new Font("Segoe UI", 14, FontStyle.Regular), // Font to hơn chút cho dễ bấm
+                Size = new Size(40, 40),
+                // [QUAN TRỌNG] Neo vào góc trên phải, nhưng không Dock
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Location = new Point(this.Width - 45, 5), // Vị trí cố định ban đầu
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.Transparent, // Nền trong suốt hoặc White tùy bạn
+                ForeColor = Color.Gray,
+                Cursor = Cursors.Hand
+            };
+            btnClose.FlatAppearance.BorderSize = 0;
+            btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(254, 202, 202);
+            btnClose.FlatAppearance.MouseDownBackColor = Color.FromArgb(239, 68, 68);
+
+            btnClose.Click += (s, e) => OnCloseClick?.Invoke(this, EventArgs.Empty);
+
+            this.Controls.Add(btnClose); // Add nút Close sau cùng
+
+            // [CỰC KỲ QUAN TRỌNG] Lệnh này bắt buộc phải có để nút X nổi lên trên FlowLayout
+            btnClose.BringToFront();
         }
 
         public void LoadData(Billiard.DAL.Entities.KhachHang kh)
@@ -88,7 +117,7 @@ namespace Billiard.WinForm.Forms.KhachHang
             pnlContainer.Controls.Clear();
 
             // --- 1. AVATAR & NAME HEADER ---
-            var pnlHeader = new Panel { Height = 100, Margin = new Padding(0, 0, 0, 20) };
+            var pnlHeader = new Panel { Height = 120, Margin = new Padding(0, 0, 0, 20) };
 
             // Avatar tròn (Vẽ bằng code)
             var lblAvatar = new Label
@@ -98,7 +127,7 @@ namespace Billiard.WinForm.Forms.KhachHang
                 ForeColor = Color.White,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Size = new Size(80, 80),
-                Location = new Point(0, 10)
+                Location = new Point(0, 15)
             };
             lblAvatar.Paint += (s, e) => {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -108,10 +137,32 @@ namespace Billiard.WinForm.Forms.KhachHang
             };
 
             // Tên & SĐT
-            var lblName = new Label { Text = kh.TenKh, Font = new Font("Segoe UI", 16, FontStyle.Bold), ForeColor = Color.FromArgb(30, 41, 59), AutoSize = true, Location = new Point(90, 20) };
-            var lblPhone = new Label { Text = kh.Sdt, Font = new Font("Segoe UI", 11, FontStyle.Regular), ForeColor = Color.Gray, AutoSize = true, Location = new Point(92, 50) };
+            var lblName = new Label 
+            { 
+                Text = kh.TenKh, 
+                Font = new Font("Segoe UI", 16, FontStyle.Bold),
+                ForeColor = Color.FromArgb(30, 41, 59), 
+                AutoSize = true, 
+                Location = new Point(90, 10)
+            };
+            var lblPhone = new Label 
+            { 
+                Text = kh.Sdt, Font = new Font("Segoe UI", 11, FontStyle.Regular), 
+                ForeColor = Color.Gray, 
+                AutoSize = true, 
+                Location = new Point(92, 45) 
+            };
+            var lblEmail = new Label
+            {
+                Text = string.IsNullOrEmpty(kh.Email) ? "Chưa cập nhật Email" : kh.Email,
+                Font = new Font("Segoe UI", 10, FontStyle.Regular),
+                ForeColor = Color.FromArgb(100, 116, 139), // Màu xám xanh nhẹ
+                AutoSize = true,
+                Location = new Point(92, 70)
+            };
 
-            pnlHeader.Controls.AddRange(new Control[] { lblAvatar, lblName, lblPhone });
+
+            pnlHeader.Controls.AddRange(new Control[] { lblAvatar, lblName, lblPhone, lblEmail });
             pnlContainer.Controls.Add(pnlHeader);
 
 
@@ -119,26 +170,74 @@ namespace Billiard.WinForm.Forms.KhachHang
             decimal tongTien = kh.HoaDons.Sum(h => h.TongTien) ?? 0;
             int soLanDen = kh.HoaDons.Count;
 
-            var pnlStats = new TableLayoutPanel { Height = 80, ColumnCount = 2, RowCount = 1, Margin = new Padding(0, 0, 0, 20) };
-            pnlStats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            pnlStats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            var pnlStats = new TableLayoutPanel 
+            { 
+                Height = 80, 
+                ColumnCount = 2, 
+                RowCount = 1, 
+                Margin = new Padding(0, 0, 0, 20) ,
 
+                Width = pnlContainer.ClientSize.Width - 40,
+            };
+            pnlStats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            pnlStats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+         
+            tongTien = 1222;
             pnlStats.Controls.Add(CreateStatBox("💰 Tổng chi tiêu", $"{tongTien:N0}đ", Color.FromArgb(22, 163, 74)), 0, 0);
             pnlStats.Controls.Add(CreateStatBox("🏆 Số lần đến", $"{soLanDen} lần", Color.FromArgb(234, 179, 8)), 1, 0);
 
             pnlContainer.Controls.Add(pnlStats);
 
+            // --- 3. LỊCH SỬ GIAO DỊCH (5 Gần nhất) ---
 
-            // --- 3. THÔNG TIN LIÊN HỆ ---
-            var pnlInfo = new Panel { AutoSize = true, Margin = new Padding(0, 0, 0, 20) };
-            AddInfoRow(pnlInfo, "Email:", kh.Email ?? "Chưa cập nhật", 0);
-            AddInfoRow(pnlInfo, "Nhóm:", "Thành viên thân thiết", 60);
-            pnlContainer.Controls.Add(pnlInfo);
+            var pnlHistoryHeader = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                FlowDirection = FlowDirection.LeftToRight,
+                Margin = new Padding(0, 0, 0, 10),
+                Width = pnlContainer.Width // Đảm bảo rộng bằng container
+            };
+
+            var lblHistoryTitle = new Label 
+            { 
+                Text = "Lịch sử gần đây", 
+                Font = new Font("Segoe UI", 12, FontStyle.Bold), 
+                ForeColor = Color.Black, 
+                AutoSize = true, 
+                Margin = new Padding(0, 5, 10, 0)
+            };
+
+            var btnViewAll = new Button
+            {
+                Text = "Xem tất cả", // Bỏ dấu > cho gọn, hoặc để lại tùy bạn
+                Font = new Font("Segoe UI", 9, FontStyle.Bold), // Font nhỏ hơn title chút cho tinh tế
+                ForeColor = Color.White, // Chữ trắng
+                BackColor = Color.FromArgb(59, 130, 246), // Nền xanh dương hiện đại
+                Cursor = Cursors.Hand,
+                AutoSize = true, // Tự co giãn theo chữ
+                AutoSizeMode = AutoSizeMode.GrowAndShrink, // Co vừa khít nội dung
+                FlatStyle = FlatStyle.Flat, // Bỏ hiệu ứng 3D cũ kỹ
+                Padding = new Padding(10, 5, 10, 5), // Tạo khoảng cách giữa chữ và viền nút
+                Margin = new Padding(0, 4, 0, 0) // Căn chỉnh lề trên để thẳng hàng với tiêu đề "Lịch sử..."
+            };
+
+            // Xóa viền đen mặc định của nút
+            btnViewAll.FlatAppearance.BorderSize = 0;
+            // Hiệu ứng khi di chuột vào (đậm hơn chút)
+            btnViewAll.FlatAppearance.MouseOverBackColor = Color.FromArgb(37, 99, 235);
 
 
-            // --- 4. LỊCH SỬ GIAO DỊCH (5 Gần nhất) ---
-            var lblHistoryTitle = new Label { Text = "Lịch sử gần đây", Font = new Font("Segoe UI", 12, FontStyle.Bold), ForeColor = Color.Black, AutoSize = true, Margin = new Padding(0, 0, 0, 10) };
-            pnlContainer.Controls.Add(lblHistoryTitle);
+            btnViewAll.Click += (s, e) =>
+            { // Ý tưởng là ấn vào sẽ lấy id khach hang do rồi chuyển sang tab hóa đơn tự điền số điện thoại và lọc tất cả
+
+
+                //var historyForm = new LichSuGiaoDichForm(_currentMaKh);
+                //historyForm.ShowDialog(); // ShowDialog để hiện dạng popup, người dùng phải tắt form này mới quay lại được
+            };
+
+            pnlHistoryHeader.Controls.Add(lblHistoryTitle);
+            pnlHistoryHeader.Controls.Add(btnViewAll);
+            pnlContainer.Controls.Add(pnlHistoryHeader);
 
             var recentInvoices = kh.HoaDons.OrderByDescending(h => h.ThoiGianBatDau).Take(5).ToList();
             if (recentInvoices.Count > 0)
@@ -159,14 +258,20 @@ namespace Billiard.WinForm.Forms.KhachHang
 
         private Panel CreateStatBox(string title, string value, Color color)
         {
-            var pnl = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(248, 250, 252) }; // Nền xám nhạt
+            var pnl = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(248, 250, 252),
+                Margin = new Padding(5)
+            }; // Nền xám nhạt
                                                                                                       // Có thể thêm bo góc ở đây nếu muốn
 
             var lblVal = new Label { Text = value, Font = new Font("Segoe UI", 14, FontStyle.Bold), ForeColor = color, Dock = DockStyle.Bottom, TextAlign = ContentAlignment.MiddleCenter, Height = 30 };
             var lblTit = new Label { Text = title, Font = new Font("Segoe UI", 9, FontStyle.Regular), ForeColor = Color.Gray, Dock = DockStyle.Top, TextAlign = ContentAlignment.MiddleCenter, Height = 25 };
 
-            pnl.Controls.Add(lblTit);
             pnl.Controls.Add(lblVal);
+            pnl.Controls.Add(lblTit);
+
             return pnl;
         }
 
