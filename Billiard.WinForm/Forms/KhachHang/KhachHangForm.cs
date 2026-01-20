@@ -34,6 +34,7 @@ namespace Billiard.WinForm.Forms.KhachHang
         private Button btnPrev;  // Nút Trước <
         private Button btnNext;  // Nút Sau >
 
+        private System.Threading.Timer _searchTimer; // Chờ người dùng ngừng gõ rồi mới tìm (Debounce)
 
         public KhachHangForm(KhachHangService khService)
         {
@@ -48,8 +49,19 @@ namespace Billiard.WinForm.Forms.KhachHang
 
             txtSearch.TextChanged += async (s, e) =>
             {
-                _currentPage = 1;
-                await LoadDataAsync();
+                _searchTimer?.Change(System.Threading.Timeout.Infinite,0);
+
+                _searchTimer = new System.Threading.Timer(async state =>
+                {
+                    if (this.IsHandleCreated)
+                    {
+                        this.Invoke(new Action(async () =>
+                        {
+                            _currentPage = 1; // Reset về trang 1
+                            await LoadDataAsync();
+                        }));
+                    }
+                }, null, 500, System.Threading.Timeout.Infinite);
             };
 
             if (btnXuatBaoCao != null) btnXuatBaoCao.Click += btnXuatBaoCao_Click;
@@ -317,60 +329,63 @@ namespace Billiard.WinForm.Forms.KhachHang
 
         private async Task LoadDataAsync()
         {
-            try
+            using (var scope = Program.ServiceProvider.CreateScope())
             {
-                this.Cursor = Cursors.WaitCursor;
-                flowLayoutPanel1.SuspendLayout();
-                flowLayoutPanel1.Controls.Clear();
+                var scopedService = scope.ServiceProvider.GetRequiredService<KhachHangService>();
 
-                string keyword = txtSearch.Text.Trim();
-
-                // 1. GỌI SERVICE (Giả sử bạn đã sửa Service trả về Tuple như Bước 1)
-                // Nếu Service chưa sửa, bạn phải sửa Service trước nhé!
-                var result = await _khService.GetListKhachHangPagingAsync(
-                    keyword,
-                    _currentRankFilter,
-                    _isShowDeletedMode,
-                    _currentPage,
-                    _pageSize
-                );
-
-                var listKH = result.Data;      // Danh sách khách hàng trang hiện tại
-                _totalRecords = result.TotalCount; // Tổng số bản ghi tìm thấy
-
-                RenderPagination();
-                // 2. CẬP NHẬT UI PHÂN TRANG
-                //UpdatePaginationControls();
-
-                if (listKH == null || listKH.Count == 0)
+                try
                 {
-                    ShowEmptyState();
-                }
-                else
-                {
-                    foreach (var kh in listKH)
+                    this.Cursor = Cursors.WaitCursor;
+                    flowLayoutPanel1.SuspendLayout();
+                    flowLayoutPanel1.Controls.Clear();
+
+                    string keyword = txtSearch.Text.Trim();
+
+                    var result = await scopedService.GetListKhachHangPagingAsync(
+                        keyword,
+                        _currentRankFilter,
+                        _isShowDeletedMode,
+                        _currentPage,
+                        _pageSize
+                    );
+
+                    var listKH = result.Data;
+                    _totalRecords = result.TotalCount;
+
+                    RenderPagination(); // Vẽ lại thanh phân trang
+
+                    if (listKH == null || listKH.Count == 0)
                     {
-                        var card = new KhachHangCard();
-                        card.SetData(kh);
-                        card.Margin = new Padding(0, 0, 20, 20);
+                        ShowEmptyState();
+                    }
+                    else
+                    {
+                        foreach (var kh in listKH)
+                        {
+                            var card = new KhachHangCard();
+                            card.SetData(kh);
+                            card.Margin = new Padding(0, 0, 20, 20);
 
-                        // Gán sự kiện click (Giữ nguyên code cũ)
-                        card.Click += (s, e) => ShowDetail(kh.MaKh);
-                        foreach (Control child in card.Controls)
-                            child.Click += (s, e) => ShowDetail(kh.MaKh);
+                            // Lưu ID lại vào biến cục bộ để tránh lỗi closure (quan trọng)
+                            int currentMaKh = kh.MaKh;
 
-                        flowLayoutPanel1.Controls.Add(card);
+                            card.Click += (s, e) => ShowDetail(currentMaKh);
+                            foreach (Control child in card.Controls)
+                                child.Click += (s, e) => ShowDetail(currentMaKh);
+
+                            flowLayoutPanel1.Controls.Add(card);
+                        }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Lỗi tải dữ liệu: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                flowLayoutPanel1.ResumeLayout();
-                this.Cursor = Cursors.Default;
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Lỗi tải dữ liệu: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                finally
+                {
+                    flowLayoutPanel1.ResumeLayout();
+                    this.Cursor = Cursors.Default;
+                }
             }
         }
 

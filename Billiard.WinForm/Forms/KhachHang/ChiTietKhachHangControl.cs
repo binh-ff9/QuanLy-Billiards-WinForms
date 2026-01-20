@@ -118,22 +118,74 @@ namespace Billiard.WinForm.Forms.KhachHang
             // --- 1. AVATAR & NAME HEADER ---
             var pnlHeader = new Panel { Height = 120, Margin = new Padding(0, 0, 0, 20) };
 
-            // Avatar tròn (Vẽ bằng code)
-            var lblAvatar = new Label
+            var picAvatar = new PictureBox
             {
-                Text = GetInitials(kh.TenKh),
-                Font = new Font("Segoe UI", 20, FontStyle.Bold),
-                ForeColor = Color.White,
-                TextAlign = ContentAlignment.MiddleCenter,
                 Size = new Size(80, 80),
-                Location = new Point(0, 15)
+                Location = new Point(0, 15),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BackColor = Color.Transparent // Or a default background color
             };
-            lblAvatar.Paint += (s, e) => {
+
+            // Avatar Drawing Logic: Handle Image or Initials
+            picAvatar.Paint += (s, e) =>
+            {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (var brush = new SolidBrush(Color.FromArgb(99, 102, 241))) // Màu tím
-                    e.Graphics.FillEllipse(brush, 0, 0, 79, 79);
-                TextRenderer.DrawText(e.Graphics, lblAvatar.Text, lblAvatar.Font, new Rectangle(0, 0, 80, 80), Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
+
+                // Create circular path
+                GraphicsPath path = new GraphicsPath();
+                path.AddEllipse(0, 0, picAvatar.Width, picAvatar.Height);
+                picAvatar.Region = new Region(path);
+
+                bool imageLoaded = false;
+
+                // Try loading image if path exists
+                if (!string.IsNullOrEmpty(kh.Avatar))
+                {
+                    try
+                    {
+                        string imagePath = Path.Combine(Application.StartupPath, "Images", "Avatars", kh.Avatar);
+                        if (File.Exists(imagePath))
+                        {
+                            using (var img = Image.FromFile(imagePath))
+                            {
+                                e.Graphics.DrawImage(img, 0, 0, picAvatar.Width, picAvatar.Height);
+                            }
+                            imageLoaded = true;
+                        }
+                    }
+                    catch { /* Ignore error, fallback to initials */ }
+                }
+
+                // Fallback to Initials if no image
+                if (!imageLoaded)
+                {
+                    using (var brush = new SolidBrush(Color.FromArgb(99, 102, 241))) // Purple background
+                        e.Graphics.FillEllipse(brush, 0, 0, 79, 79);
+
+                    string initials = GetInitials(kh.TenKh);
+                    using (var font = new Font("Segoe UI", 20, FontStyle.Bold))
+                    {
+                        TextRenderer.DrawText(e.Graphics, initials, font, new Rectangle(0, 0, 80, 80), Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
+                    }
+                }
             };
+
+            //// Avatar tròn (Vẽ bằng code)
+            //var lblAvatar = new Label
+            //{
+            //    Text = GetInitials(kh.TenKh),
+            //    Font = new Font("Segoe UI", 20, FontStyle.Bold),
+            //    ForeColor = Color.White,
+            //    TextAlign = ContentAlignment.MiddleCenter,
+            //    Size = new Size(80, 80),
+            //    Location = new Point(0, 15)
+            //};
+            //lblAvatar.Paint += (s, e) => {
+            //    e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            //    using (var brush = new SolidBrush(Color.FromArgb(99, 102, 241))) // Màu tím
+            //        e.Graphics.FillEllipse(brush, 0, 0, 79, 79);
+            //    TextRenderer.DrawText(e.Graphics, lblAvatar.Text, lblAvatar.Font, new Rectangle(0, 0, 80, 80), Color.White, TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
+            //};
 
             // Tên & SĐT
             var lblName = new Label 
@@ -161,7 +213,7 @@ namespace Billiard.WinForm.Forms.KhachHang
             };
 
 
-            pnlHeader.Controls.AddRange(new Control[] { lblAvatar, lblName, lblPhone, lblEmail });
+            pnlHeader.Controls.AddRange(new Control[] { picAvatar, lblName, lblPhone, lblEmail });
             pnlContainer.Controls.Add(pnlHeader);
 
 
