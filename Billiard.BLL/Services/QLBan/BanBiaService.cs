@@ -229,24 +229,13 @@ namespace Billiard.BLL.Services.QLBan
 
             return (banDangChoi, true);
         }
-        // Bắt đầu chơi bàn
-        // Thêm method overload với skipWarning parameter
         public async Task<(bool isSuccess, string message, bool needConfirmation)> StartTableAsync(
-            int maBan,
-            int maNv,
-            int? maKh = null,
-            bool skipWarning = false)
+    int maBan,
+    int maNv,
+    int? maKh = null,
+    bool skipWarning = false)
         {
-            // KIỂM TRA GIỜ HOẠT ĐỘNG
-            if (!_gioHoatDongService.KiemTraTrongGioHoatDong())
-            {
-                var moCua = _gioHoatDongService.LayThoiDiemMoCua();
-                return (false,
-                    $"⚠️ Quán đã đóng cửa!\nMở cửa lại lúc {moCua:HH:mm dd/MM/yyyy}",
-                    false);
-            }
-
-            // CẢNH BÁO NẾU SẮP ĐÓNG CỬA (chỉ khi chưa confirm)
+            
             if (!skipWarning && _gioHoatDongService.SapDenGioDongCua())
             {
                 var phutConLai = _gioHoatDongService.TinhSoPhutConLaiDenDongCua();

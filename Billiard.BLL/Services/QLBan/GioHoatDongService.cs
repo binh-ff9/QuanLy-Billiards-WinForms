@@ -3,90 +3,52 @@
 namespace Billiard.BLL.Services.QLBan
 {
     /// <summary>
-    /// Service quản lý giờ hoạt động của quán: 9h sáng hôm nay → 2h sáng hôm sau
-    /// CRITICAL: Không cho phép bàn hoạt động quá 17 tiếng (giờ mở → giờ đóng)
+    /// Service quản lý giờ hoạt động với hỗ trợ booking qua đêm
     /// </summary>
     public class GioHoatDongService
     {
-        // Giờ mở cửa: 9h sáng
         private const int GIO_MO_CUA = 9;
-
-        // Giờ đóng cửa: 2h sáng hôm sau
         private const int GIO_DONG_CUA = 2;
-
-        // Cảnh báo trước khi đóng cửa (phút)
         private const int PHUT_CANH_BAO = 5;
+        private const int SO_GIO_HOAT_DONG_TOI_DA = 17;
+        private const int PHUT_GIA_HAN_MIEN_PHI = 10;
 
-        // Số giờ hoạt động tối đa trong 1 ngày làm việc
-        private const int SO_GIO_HOAT_DONG_TOI_DA = 17; // 9h → 2h sáng = 17 giờ
-
-        /// <summary>
-        /// Kiểm tra hiện tại có trong giờ hoạt động không
-        /// </summary>
         public bool KiemTraTrongGioHoatDong()
         {
             var now = DateTime.Now;
             var hour = now.Hour;
-
-            // Giờ hoạt động: 9h → 23h59 (cùng ngày) HOẶC 0h → 2h (ngày hôm sau)
             return hour >= GIO_MO_CUA || hour < GIO_DONG_CUA;
         }
 
-        /// <summary>
-        /// Lấy thời điểm đóng cửa gần nhất (2h sáng)
-        /// </summary>
         public DateTime LayThoiDiemDongCua()
         {
             var now = DateTime.Now;
-
-            // Nếu hiện tại < 2h sáng → đóng cửa là 2h sáng hôm nay
             if (now.Hour < GIO_DONG_CUA)
             {
                 return new DateTime(now.Year, now.Month, now.Day, GIO_DONG_CUA, 0, 0);
             }
-
-            // Nếu hiện tại >= 9h → đóng cửa là 2h sáng hôm sau
             return new DateTime(now.Year, now.Month, now.Day, GIO_DONG_CUA, 0, 0).AddDays(1);
         }
 
-        /// <summary>
-        /// Lấy thời điểm mở cửa gần nhất (9h sáng)
-        /// </summary>
         public DateTime LayThoiDiemMoCua()
         {
             var now = DateTime.Now;
-
-            // Nếu hiện tại < 9h sáng → mở cửa là 9h sáng hôm nay
             if (now.Hour < GIO_MO_CUA)
             {
                 return new DateTime(now.Year, now.Month, now.Day, GIO_MO_CUA, 0, 0);
             }
-
-            // Nếu hiện tại >= 9h → mở cửa là 9h sáng hôm sau
             return new DateTime(now.Year, now.Month, now.Day, GIO_MO_CUA, 0, 0).AddDays(1);
         }
 
-        /// <summary>
-        /// Lấy thời điểm đóng cửa dựa trên giờ bắt đầu chơi
-        /// QUAN TRỌNG: Dùng để xác định giờ đóng cửa CỤ THỂ cho ca làm việc của bàn đó
-        /// </summary>
         public DateTime LayThoiDiemDongCuaTheoBanBatDau(DateTime gioBatDau)
         {
-            // Nếu bắt đầu trong khoảng 0h → 2h sáng
-            // => Ca làm việc là từ 9h sáng HÔM TRƯỚC đến 2h sáng HÔM NAY
             if (gioBatDau.Hour >= 0 && gioBatDau.Hour < GIO_DONG_CUA)
             {
                 return new DateTime(gioBatDau.Year, gioBatDau.Month, gioBatDau.Day, GIO_DONG_CUA, 0, 0);
             }
-
-            // Nếu bắt đầu từ 9h trở đi
-            // => Ca làm việc là từ 9h HÔM NAY đến 2h sáng HÔM SAU
             return new DateTime(gioBatDau.Year, gioBatDau.Month, gioBatDau.Day, GIO_DONG_CUA, 0, 0).AddDays(1);
         }
 
-        /// <summary>
-        /// Kiểm tra sắp đến giờ đóng cửa (còn <= 5 phút)
-        /// </summary>
         public bool SapDenGioDongCua()
         {
             if (!KiemTraTrongGioHoatDong())
@@ -99,9 +61,6 @@ namespace Billiard.BLL.Services.QLBan
             return phutConLai > 0 && phutConLai <= PHUT_CANH_BAO;
         }
 
-        /// <summary>
-        /// Kiểm tra ĐÃ ĐẾN giờ đóng cửa
-        /// </summary>
         public bool DaDenGioDongCua()
         {
             var now = DateTime.Now;
@@ -109,113 +68,320 @@ namespace Billiard.BLL.Services.QLBan
             return now >= gioDongCua;
         }
 
-        /// <summary>
-        /// Tính số phút còn lại đến giờ đóng cửa
-        /// </summary>
         public int TinhSoPhutConLaiDenDongCua()
         {
             var now = DateTime.Now;
             var gioDongCua = LayThoiDiemDongCua();
             var phutConLai = (gioDongCua - now).TotalMinutes;
-
             return phutConLai > 0 ? (int)Math.Ceiling(phutConLai) : 0;
         }
 
+        public bool KiemTraBanQuaGioChoPhep(DateTime gioBatDau)
+        {
+            var now = DateTime.Now;
+            var gioDongCua = LayThoiDiemDongCuaTheoBanBatDau(gioBatDau);
+            return now > gioDongCua;
+        }
+
         /// <summary>
-        /// ✅ FIXED: Tính tiền bàn TẠM THỜI với logic CHẶT CHẼ
-        /// - Không cho phép vượt quá giờ đóng cửa
-        /// - Không cho phép vượt quá số giờ hoạt động tối đa (17 tiếng)
+        /// ✅ FIXED: Lấy thời gian kết thúc hợp lệ, XÉT ĐẾN BOOKING QUA ĐÊM
         /// </summary>
-        public (decimal tienBan, string ghiChu) TinhTienTamThoi(DateTime gioBatDau, decimal giaGio)
+        public DateTime LayThoiGianKetThucHopLe(DateTime gioBatDau, DateTime? gioKetThucBooking = null)
+        {
+            var now = DateTime.Now;
+            var gioDongCua = LayThoiDiemDongCuaTheoBanBatDau(gioBatDau);
+
+            // ✅ Nếu có booking, xét đến giờ kết thúc booking
+            if (gioKetThucBooking.HasValue)
+            {
+                var gioKetThuc = gioKetThucBooking.Value;
+
+                // ✅ XỬ LÝ BOOKING QUA ĐÊM
+                // Nếu giờ kết thúc < giờ bắt đầu → booking qua đêm
+                if (gioKetThuc < gioBatDau)
+                {
+                    gioKetThuc = gioKetThuc.AddDays(1);
+                }
+
+                // Chọn thời gian nhỏ nhất giữa: now, booking, đóng cửa
+                var thoiGianKetThucToiDa = gioKetThuc < gioDongCua ? gioKetThuc : gioDongCua;
+                return now < thoiGianKetThucToiDa ? now : thoiGianKetThucToiDa;
+            }
+
+            // Không có booking → chỉ giới hạn bởi giờ đóng cửa
+            return now < gioDongCua ? now : gioDongCua;
+        }
+
+        public int LaySoGioHoatDongToiDa()
+        {
+            return SO_GIO_HOAT_DONG_TOI_DA;
+        }
+
+        // ============================================================
+        // CÁC PHƯƠNG THỨC XỬ LÝ BOOKING
+        // ============================================================
+
+        /// <summary>
+        /// Tính tiền cho bàn có booking với các quy tắc:
+        /// - Trong 10 phút sau giờ kết thúc: tính theo giờ đã đặt
+        /// - Sau 10 phút: tính tiếp thời gian thực tế
+        /// - Không vượt quá giờ đóng cửa
+        /// - Không vượt quá booking tiếp theo (nếu có)
+        /// </summary>
+        public (decimal tienBan, string ghiChu, DateTime thoiGianKetThuc, bool canChuyenBan, string lyDoChuyenBan)
+            TinhTienVoiBooking(
+                DateTime gioBatDau,
+                DateTime? gioKetThucDat,
+                DateTime? gioBookingTiepTheo,
+                decimal giaGio)
         {
             var now = DateTime.Now;
             var gioDongCua = LayThoiDiemDongCuaTheoBanBatDau(gioBatDau);
 
             // ============================================================
-            // BƯỚC 1: Xác định thời gian kết thúc HỢP LỆ
+            // TRƯỜNG HỢP 1: Bàn KHÔNG có booking (chơi tự do)
             // ============================================================
-            DateTime thoiGianKetThuc;
-            string ghiChu;
-
-            // Trường hợp 1: Đã quá giờ đóng cửa → BẮT BUỘC tính đến giờ đóng cửa
-            if (now >= gioDongCua)
+            if (!gioKetThucDat.HasValue)
             {
-                thoiGianKetThuc = gioDongCua;
-                ghiChu = $"⚠️ ĐÃ ĐÓNG CỬA - Tính đến {gioDongCua:HH:mm}";
+                return TinhTienBanTuDo(gioBatDau, gioDongCua, gioBookingTiepTheo, giaGio);
             }
-            // Trường hợp 2: Chưa đến giờ đóng cửa → tính đến hiện tại
+
+            // ============================================================
+            // TRƯỜNG HỢP 2: Bàn CÓ booking (đã đặt trước)
+            // ============================================================
+            var gioKetThuc = gioKetThucDat.Value;
+
+            // ✅ FIX: Kiểm tra booking qua đêm
+            if (gioKetThuc < gioBatDau)
+            {
+                gioKetThuc = gioKetThuc.AddDays(1);
+            }
+
+            // Case 2.1: Giờ kết thúc booking đúng bằng hoặc sau giờ đóng cửa
+            if (gioKetThuc >= gioDongCua)
+            {
+                var thoiGianKetThucCoDinh = now < gioDongCua ? now : gioDongCua;
+                var duration = thoiGianKetThucCoDinh - gioBatDau;
+                var tongPhut = (int)Math.Ceiling(duration.TotalMinutes);
+                var soGio = (decimal)tongPhut / 60m;
+                var tienBan = soGio * giaGio;
+
+                string ghiChu;
+                if (now >= gioDongCua)
+                {
+                    ghiChu = $"⚠️ ĐÚNG GIỜ ĐÓNG CỬA - Tính đến {gioDongCua:HH:mm}";
+                }
+                else
+                {
+                    ghiChu = $"Booking đến giờ đóng cửa ({gioBatDau:HH:mm} - {gioDongCua:HH:mm})";
+                }
+
+                return (tienBan, ghiChu, thoiGianKetThucCoDinh, false, null);
+            }
+
+            // Case 2.2: Chưa hết giờ booking
+            if (now <= gioKetThuc)
+            {
+                var duration = now - gioBatDau;
+                var tongPhut = (int)Math.Ceiling(duration.TotalMinutes);
+                var soGio = (decimal)tongPhut / 60m;
+                var tienBan = soGio * giaGio;
+
+                var phutConLai = (int)(gioKetThuc - now).TotalMinutes;
+                var ghiChu = $"Booking đến {gioKetThuc:HH:mm} (còn {phutConLai}p)";
+
+                return (tienBan, ghiChu, now, false, null);
+            }
+
+            // Case 2.3: Đã hết giờ booking
+            var phutQuaGio = (int)(now - gioKetThuc).TotalMinutes;
+
+            // Case 2.3.1: Trong 10 phút miễn phí sau khi hết giờ
+            if (phutQuaGio <= PHUT_GIA_HAN_MIEN_PHI)
+            {
+                var duration = gioKetThuc - gioBatDau;
+                var tongPhut = (int)Math.Ceiling(duration.TotalMinutes);
+                var soGio = (decimal)tongPhut / 60m;
+                var tienBan = soGio * giaGio;
+
+                var ghiChu = $"Trong {PHUT_GIA_HAN_MIEN_PHI}p miễn phí - Tính theo booking ({gioBatDau:HH:mm} - {gioKetThuc:HH:mm})";
+
+                return (tienBan, ghiChu, gioKetThuc, false, null);
+            }
+
+            // Case 2.3.2: Quá 10 phút - tính tiếp thời gian thực tế
+            var thoiGianKetThucToiDa = gioDongCua;
+            bool biGioiHanBoiDongCua = now >= gioDongCua;
+
+            bool coBookingTiepTheo = gioBookingTiepTheo.HasValue && gioBookingTiepTheo.Value > gioKetThuc;
+            bool biGioiHanBoiBookingTiepTheo = coBookingTiepTheo && now >= gioBookingTiepTheo.Value;
+
+            if (coBookingTiepTheo && gioBookingTiepTheo.Value < thoiGianKetThucToiDa)
+            {
+                thoiGianKetThucToiDa = gioBookingTiepTheo.Value;
+            }
+
+            var thoiGianKetThucThucTe = now < thoiGianKetThucToiDa ? now : thoiGianKetThucToiDa;
+
+            var durationThucTe = thoiGianKetThucThucTe - gioBatDau;
+            var tongPhutThucTe = (int)Math.Ceiling(durationThucTe.TotalMinutes);
+            var soGioThucTe = (decimal)tongPhutThucTe / 60m;
+            var tienBanThucTe = soGioThucTe * giaGio;
+
+            string ghiChuThucTe;
+            bool canChuyenBan = false;
+            string lyDoChuyenBan = null;
+
+            if (biGioiHanBoiBookingTiepTheo)
+            {
+                canChuyenBan = true;
+                lyDoChuyenBan = $"Khung giờ {gioBookingTiepTheo.Value:HH:mm} - {gioBookingTiepTheo.Value.AddHours(2):HH:mm} đã có người đặt";
+                ghiChuThucTe = $"⚠️ VỰT QUÁ BOOKING TIẾP THEO - Tính đến {thoiGianKetThucThucTe:HH:mm}\n" +
+                              $"Booking gốc: {gioBatDau:HH:mm} - {gioKetThuc:HH:mm}\n" +
+                              $"Đã chơi thêm: {phutQuaGio}p\n" +
+                              $"{lyDoChuyenBan}";
+            }
+            else if (biGioiHanBoiDongCua)
+            {
+                ghiChuThucTe = $"⚠️ ĐÃ ĐÓNG CỬA - Tính đến {thoiGianKetThucThucTe:HH:mm}\n" +
+                              $"Booking gốc: {gioBatDau:HH:mm} - {gioKetThuc:HH:mm}\n" +
+                              $"Đã chơi thêm: {phutQuaGio}p";
+            }
             else
             {
-                thoiGianKetThuc = now;
-                ghiChu = $"Tính đến {now:HH:mm}";
+                ghiChuThucTe = $"Quá {PHUT_GIA_HAN_MIEN_PHI}p miễn phí - Tính thời gian thực tế\n" +
+                              $"Booking gốc: {gioBatDau:HH:mm} - {gioKetThuc:HH:mm}\n" +
+                              $"Đã chơi thêm: {phutQuaGio}p";
+
+                if (coBookingTiepTheo)
+                {
+                    var phutConLaiDenBookingTiepTheo = (int)(gioBookingTiepTheo.Value - now).TotalMinutes;
+                    if (phutConLaiDenBookingTiepTheo <= 15 && phutConLaiDenBookingTiepTheo > 0)
+                    {
+                        ghiChuThucTe += $"\n⚠️ Còn {phutConLaiDenBookingTiepTheo}p đến booking tiếp theo";
+                    }
+                }
             }
 
-            // ============================================================
-            // BƯỚC 2: KIỂM TRA VÀ CHẶN SỐ GIỜ TỐI ĐA
-            // ============================================================
-            var duration = thoiGianKetThuc - gioBatDau;
-            var soGioThucTe = duration.TotalHours;
+            return (tienBanThucTe, ghiChuThucTe, thoiGianKetThucThucTe, canChuyenBan, lyDoChuyenBan);
+        }
 
-            // Nếu vượt quá số giờ hoạt động tối đa (17 tiếng)
-            // → Tự động cắt về giờ đóng cửa
-            if (soGioThucTe > SO_GIO_HOAT_DONG_TOI_DA)
+        private (decimal tienBan, string ghiChu, DateTime thoiGianKetThuc, bool canChuyenBan, string lyDoChuyenBan)
+            TinhTienBanTuDo(
+                DateTime gioBatDau,
+                DateTime gioDongCua,
+                DateTime? gioBookingTiepTheo,
+                decimal giaGio)
+        {
+            var now = DateTime.Now;
+
+            var thoiGianKetThucToiDa = gioDongCua;
+            bool coBookingTiepTheo = gioBookingTiepTheo.HasValue;
+            bool biGioiHanBoiBooking = false;
+
+            if (coBookingTiepTheo && gioBookingTiepTheo.Value < thoiGianKetThucToiDa)
             {
-                thoiGianKetThuc = gioDongCua;
-                duration = thoiGianKetThuc - gioBatDau;
-                ghiChu = $"⚠️ QUÁ GIỜ HOẠT ĐỘNG - Chỉ tính {SO_GIO_HOAT_DONG_TOI_DA}h (đến {gioDongCua:HH:mm})";
+                thoiGianKetThucToiDa = gioBookingTiepTheo.Value;
+                biGioiHanBoiBooking = now >= gioBookingTiepTheo.Value;
             }
 
-            // ============================================================
-            // BƯỚC 3: Tính tiền
-            // ============================================================
+            var thoiGianKetThuc = now < thoiGianKetThucToiDa ? now : thoiGianKetThucToiDa;
+
+            var duration = thoiGianKetThuc - gioBatDau;
             var tongPhut = (int)Math.Ceiling(duration.TotalMinutes);
             var soGio = (decimal)tongPhut / 60m;
             var tienBan = soGio * giaGio;
 
-            return (tienBan, ghiChu);
-        }
+            string ghiChu;
+            bool canChuyenBan = false;
+            string lyDoChuyenBan = null;
 
-        /// <summary>
-        /// ✅ NEW: Kiểm tra bàn có đang chơi quá giờ cho phép không
-        /// </summary>
-        public bool KiemTraBanQuaGioChoPhep(DateTime gioBatDau)
-        {
-            var gioDongCua = LayThoiDiemDongCuaTheoBanBatDau(gioBatDau);
-            var soGioThucTe = (DateTime.Now - gioBatDau).TotalHours;
-
-            return soGioThucTe > SO_GIO_HOAT_DONG_TOI_DA || DateTime.Now > gioDongCua;
-        }
-
-        /// <summary>
-        /// ✅ NEW: Lấy thời gian kết thúc HỢP LỆ cho một bàn
-        /// (Dùng để fix dữ liệu hoặc hiển thị cảnh báo)
-        /// </summary>
-        public DateTime LayThoiGianKetThucHopLe(DateTime gioBatDau)
-        {
-            var gioDongCua = LayThoiDiemDongCuaTheoBanBatDau(gioBatDau);
-            var now = DateTime.Now;
-
-            // Nếu hiện tại chưa đến giờ đóng cửa → trả về hiện tại
-            if (now < gioDongCua)
+            if (biGioiHanBoiBooking)
             {
-                var soGioHienTai = (now - gioBatDau).TotalHours;
-
-                // Nếu đã chơi quá 17 tiếng → trả về giờ đóng cửa
-                if (soGioHienTai > SO_GIO_HOAT_DONG_TOI_DA)
+                canChuyenBan = true;
+                lyDoChuyenBan = $"Khung giờ {gioBookingTiepTheo.Value:HH:mm} đã có người đặt";
+                ghiChu = $"⚠️ CÓ BOOKING TIẾP THEO - Tính đến {thoiGianKetThuc:HH:mm}\n{lyDoChuyenBan}";
+            }
+            else if (now >= gioDongCua)
+            {
+                ghiChu = $"⚠️ ĐÃ ĐÓNG CỬA - Tính đến {thoiGianKetThuc:HH:mm}";
+            }
+            else if (coBookingTiepTheo)
+            {
+                var phutConLai = (int)(gioBookingTiepTheo.Value - now).TotalMinutes;
+                if (phutConLai <= 15)
                 {
-                    return gioDongCua;
+                    ghiChu = $"Tính đến {thoiGianKetThuc:HH:mm}\n⚠️ Còn {phutConLai}p đến booking tiếp theo";
                 }
-
-                return now;
+                else
+                {
+                    ghiChu = $"Tính đến {thoiGianKetThuc:HH:mm}";
+                }
+            }
+            else
+            {
+                ghiChu = $"Tính đến {thoiGianKetThuc:HH:mm}";
             }
 
-            // Nếu đã quá giờ đóng cửa → trả về giờ đóng cửa
-            return gioDongCua;
+            return (tienBan, ghiChu, thoiGianKetThuc, canChuyenBan, lyDoChuyenBan);
         }
 
-        /// <summary>
-        /// Lấy thông báo trạng thái giờ hoạt động
-        /// </summary>
+        public bool DangTrongThoiGianGiaHanMienPhi(DateTime? gioKetThucDat)
+        {
+            if (!gioKetThucDat.HasValue)
+                return false;
+
+            var now = DateTime.Now;
+            if (now <= gioKetThucDat.Value)
+                return false;
+
+            var phutQuaGio = (now - gioKetThucDat.Value).TotalMinutes;
+            return phutQuaGio <= PHUT_GIA_HAN_MIEN_PHI;
+        }
+
+        public (bool canCanhBao, string thongBao) KiemTraCanhBaoChuyenBan(
+            DateTime? gioKetThucDat,
+            DateTime? gioBookingTiepTheo)
+        {
+            if (!gioBookingTiepTheo.HasValue)
+                return (false, null);
+
+            var now = DateTime.Now;
+
+            if (gioKetThucDat.HasValue)
+            {
+                var phutQuaGio = (now - gioKetThucDat.Value).TotalMinutes;
+                if (phutQuaGio > PHUT_GIA_HAN_MIEN_PHI)
+                {
+                    var phutConLai = (int)(gioBookingTiepTheo.Value - now).TotalMinutes;
+                    if (phutConLai <= 15 && phutConLai > 0)
+                    {
+                        return (true, $"⚠️ Còn {phutConLai} phút đến booking tiếp theo!\nVui lòng chuẩn bị chuyển bàn hoặc thanh toán.");
+                    }
+
+                    if (phutConLai <= 0)
+                    {
+                        return (true, $"🚨 ĐÃ ĐẾN GIỜ BOOKING TIẾP THEO!\nVui lòng CHUYỂN BÀN hoặc THANH TOÁN NGAY!");
+                    }
+                }
+            }
+            else
+            {
+                var phutConLai = (int)(gioBookingTiepTheo.Value - now).TotalMinutes;
+                if (phutConLai <= 10 && phutConLai > 0)
+                {
+                    return (true, $"⚠️ Còn {phutConLai} phút đến booking tiếp theo!\nVui lòng chuẩn bị thanh toán hoặc chuyển bàn.");
+                }
+
+                if (phutConLai <= 0)
+                {
+                    return (true, $"🚨 ĐÃ ĐẾN GIỜ BOOKING TIẾP THEO!\nVui lòng THANH TOÁN NGAY hoặc CHUYỂN BÀN!");
+                }
+            }
+
+            return (false, null);
+        }
+
         public string LayThongBaoGioHoatDong()
         {
             if (!KiemTraTrongGioHoatDong())
@@ -234,9 +400,6 @@ namespace Billiard.BLL.Services.QLBan
             return $"Đang hoạt động. Đóng cửa lúc {dongCua:HH:mm}";
         }
 
-        /// <summary>
-        /// Kiểm tra một bàn có cần bắt buộc thanh toán không (đã quá giờ đóng cửa)
-        /// </summary>
         public bool CanBatBuocThanhToan(DateTime? gioBatDau)
         {
             if (!gioBatDau.HasValue)
@@ -246,9 +409,6 @@ namespace Billiard.BLL.Services.QLBan
             return DateTime.Now >= gioDongCua;
         }
 
-        /// <summary>
-        /// Kiểm tra bàn có cần cảnh báo sắp đóng cửa không
-        /// </summary>
         public bool CanCanhBaoSapDongCua(DateTime? gioBatDau)
         {
             if (!gioBatDau.HasValue)
@@ -258,11 +418,13 @@ namespace Billiard.BLL.Services.QLBan
         }
 
         /// <summary>
-        /// ✅ NEW: Lấy số giờ tối đa có thể chơi
+        /// ✅ DEPRECATED: Phương thức cũ, giữ lại để tương thích
+        /// Nên dùng TinhTienVoiBooking() thay thế
         /// </summary>
-        public int LaySoGioHoatDongToiDa()
+        public (decimal tienBan, string ghiChu) TinhTienTamThoi(DateTime gioBatDau, decimal giaGio)
         {
-            return SO_GIO_HOAT_DONG_TOI_DA;
+            var (tienBan, ghiChu, _, _, _) = TinhTienVoiBooking(gioBatDau, null, null, giaGio);
+            return (tienBan, ghiChu);
         }
     }
 }

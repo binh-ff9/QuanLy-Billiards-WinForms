@@ -171,7 +171,9 @@ namespace Billiard.WinForm.Forms.QLBan
             var hoaDon = await _banBiaService.GetActiveInvoiceAsync(_ban.MaBan);
             if (hoaDon?.ThoiGianBatDau == null) return;
 
-            var duration = DateTime.Now - hoaDon.ThoiGianBatDau.Value;
+            // ✅ FIXED: Use LayThoiGianKetThucHopLe() - same as UpdateInfoLabelText
+            var thoiGianKetThuc = _gioHoatDongService.LayThoiGianKetThucHopLe(hoaDon.ThoiGianBatDau.Value);
+            var duration = thoiGianKetThuc - hoaDon.ThoiGianBatDau.Value;
 
             foreach (Control ctrl in pnlContent.Controls)
             {
@@ -191,17 +193,19 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private async Task UpdatePaymentInfoIfExists()
         {
-            // Lấy hóa đơn mới nhất
             var hoaDon = await _banBiaService.GetActiveInvoiceAsync(_ban.MaBan);
             if (hoaDon == null) return;
 
-            var duration = DateTime.Now - hoaDon.ThoiGianBatDau.Value;
+            // ✅ FIXED: Use LayThoiGianKetThucHopLe() for consistency
+            var thoiGianKetThuc = _gioHoatDongService.LayThoiGianKetThucHopLe(hoaDon.ThoiGianBatDau.Value);
+            var duration = thoiGianKetThuc - hoaDon.ThoiGianBatDau.Value;
+
             var tongPhut = (int)Math.Ceiling(duration.TotalMinutes);
             var soGio = (decimal)tongPhut / 60m;
             var giaGioDecimal = _ban.MaLoaiNavigation?.GiaGio ?? 0;
             var tienBan = soGio * giaGioDecimal;
 
-            // Lấy tổng tiền dịch vụ MỚI NHẤT
+            // Get latest service charges
             var chiTietList = await _banBiaService.GetInvoiceDetailsAsync(hoaDon.MaHd);
             var tienDichVu = chiTietList.Sum(ct => ct.ThanhTien);
 
@@ -219,7 +223,8 @@ namespace Billiard.WinForm.Forms.QLBan
                     if (titleLabel != null)
                     {
                         var totalPanel = pnl.Controls.OfType<Panel>()
-                            .FirstOrDefault(p => p.BackColor == Color.FromArgb(239, 246, 255));
+                            .FirstOrDefault(p => p.BackColor == Color.FromArgb(239, 246, 255) ||
+                                                p.BackColor == Color.FromArgb(254, 226, 226));
 
                         if (totalPanel != null)
                         {
@@ -356,67 +361,7 @@ namespace Billiard.WinForm.Forms.QLBan
 
             return yPos + 85;
         }
-        private int RenderOvertimeWarning(Panel targetPanel, int yPos, int panelWidth, DateTime gioBatDau)
-        {
-            var soGioToiDa = _gioHoatDongService.LaySoGioHoatDongToiDa();
-            var gioDongCua = _gioHoatDongService.LayThoiDiemDongCuaTheoBanBatDau(gioBatDau);
-            var soGioThucTe = (DateTime.Now - gioBatDau).TotalHours;
 
-            var pnlWarning = new Panel
-            {
-                Location = new Point(15, yPos + 20),
-                Size = new Size(panelWidth, 110),
-                BackColor = Color.FromArgb(153, 27, 27) // Đỏ đậm hơn cả đóng cửa
-            };
-
-            // Icon lớn hơn
-            var lblIcon = new Label
-            {
-                Text = "⛔",
-                Font = new Font("Segoe UI", 40F),
-                ForeColor = Color.White,
-                Location = new Point(15, 15),
-                AutoSize = true,
-                BackColor = Color.Transparent
-            };
-            pnlWarning.Controls.Add(lblIcon);
-
-            // Warning text
-            var lblWarning = new Label
-            {
-                Text = $"BÀN ĐÃ CHƠI QUÁ {soGioToiDa} TIẾNG!\n" +
-                       $"(Từ {gioBatDau:HH:mm dd/MM} - {soGioThucTe:F1}h)\n" +
-                       $"THANH TOÁN NGAY LẬP TỨC!",
-                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
-                ForeColor = Color.White,
-                Location = new Point(85, 15),
-                Size = new Size(panelWidth - 100, 80),
-                BackColor = Color.Transparent
-            };
-            pnlWarning.Controls.Add(lblWarning);
-
-            // Animation mạnh hơn
-            var timer = new System.Windows.Forms.Timer { Interval = 400 };
-            var isHighlight = false;
-            timer.Tick += (s, e) =>
-            {
-                if (pnlWarning.IsDisposed)
-                {
-                    timer.Stop();
-                    timer.Dispose();
-                    return;
-                }
-
-                isHighlight = !isHighlight;
-                pnlWarning.BackColor = isHighlight
-                    ? Color.FromArgb(220, 38, 38)
-                    : Color.FromArgb(153, 27, 27);
-            };
-            timer.Start();
-
-            targetPanel.Controls.Add(pnlWarning);
-            return yPos + 110;
-        }
         private async Task<int> RenderPlayingContent(Panel targetPanel, int yPos, int panelWidth, System.Threading.CancellationToken token)
         {
             var hoaDon = await _banBiaService.GetActiveInvoiceAsync(_ban.MaBan);
@@ -428,33 +373,27 @@ namespace Billiard.WinForm.Forms.QLBan
 
             if (token.IsCancellationRequested) return yPos;
 
-            var duration = DateTime.Now - hoaDon.ThoiGianBatDau.Value;
+            // ✅ FIXED: Calculate duration using LayThoiGianKetThucHopLe()
+            var thoiGianKetThuc = _gioHoatDongService.LayThoiGianKetThucHopLe(hoaDon.ThoiGianBatDau.Value);
+            var duration = thoiGianKetThuc - hoaDon.ThoiGianBatDau.Value;
 
-            // ============================================================
-            // DECLARE VARIABLES FIRST (BEFORE ANY if statements)
-            // ============================================================
+            // Check various warning conditions
             var isQuaGioChoPhep = _gioHoatDongService.KiemTraBanQuaGioChoPhep(hoaDon.ThoiGianBatDau.Value);
             var isDaDongCua = _gioHoatDongService.DaDenGioDongCua();
             var isSapDongCua = _gioHoatDongService.SapDenGioDongCua();
 
-            // ============================================================
-            // NOW USE THE VARIABLES
-            // ============================================================
             if (isQuaGioChoPhep)
             {
-                // Hiển thị cảnh báo QUÁ GIỜ (ưu tiên cao nhất)
-                yPos = RenderOvertimeWarning(targetPanel, yPos, panelWidth, hoaDon.ThoiGianBatDau.Value);
-                yPos += CARD_SPACING;
+                // Over allowed hours - no additional warnings needed
             }
             else
             {
-                // Hiển thị cảnh báo ĐÃ ĐÓNG CỬA
+                // Show closing time warnings
                 if (isDaDongCua && hoaDon.ThoiGianBatDau < _gioHoatDongService.LayThoiDiemDongCua())
                 {
                     yPos = RenderClosedWarning(targetPanel, yPos, panelWidth);
                     yPos += CARD_SPACING;
                 }
-                // Hiển thị cảnh báo SẮP ĐÓNG CỬA (còn <= 5 phút)
                 else if (isSapDongCua)
                 {
                     yPos = RenderClosingSoonWarning(targetPanel, yPos, panelWidth);
@@ -462,7 +401,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 }
             }
 
-            // Timer Card
+            // Timer Card - pass the correctly calculated duration
             yPos = RenderTimerCard(targetPanel, duration, yPos, panelWidth,
                 isQuaGioChoPhep || isDaDongCua || isSapDongCua);
             yPos += CARD_SPACING;
@@ -478,7 +417,7 @@ namespace Billiard.WinForm.Forms.QLBan
             if (token.IsCancellationRequested) return yPos;
 
             // Service List
-            yPos = await RenderServiceList(targetPanel, hoaDon.MaHd, yPos, panelWidth, token);
+            //yPos = await RenderServiceList(targetPanel, hoaDon.MaHd, yPos, panelWidth, token);
             yPos += SECTION_SPACING;
 
             // Buttons
@@ -501,7 +440,6 @@ namespace Billiard.WinForm.Forms.QLBan
             // Icon
             var lblIcon = new Label
             {
-                Text = "⚠️",
                 Font = new Font("Segoe UI", 32F),
                 ForeColor = Color.White,
                 Location = new Point(15, 15),
@@ -601,82 +539,26 @@ namespace Billiard.WinForm.Forms.QLBan
             targetPanel.Controls.Add(pnlWarning);
             return yPos + 100;
         }
-        private int RenderUrgentWarning(Panel targetPanel, int yPos, int panelWidth)
-        {
-            var gioDongCua = _gioHoatDongService.LayThoiDiemDongCua();
-
-            var pnlWarning = new Panel
-            {
-                Location = new Point(15, yPos + 20),
-                Size = new Size(panelWidth, 90),
-                BackColor = Color.FromArgb(220, 38, 38)
-            };
-
-            // Icon
-            var lblIcon = new Label
-            {
-                Text = "⚠️",
-                Font = new Font("Segoe UI", 32F),
-                ForeColor = Color.White,
-                Location = new Point(15, 15),
-                AutoSize = true,
-                BackColor = Color.Transparent
-            };
-            pnlWarning.Controls.Add(lblIcon);
-
-            // Warning text
-            var lblWarning = new Label
-            {
-                Text = $"ĐÃ ĐẾN GIỜ ĐÓNG CỬA!\nVui lòng thanh toán NGAY\n(Đã đóng cửa lúc {gioDongCua:HH:mm})",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.White,
-                Location = new Point(80, 12),
-                Size = new Size(panelWidth - 100, 70),
-                BackColor = Color.Transparent
-            };
-            pnlWarning.Controls.Add(lblWarning);
-
-            // Pulsing animation
-            var timer = new System.Windows.Forms.Timer { Interval = 500 };
-            var isHighlight = false;
-            timer.Tick += (s, e) =>
-            {
-                if (pnlWarning.IsDisposed)
-                {
-                    timer.Stop();
-                    timer.Dispose();
-                    return;
-                }
-
-                isHighlight = !isHighlight;
-                pnlWarning.BackColor = isHighlight
-                    ? Color.FromArgb(239, 68, 68)
-                    : Color.FromArgb(220, 38, 38);
-            };
-            timer.Start();
-
-            targetPanel.Controls.Add(pnlWarning);
-            return yPos + 90;
-        }
-
-
         private int RenderTimerCard(Panel targetPanel, TimeSpan duration, int yPos, int panelWidth, bool isDenGioDongCua)
         {
-            var hours = (int)duration.TotalHours;
-            var minutes = duration.Minutes;
+            // ✅ SỬ DỤNG duration ĐÃ ĐƯỢC TÍNH TỪ RenderPlayingContent
+            // Làm tròn lên phút - giống UpdateInfoLabelText
+            var totalMinutes = (int)Math.Ceiling(duration.TotalMinutes);
+            var hours = totalMinutes / 60;
+            var minutes = totalMinutes % 60;
 
             var pnlTimer = new Panel
             {
                 Location = new Point(15, yPos + 20),
                 Size = new Size(panelWidth, 75),
                 BackColor = isDenGioDongCua
-                    ? Color.FromArgb(153, 27, 27) // Đỏ đậm hơn khi đóng cửa
+                    ? Color.FromArgb(153, 27, 27)
                     : Color.FromArgb(220, 38, 38)
             };
 
             var lblLabel = new Label
             {
-                Text = isDenGioDongCua ? "⚠️ THỜI GIAN TẠM TÍNH" : "THỜI GIAN CHƠI",
+                Text = isDenGioDongCua ? "THỜI GIAN TẠM TÍNH" : "THỜI GIAN CHƠI",
                 Font = new Font("Segoe UI", 9, FontStyle.Bold),
                 ForeColor = isDenGioDongCua
                     ? Color.FromArgb(254, 202, 202)
@@ -686,6 +568,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 BackColor = Color.Transparent
             };
 
+            // ✅ Hiển thị duration đã tính đúng
             var lblTime = new Label
             {
                 Text = $"{hours:D2}h {minutes:D2}m",
@@ -701,6 +584,7 @@ namespace Billiard.WinForm.Forms.QLBan
 
             return yPos + 75;
         }
+
 
         private int RenderCustomerInfoCard(Panel targetPanel, HoaDonEntity hoaDon, int yPos, int panelWidth)
         {
@@ -737,6 +621,8 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private async Task<int> RenderPaymentInfo(Panel targetPanel, HoaDonEntity hoaDon, TimeSpan duration, int yPos, int panelWidth, System.Threading.CancellationToken token)
         {
+            // ✅ SỬ DỤNG duration ĐÃ ĐƯỢC TÍNH ĐÚNG từ RenderPlayingContent
+            // Làm tròn lên phút
             var tongPhut = (int)Math.Ceiling(duration.TotalMinutes);
             var soGio = (decimal)tongPhut / 60m;
             var giaGioDecimal = _ban.MaLoaiNavigation?.GiaGio ?? 0;
@@ -758,55 +644,36 @@ namespace Billiard.WinForm.Forms.QLBan
             int cardY = 12;
 
             // ============================================================
-            // THÊM: KIỂM TRA VÀ HIỂN THỊ BADGE TẠM TÍNH
+            // Check closing time status
             // ============================================================
-            var gioDongCua = _gioHoatDongService.LayThoiDiemDongCua();
-            var isDenGioDongCua = DateTime.Now >= gioDongCua && hoaDon.ThoiGianBatDau < gioDongCua;
+            var gioDongCua = _gioHoatDongService.LayThoiDiemDongCuaTheoBanBatDau(hoaDon.ThoiGianBatDau.Value);
+            var isDenGioDongCua = DateTime.Now >= gioDongCua;
 
             if (isDenGioDongCua)
             {
-                // Badge cảnh báo tạm tính
+                // Warning badge for temporary calculation
                 var pnlWarning = new Panel
                 {
                     Location = new Point(12, cardY),
-                    Size = new Size(panelWidth - 24, 45),
-                    BackColor = Color.FromArgb(254, 243, 199) // Vàng nhạt
-                };
-
-                var lblWarningIcon = new Label
-                {
-                    Text = "⚠️",
-                    Font = new Font("Segoe UI", 18F),
-                    Location = new Point(10, 8),
-                    AutoSize = true,
-                    BackColor = Color.Transparent
+                    Size = new Size(panelWidth - 24, 75),
+                    BackColor = Color.FromArgb(254, 243, 199)
                 };
 
                 var lblWarningText = new Label
                 {
                     Text = "TẠM TÍNH - Đã đến giờ đóng cửa\nVui lòng thanh toán ngay",
                     Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                    ForeColor = Color.FromArgb(146, 64, 14), // Cam đậm
+                    ForeColor = Color.FromArgb(146, 64, 14),
                     Location = new Point(50, 8),
-                    Size = new Size(panelWidth - 80, 35),
+                    Size = new Size(panelWidth - 80, 75),
                     BackColor = Color.Transparent
                 };
 
-                pnlWarning.Controls.AddRange(new Control[] { lblWarningIcon, lblWarningText });
+                pnlWarning.Controls.AddRange(new Control[] { lblWarningText });
                 pnlPayment.Controls.Add(pnlWarning);
-                cardY += 55;
+                cardY += 85;
 
-                // Tính lại tiền bàn theo giờ đóng cửa
-                var thoiGianThucTe = gioDongCua - hoaDon.ThoiGianBatDau.Value;
-                tongPhut = (int)Math.Ceiling(thoiGianThucTe.TotalMinutes);
-                soGio = (decimal)tongPhut / 60m;
-                tienBan = soGio * giaGioDecimal;
-
-                tamTinh = tienBan + tienDichVu - giamGia;
-                tongCong = Math.Ceiling((tamTinh ?? 0m) / 1000m) * 1000m;
-                chenhLech = tongCong - tamTinh;
             }
-            // ============================================================
 
             var lblTitle = new Label
             {
@@ -849,8 +716,8 @@ namespace Billiard.WinForm.Forms.QLBan
                 Location = new Point(12, cardY),
                 Size = new Size(panelWidth - 24, 42),
                 BackColor = isDenGioDongCua
-                    ? Color.FromArgb(254, 226, 226)  // Đỏ nhạt nếu tạm tính
-                    : Color.FromArgb(239, 246, 255)   // Xanh nhạt bình thường
+                    ? Color.FromArgb(254, 226, 226)
+                    : Color.FromArgb(239, 246, 255)
             };
 
             var lblTotalLabel = new Label
@@ -858,8 +725,8 @@ namespace Billiard.WinForm.Forms.QLBan
                 Text = isDenGioDongCua ? "TỔNG TẠM TÍNH" : "TỔNG CỘNG",
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 ForeColor = isDenGioDongCua
-                    ? Color.FromArgb(153, 27, 27)    // Đỏ đậm
-                    : Color.FromArgb(30, 64, 175),   // Xanh đậm
+                    ? Color.FromArgb(153, 27, 27)
+                    : Color.FromArgb(30, 64, 175),
                 Location = new Point(10, 11),
                 AutoSize = true
             };
@@ -883,68 +750,6 @@ namespace Billiard.WinForm.Forms.QLBan
             targetPanel.Controls.Add(pnlPayment);
 
             return yPos + cardY;
-        }
-        private async Task<int> RenderServiceList(Panel targetPanel, int maHd, int yPos, int panelWidth, System.Threading.CancellationToken token)
-        {
-            // QUAN TRỌNG: LUÔN lấy dữ liệu MỚI NHẤT từ database
-            // Không sử dụng cache, không dùng dữ liệu cũ
-            var chiTietList = await Task.Run(() => _banBiaService.GetInvoiceDetailsAsync(maHd), token);
-
-            if (token.IsCancellationRequested) return yPos;
-
-            var lblHeader = new Label
-            {
-                Text = $"DỊCH VỤ ĐÃ GỌI ({chiTietList.Count})",
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Location = new Point(15, yPos + 20),
-                AutoSize = true
-            };
-            targetPanel.Controls.Add(lblHeader);
-            yPos += 28;
-
-            if (chiTietList.Count > 0)
-            {
-                var pnlServicesContainer = new Panel
-                {
-                    Location = new Point(15, yPos + 20),
-                    Size = new Size(panelWidth, 220),
-                    BackColor = Color.White,
-                    AutoScroll = true,
-                    BorderStyle = BorderStyle.FixedSingle
-                };
-
-                int serviceY = 8;
-                foreach (var item in chiTietList)
-                {
-                    serviceY = RenderServiceItem(pnlServicesContainer, item, serviceY, panelWidth - 25);
-                }
-
-                targetPanel.Controls.Add(pnlServicesContainer);
-                yPos += 220;
-            }
-            else
-            {
-                var pnlEmpty = CreateModernCard(panelWidth);
-                pnlEmpty.Location = new Point(15, yPos + 20);
-                pnlEmpty.Height = 65;
-                pnlEmpty.BackColor = Color.FromArgb(249, 250, 251);
-
-                var lblEmpty = new Label
-                {
-                    Text = "Chưa có dịch vụ",
-                    Font = new Font("Segoe UI", 9.5F, FontStyle.Italic),
-                    ForeColor = Color.FromArgb(148, 163, 184),
-                    AutoSize = false,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    Dock = DockStyle.Fill
-                };
-                pnlEmpty.Controls.Add(lblEmpty);
-                targetPanel.Controls.Add(pnlEmpty);
-                yPos += 65;
-            }
-
-            return yPos;
         }
         private int RenderServiceItem(Panel parentPanel, ChiTietHoaDonEntity item, int yPos, int panelWidth)
         {
@@ -1013,21 +818,19 @@ namespace Billiard.WinForm.Forms.QLBan
         }
         private int RenderPlayingButtons(Panel targetPanel, int yPos, int panelWidth, bool isDenGioDongCua)
         {
+            // ============================================================
+            // ✅ NÚT THÊM DỊCH VỤ: LUÔN LUÔN BẬT
+            // ============================================================
             var btnThemDV = CreateModernButton("Thêm dịch vụ", Color.FromArgb(59, 130, 246), panelWidth);
             btnThemDV.Location = new Point(15, yPos + 20);
             btnThemDV.Click += BtnThemDV_Click;
-
-            // Vô hiệu hóa khi đóng cửa
-            if (isDenGioDongCua)
-            {
-                btnThemDV.Enabled = false;
-                btnThemDV.BackColor = Color.FromArgb(148, 163, 184);
-                btnThemDV.Text = "⚠️ Không thể thêm dịch vụ (Đã đóng cửa)";
-            }
-
+            // ✅ BỎ: Không disable nút này nữa
             targetPanel.Controls.Add(btnThemDV);
             yPos += 48;
 
+            // ============================================================
+            // ✅ NÚT THANH TOÁN: Highlight khi đã đóng cửa
+            // ============================================================
             var btnThanhToan = CreateModernButton(
                 isDenGioDongCua ? "⚠️ THANH TOÁN NGAY" : "Thanh toán",
                 Color.FromArgb(34, 197, 94),

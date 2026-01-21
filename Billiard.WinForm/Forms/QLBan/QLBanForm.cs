@@ -44,7 +44,7 @@ namespace Billiard.WinForm.Forms.QLBan
         public QLBanForm(BanBiaService banBiaService)
         {
             _banBiaService = banBiaService;
-            _gioHoatDongService = new GioHoatDongService(); 
+            _gioHoatDongService = new GioHoatDongService();
 
             InitializeComponent();
             InitializeDetailPanel();
@@ -233,6 +233,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 MessageBox.Show($"Lỗi: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
         private void ShowDetailPanel()
         {
             if (_isDetailVisible) return;
@@ -317,7 +318,7 @@ namespace Billiard.WinForm.Forms.QLBan
             var card = new Panel
             {
                 Width = CARD_WIDTH,
-                Height = 280,
+                Height = 330, // Tăng chiều cao cho bàn đang chơi và đã đặt
                 Margin = new Padding(10),
                 BorderStyle = BorderStyle.FixedSingle,
                 Cursor = Cursors.Hand,
@@ -341,16 +342,27 @@ namespace Billiard.WinForm.Forms.QLBan
             var pnlImage = CreateImagePanel(ban);
             var lblName = CreateNameLabel(ban);
             var lblInfo = CreateInfoLabel(ban);
-            var lblPrice = CreatePriceLabel(ban);
 
-            card.Controls.AddRange(new Control[] { pnlImage, lblName, lblInfo, lblPrice });
+            card.Controls.AddRange(new Control[] { pnlImage, lblName, lblInfo });
 
-            // Add customer label for playing tables
+            // ✅ Thông tin giờ chơi cho bàn đang chơi
             if (ban.TrangThai == "Đang chơi")
             {
+                var lblTimeInfo = CreateTimeInfoLabel(ban);
                 var lblCustomer = CreateCustomerLabel(ban);
-                card.Controls.Add(lblCustomer);
+                card.Controls.AddRange(new Control[] { lblTimeInfo, lblCustomer });
             }
+
+            // ✅ Thông tin giờ đặt cho bàn đã đặt
+            if (ban.TrangThai == "Đã đặt")
+            {
+                var lblBookingTimeInfo = CreateBookingTimeInfoLabel(ban);
+                var lblCustomer = CreateCustomerLabelForReserved(ban);
+                card.Controls.AddRange(new Control[] { lblBookingTimeInfo, lblCustomer });
+            }
+
+            var lblPrice = CreatePriceLabel(ban);
+            card.Controls.Add(lblPrice);
 
             // Click handlers
             SetupCardClickHandlers(card, ban);
@@ -359,6 +371,104 @@ namespace Billiard.WinForm.Forms.QLBan
             SetupCardHoverEffects(card, ban);
 
             return card;
+        }
+
+        private Label CreateTimeInfoLabel(BanBium ban)
+        {
+            var lblTimeInfo = new Label
+            {
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = Color.FromArgb(71, 85, 105),
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 210),
+                Size = new Size(CARD_WIDTH, 40),
+                Name = "lblTimeInfo"
+            };
+
+            UpdateTimeInfoText(lblTimeInfo, ban);
+            return lblTimeInfo;
+        }
+
+        private async void UpdateTimeInfoText(Label lblTimeInfo, BanBium ban)
+        {
+            if (ban.TrangThai == "Đang chơi" && ban.GioBatDau.HasValue)
+            {
+                var gioBatDau = ban.GioBatDau.Value;
+
+                // ✅ LẤY THÔNG TIN BOOKING (nếu có)
+                DateTime? gioKetThucBooking = null;
+                try
+                {
+                    var datBanService = Program.GetService<DatBanService>();
+                    var datBans = await datBanService.GetByTableAsync(ban.MaBan);
+                    var activeBooking = datBans.FirstOrDefault(d =>
+                        d.TrangThai == "Đã xác nhận" &&
+                        d.ThoiGianKetThuc.HasValue);
+
+                    if (activeBooking != null)
+                    {
+                        gioKetThucBooking = activeBooking.ThoiGianKetThuc.Value;
+                    }
+                }
+                catch { }
+
+                // ✅ TÍNH ĐÚNG VỚI BOOKING QUA ĐÊM
+                var gioKetThuc = _gioHoatDongService.LayThoiGianKetThucHopLe(gioBatDau, gioKetThucBooking);
+
+                lblTimeInfo.Text = $"Time: {gioBatDau:HH:mm}" +
+                                  $" - {gioKetThuc:HH:mm}";
+            }
+        }
+
+        private Label CreateBookingTimeInfoLabel(BanBium ban)
+        {
+            var lblBookingTimeInfo = new Label
+            {
+                Font = new Font("Segoe UI", 8.5F),
+                ForeColor = Color.FromArgb(71, 85, 105),
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 210),
+                Size = new Size(CARD_WIDTH, 40),
+                Name = "lblBookingTimeInfo"
+            };
+
+            UpdateBookingTimeInfoText(lblBookingTimeInfo, ban);
+            return lblBookingTimeInfo;
+        }
+
+        private async void UpdateBookingTimeInfoText(Label lblBookingTimeInfo, BanBium ban)
+        {
+            if (ban.TrangThai == "Đã đặt")
+            {
+                try
+                {
+                    var datBanService = Program.GetService<DatBanService>();
+                    var datBans = await datBanService.GetByTableAsync(ban.MaBan);
+                    var activeBooking = datBans.FirstOrDefault(d =>
+                        d.TrangThai == "Đã xác nhận" &&
+                        d.ThoiGianBatDau.HasValue &&
+                        d.ThoiGianKetThuc.HasValue);
+
+                    if (activeBooking != null)
+                    {
+                        var gioBatDau = activeBooking.ThoiGianBatDau.Value;
+                        var gioKetThuc = activeBooking.ThoiGianKetThuc.Value;
+
+                        lblBookingTimeInfo.Text = $"Đặt: {gioBatDau:HH:mm}" +
+                                                 $" - {gioKetThuc:HH:mm}";
+                    }
+                    else
+                    {
+                        lblBookingTimeInfo.Text = "Chưa có thông tin giờ đặt";
+                    }
+                }
+                catch
+                {
+                    lblBookingTimeInfo.Text = "Lỗi tải thông tin đặt bàn";
+                }
+            }
         }
 
         private Panel CreateImagePanel(BanBium ban)
@@ -468,18 +578,46 @@ namespace Billiard.WinForm.Forms.QLBan
             return lblInfo;
         }
 
-        private void UpdateInfoLabelText(Label lblInfo, BanBium ban)
+        private async void UpdateInfoLabelText(Label lblInfo, BanBium ban)
         {
             if (ban.TrangThai == "Đang chơi" && ban.GioBatDau.HasValue)
             {
-                var duration = DateTime.Now - ban.GioBatDau.Value;
-                lblInfo.Text = $"⏱️ {(int)duration.TotalHours}h {duration.Minutes}m";
+                // ✅ LẤY THÔNG TIN BOOKING (nếu có)
+                DateTime? gioKetThucBooking = null;
+                try
+                {
+                    var datBanService = Program.GetService<DatBanService>();
+                    var datBans = await datBanService.GetByTableAsync(ban.MaBan);
+                    var activeBooking = datBans.FirstOrDefault(d =>
+                        d.TrangThai == "Đã xác nhận" &&
+                        d.ThoiGianKetThuc.HasValue);
+
+                    if (activeBooking != null)
+                    {
+                        gioKetThucBooking = activeBooking.ThoiGianKetThuc.Value;
+                    }
+                }
+                catch { }
+
+                // ✅ TÍNH DURATION ĐÚNG VỚI BOOKING QUA ĐÊM
+                var thoiGianKetThuc = _gioHoatDongService.LayThoiGianKetThucHopLe(
+                    ban.GioBatDau.Value,
+                    gioKetThucBooking
+                );
+                var duration = thoiGianKetThuc - ban.GioBatDau.Value;
+
+                // ✅ LÀM TRÒN LÊN PHÚT
+                var totalMinutes = (int)Math.Ceiling(duration.TotalMinutes);
+                var hours = totalMinutes / 60;
+                var minutes = totalMinutes % 60;
+
+                lblInfo.Text = $"⏱️ {hours}h {minutes}m";
                 lblInfo.ForeColor = Color.FromArgb(239, 68, 68);
                 lblInfo.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             }
             else if (ban.TrangThai == "Đã đặt")
             {
-                lblInfo.Text = $"👤 {ban.MaKhNavigation?.TenKh ?? "Khách đặt"}";
+                lblInfo.Text = $"📍 {ban.MaKhuVucNavigation?.TenKhuVuc ?? "Khu vực"}";
             }
             else
             {
@@ -496,7 +634,22 @@ namespace Billiard.WinForm.Forms.QLBan
                 ForeColor = Color.FromArgb(71, 85, 105),
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(0, 210),
+                Location = new Point(0, 250),
+                Size = new Size(CARD_WIDTH, 22),
+                Name = "lblCustomer"
+            };
+        }
+
+        private Label CreateCustomerLabelForReserved(BanBium ban)
+        {
+            return new Label
+            {
+                Text = $"👤 {ban.MaKhNavigation?.TenKh ?? "Khách đặt"}",
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = Color.FromArgb(71, 85, 105),
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(0, 250),
                 Size = new Size(CARD_WIDTH, 22),
                 Name = "lblCustomer"
             };
@@ -504,6 +657,9 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private Label CreatePriceLabel(BanBium ban)
         {
+            // ✅ Cả "Đang chơi" và "Đã đặt" đều dùng position 275
+            int yPos = (ban.TrangThai == "Đang chơi" || ban.TrangThai == "Đã đặt") ? 275 : 235;
+
             return new Label
             {
                 Text = $"{ban.MaLoaiNavigation?.GiaGio:N0} đ/giờ",
@@ -511,7 +667,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 ForeColor = Color.FromArgb(99, 102, 241),
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleCenter,
-                Location = new Point(0, 235),
+                Location = new Point(0, yPos),
                 Size = new Size(CARD_WIDTH, 28)
             };
         }
@@ -626,6 +782,13 @@ namespace Billiard.WinForm.Forms.QLBan
             // Update tag
             card.Tag = updatedBan;
 
+            // Update height nếu thay đổi trạng thái
+            int newHeight = 330;
+            if (card.Height != newHeight)
+            {
+                card.Height = newHeight;
+            }
+
             // Update background
             card.BackColor = GetCardBackColor(updatedBan.TrangThai);
 
@@ -640,10 +803,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 lblStatus.BackColor = GetStatusColor(updatedBan.TrangThai);
             }
 
-            // ============================================================
-            // CẬP NHẬT: Badge cảnh báo
-            // ============================================================
-            // Remove existing warning badges
+            // Update warning badges
             var lblDongCua = pnlImage.Controls.Find("lblDongCua", false).FirstOrDefault();
             var lblSapDong = pnlImage.Controls.Find("lblSapDong", false).FirstOrDefault();
 
@@ -658,7 +818,6 @@ namespace Billiard.WinForm.Forms.QLBan
                 lblSapDong.Dispose();
             }
 
-            // Add new warning badges if needed
             if (updatedBan.TrangThai == "Đang chơi" && updatedBan.GioBatDau.HasValue)
             {
                 var isDaDongCua = _gioHoatDongService.DaDenGioDongCua() &&
@@ -743,7 +902,47 @@ namespace Billiard.WinForm.Forms.QLBan
                 UpdateInfoLabelText(lblInfo, updatedBan);
             }
 
-            // Update/remove customer label
+            // ✅ Update time info label cho bàn đang chơi
+            var lblTimeInfo = card.Controls.Find("lblTimeInfo", false).FirstOrDefault() as Label;
+            if (updatedBan.TrangThai == "Đang chơi")
+            {
+                if (lblTimeInfo == null)
+                {
+                    lblTimeInfo = CreateTimeInfoLabel(updatedBan);
+                    card.Controls.Add(lblTimeInfo);
+                }
+                else
+                {
+                    UpdateTimeInfoText(lblTimeInfo, updatedBan);
+                }
+            }
+            else if (lblTimeInfo != null)
+            {
+                card.Controls.Remove(lblTimeInfo);
+                lblTimeInfo.Dispose();
+            }
+
+            // ✅ Update booking time info label cho bàn đã đặt
+            var lblBookingTimeInfo = card.Controls.Find("lblBookingTimeInfo", false).FirstOrDefault() as Label;
+            if (updatedBan.TrangThai == "Đã đặt")
+            {
+                if (lblBookingTimeInfo == null)
+                {
+                    lblBookingTimeInfo = CreateBookingTimeInfoLabel(updatedBan);
+                    card.Controls.Add(lblBookingTimeInfo);
+                }
+                else
+                {
+                    UpdateBookingTimeInfoText(lblBookingTimeInfo, updatedBan);
+                }
+            }
+            else if (lblBookingTimeInfo != null)
+            {
+                card.Controls.Remove(lblBookingTimeInfo);
+                lblBookingTimeInfo.Dispose();
+            }
+
+            // Update customer label
             var lblCustomer = card.Controls.Find("lblCustomer", false).FirstOrDefault() as Label;
             if (updatedBan.TrangThai == "Đang chơi")
             {
@@ -757,16 +956,236 @@ namespace Billiard.WinForm.Forms.QLBan
                     lblCustomer.Text = $"👤 {updatedBan.MaKhNavigation?.TenKh ?? "Khách lẻ"}";
                 }
             }
+            else if (updatedBan.TrangThai == "Đã đặt")
+            {
+                if (lblCustomer == null)
+                {
+                    lblCustomer = CreateCustomerLabelForReserved(updatedBan);
+                    card.Controls.Add(lblCustomer);
+                }
+                else
+                {
+                    lblCustomer.Text = $"👤 {updatedBan.MaKhNavigation?.TenKh ?? "Khách đặt"}";
+                }
+            }
             else if (lblCustomer != null)
             {
                 card.Controls.Remove(lblCustomer);
                 lblCustomer.Dispose();
             }
 
+            // Update price label position
+            var lblPrice = card.Controls.OfType<Label>()
+                .FirstOrDefault(l => l.Text.Contains("đ/giờ"));
+            if (lblPrice != null)
+            {
+                // ✅ Cả "Đang chơi" và "Đã đặt" đều dùng position 275
+                int yPos = (updatedBan.TrangThai == "Đang chơi" || updatedBan.TrangThai == "Đã đặt") ? 275 : 235;
+                lblPrice.Location = new Point(0, yPos);
+            }
+
             card.Invalidate();
         }
 
         #endregion
+
+        #region Data Loading & Filtering
+
+        private async Task LoadTables()
+        {
+            try
+            {
+                this.Cursor = Cursors.WaitCursor;
+                flpBanBia.SuspendLayout();
+                flpBanBia.Controls.Clear();
+
+                _allTables = await _banBiaService.GetAllTablesAsync();
+                RenderFilteredTables();
+
+                flpBanBia.ResumeLayout();
+                this.Cursor = Cursors.Default;
+            }
+            catch (Exception ex)
+            {
+                flpBanBia.ResumeLayout();
+                this.Cursor = Cursors.Default;
+                MessageBox.Show($"Lỗi tải danh sách bàn: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private async Task RefreshTables()
+        {
+            await LoadTables();
+
+            // Reload detail if visible
+            if (_isDetailVisible && _chiTietControl != null)
+            {
+                await _chiTietControl.LoadBanDetail();
+            }
+        }
+
+        private async Task RefreshTablesSmooth()
+        {
+            try
+            {
+                // Kiểm tra bàn quá giờ cho phép (17 tiếng)
+                await KiemTraVaXuLyBanQuaGioChoPhep();
+
+                // Kiểm tra giờ đóng cửa
+                await KiemTraVaXuLyBanDenGioDongCua();
+
+                var newTables = await _banBiaService.GetAllTablesAsync();
+
+                if (!HasTableChanges(newTables)) return;
+
+                _allTables = newTables;
+
+                await UpdateExistingCardsSmooth();
+
+                if (_isDetailVisible && _chiTietControl != null)
+                {
+                    await _chiTietControl.LoadBanDetail(forceReload: false);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Lỗi refresh: {ex.Message}");
+            }
+        }
+
+        private async Task KiemTraVaXuLyBanQuaGioChoPhep()
+        {
+            try
+            {
+                var banQuaGio = await _banBiaService.KiemTraBanQuaGioChoPhep();
+
+                if (banQuaGio.Count == 0)
+                    return;
+
+                // Đánh dấu bàn cần thanh toán
+                foreach (var ban in banQuaGio)
+                {
+                    await _banBiaService.DanhDauBanCanThanhToan(ban.MaBan, true);
+                }
+
+                // Hiển thị cảnh báo (chỉ hiện 1 lần mỗi session)
+                if (!_daHienThiCanhBaoQuaGio)
+                {
+                    _daHienThiCanhBaoQuaGio = true;
+
+                    var danhSachBan = string.Join(", ", banQuaGio.Select(b => b.TenBan));
+                    var soGioToiDa = _gioHoatDongService.LaySoGioHoatDongToiDa();
+
+                    var result = MessageBox.Show(
+                        $"⛔ CẢNH BÁO KHẨN CẤP!\n\n" +
+                        $"Các bàn sau đã chơi QUÁ {soGioToiDa} TIẾNG:\n{danhSachBan}\n\n" +
+                        $"Vui lòng THANH TOÁN NGAY LẬP TỨC!\n\n" +
+                        $"Bạn có muốn xem danh sách chi tiết?",
+                        "Bàn chơi quá giờ cho phép",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Error);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        HienThiFormBanQuaGio(banQuaGio);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Lỗi kiểm tra bàn quá giờ: {ex.Message}");
+            }
+        }
+
+        private async Task HienThiFormBanQuaGio(List<BanBium> danhSachBan)
+        {
+            var form = new Form
+            {
+                Text = "Bàn chơi quá giờ cho phép",
+                Size = new Size(650, 450),
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.FixedDialog,
+                MaximizeBox = false,
+                MinimizeBox = false
+            };
+
+            var soGioToiDa = _gioHoatDongService.LaySoGioHoatDongToiDa();
+
+            var lblTitle = new Label
+            {
+                Text = $"⛔ BÀN ĐÃ CHƠI QUÁ {soGioToiDa} TIẾNG",
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(153, 27, 27),
+                Location = new Point(20, 20),
+                AutoSize = true
+            };
+            form.Controls.Add(lblTitle);
+
+            var lblWarning = new Label
+            {
+                Text = "Các bàn này ĐÃ VƯỢT QUÁ thời gian hoạt động cho phép của quán!",
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = Color.FromArgb(220, 38, 38),
+                Location = new Point(20, 55),
+                AutoSize = true
+            };
+            form.Controls.Add(lblWarning);
+
+            var dgv = new DataGridView
+            {
+                Location = new Point(20, 90),
+                Size = new Size(590, 270),
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            };
+
+            dgv.Columns.Add("TenBan", "Bàn");
+            dgv.Columns.Add("KhuVuc", "Khu vực");
+            dgv.Columns.Add("GioBatDau", "Giờ bắt đầu");
+            dgv.Columns.Add("SoGioChoi", "Số giờ đã chơi");
+            dgv.Columns.Add("TienTamTinh", "Tiền tạm tính");
+
+            foreach (var ban in danhSachBan)
+            {
+                var duration = DateTime.Now - (ban.GioBatDau ?? DateTime.Now);
+                var (tienTamTinh, ghiChu) = await _banBiaService.TinhTienTamThoiBan(ban.MaBan);
+
+                var row = dgv.Rows.Add(
+                    ban.TenBan,
+                    ban.MaKhuVucNavigation?.TenKhuVuc ?? "-",
+                    ban.GioBatDau?.ToString("HH:mm dd/MM") ?? "-",
+                    $"{duration.TotalHours:F1}h ⚠️",
+                    $"{tienTamTinh:N0} đ"
+                );
+
+                dgv.Rows[row].DefaultCellStyle.BackColor = Color.FromArgb(254, 242, 242);
+                dgv.Rows[row].DefaultCellStyle.ForeColor = Color.FromArgb(153, 27, 27);
+                dgv.Rows[row].DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            }
+
+            form.Controls.Add(dgv);
+
+            var btnDong = new Button
+            {
+                Text = "Đóng",
+                Location = new Point(510, 370),
+                Size = new Size(100, 35),
+                BackColor = Color.FromArgb(148, 163, 184),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
+            };
+            btnDong.FlatAppearance.BorderSize = 0;
+            btnDong.Click += (s, e) => form.Close();
+            form.Controls.Add(btnDong);
+
+            form.ShowDialog(this);
+        }
+
         private async Task KiemTraVaXuLyBanDenGioDongCua()
         {
             try
@@ -776,7 +1195,6 @@ namespace Billiard.WinForm.Forms.QLBan
                 if (banDenGioDongCua.Count == 0)
                     return;
 
-                // Hiển thị cảnh báo
                 var danhSachBan = string.Join(", ", banDenGioDongCua.Select(b => b.TenBan));
 
                 var result = MessageBox.Show(
@@ -789,7 +1207,6 @@ namespace Billiard.WinForm.Forms.QLBan
 
                 if (result == DialogResult.Yes)
                 {
-                    // Hiển thị form danh sách bàn cần thanh toán
                     HienThiFormBanCanThanhToan(banDenGioDongCua);
                 }
             }
@@ -798,6 +1215,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 System.Diagnostics.Debug.WriteLine($"Lỗi kiểm tra giờ đóng cửa: {ex.Message}");
             }
         }
+
         private async Task HienThiFormBanCanThanhToan(List<BanBium> danhSachBan)
         {
             var form = new Form
@@ -869,200 +1287,7 @@ namespace Billiard.WinForm.Forms.QLBan
 
             form.ShowDialog(this);
         }
-        #region Data Loading & Filtering
 
-        private async Task LoadTables()
-        {
-            try
-            {
-                this.Cursor = Cursors.WaitCursor;
-                flpBanBia.SuspendLayout();
-                flpBanBia.Controls.Clear();
-
-                _allTables = await _banBiaService.GetAllTablesAsync();
-                RenderFilteredTables();
-
-                flpBanBia.ResumeLayout();
-                this.Cursor = Cursors.Default;
-            }
-            catch (Exception ex)
-            {
-                flpBanBia.ResumeLayout();
-                this.Cursor = Cursors.Default;
-                MessageBox.Show($"Lỗi tải danh sách bàn: {ex.Message}", "Lỗi",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private async Task RefreshTables()
-        {
-            await LoadTables();
-
-            // Reload detail if visible
-            if (_isDetailVisible && _chiTietControl != null)
-            {
-                await _chiTietControl.LoadBanDetail();
-            }
-        }
-        private async Task RefreshTablesSmooth()
-        {
-            try
-            {
-                // ✅ THÊM: Kiểm tra bàn quá giờ cho phép (17 tiếng)
-                await KiemTraVaXuLyBanQuaGioChoPhep();
-
-                // ✅ GIỮ NGUYÊN: Kiểm tra giờ đóng cửa
-                await KiemTraVaXuLyBanDenGioDongCua();
-
-                var newTables = await _banBiaService.GetAllTablesAsync();
-
-                if (!HasTableChanges(newTables)) return;
-
-                _allTables = newTables;
-
-                await UpdateExistingCardsSmooth();
-
-                if (_isDetailVisible && _chiTietControl != null)
-                {
-                    await _chiTietControl.LoadBanDetail(forceReload: false);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Lỗi refresh: {ex.Message}");
-            }
-        }
-        private async Task KiemTraVaXuLyBanQuaGioChoPhep()
-        {
-            try
-            {
-                var banQuaGio = await _banBiaService.KiemTraBanQuaGioChoPhep();
-
-                if (banQuaGio.Count == 0)
-                    return;
-
-                // Đánh dấu bàn cần thanh toán
-                foreach (var ban in banQuaGio)
-                {
-                    await _banBiaService.DanhDauBanCanThanhToan(ban.MaBan, true);
-                }
-
-                // Hiển thị cảnh báo (chỉ hiện 1 lần mỗi session)
-                if (!_daHienThiCanhBaoQuaGio)
-                {
-                    _daHienThiCanhBaoQuaGio = true;
-
-                    var danhSachBan = string.Join(", ", banQuaGio.Select(b => b.TenBan));
-                    var soGioToiDa = _gioHoatDongService.LaySoGioHoatDongToiDa();
-
-                    var result = MessageBox.Show(
-                        $"⛔ CẢNH BÁO KHẨN CẤP!\n\n" +
-                        $"Các bàn sau đã chơi QUÁ {soGioToiDa} TIẾNG:\n{danhSachBan}\n\n" +
-                        $"Vui lòng THANH TOÁN NGAY LẬP TỨC!\n\n" +
-                        $"Bạn có muốn xem danh sách chi tiết?",
-                        "Bàn chơi quá giờ cho phép",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Error);
-
-                    if (result == DialogResult.Yes)
-                    {
-                        HienThiFormBanQuaGio(banQuaGio);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Lỗi kiểm tra bàn quá giờ: {ex.Message}");
-            }
-        }
-        private async Task HienThiFormBanQuaGio(List<BanBium> danhSachBan)
-        {
-            var form = new Form
-            {
-                Text = "Bàn chơi quá giờ cho phép",
-                Size = new Size(650, 450),
-                StartPosition = FormStartPosition.CenterParent,
-                FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false,
-                MinimizeBox = false
-            };
-
-            var soGioToiDa = _gioHoatDongService.LaySoGioHoatDongToiDa();
-
-            var lblTitle = new Label
-            {
-                Text = $"⛔ BÀN ĐÃ CHƠI QUÁ {soGioToiDa} TIẾNG",
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(153, 27, 27),
-                Location = new Point(20, 20),
-                AutoSize = true
-            };
-            form.Controls.Add(lblTitle);
-
-            var lblWarning = new Label
-            {
-                Text = "Các bàn này ĐÃ VƯỢT QUÁ thời gian hoạt động cho phép của quán!",
-                Font = new Font("Segoe UI", 10F),
-                ForeColor = Color.FromArgb(220, 38, 38),
-                Location = new Point(20, 55),
-                AutoSize = true
-            };
-            form.Controls.Add(lblWarning);
-
-            var dgv = new DataGridView
-            {
-                Location = new Point(20, 90),
-                Size = new Size(590, 270),
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                ReadOnly = true,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect
-            };
-
-            dgv.Columns.Add("TenBan", "Bàn");
-            dgv.Columns.Add("KhuVuc", "Khu vực");
-            dgv.Columns.Add("GioBatDau", "Giờ bắt đầu");
-            dgv.Columns.Add("SoGioChoi", "Số giờ đã chơi");
-            dgv.Columns.Add("TienTamTinh", "Tiền tạm tính");
-
-            foreach (var ban in danhSachBan)
-            {
-                var duration = DateTime.Now - (ban.GioBatDau ?? DateTime.Now);
-                var (tienTamTinh, ghiChu) = await _banBiaService.TinhTienTamThoiBan(ban.MaBan);
-
-                var row = dgv.Rows.Add(
-                    ban.TenBan,
-                    ban.MaKhuVucNavigation?.TenKhuVuc ?? "-",
-                    ban.GioBatDau?.ToString("HH:mm dd/MM") ?? "-",
-                    $"{duration.TotalHours:F1}h ⚠️",
-                    $"{tienTamTinh:N0} đ"
-                );
-
-                // Tô đỏ dòng
-                dgv.Rows[row].DefaultCellStyle.BackColor = Color.FromArgb(254, 242, 242);
-                dgv.Rows[row].DefaultCellStyle.ForeColor = Color.FromArgb(153, 27, 27);
-                dgv.Rows[row].DefaultCellStyle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            }
-
-            form.Controls.Add(dgv);
-
-            var btnDong = new Button
-            {
-                Text = "Đóng",
-                Location = new Point(510, 370),
-                Size = new Size(100, 35),
-                BackColor = Color.FromArgb(148, 163, 184),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-            };
-            btnDong.FlatAppearance.BorderSize = 0;
-            btnDong.Click += (s, e) => form.Close();
-            form.Controls.Add(btnDong);
-
-            form.ShowDialog(this);
-        }
         private async Task UpdateExistingCardsSmooth()
         {
             var filteredTables = GetFilteredTables().ToList();
@@ -1070,12 +1295,10 @@ namespace Billiard.WinForm.Forms.QLBan
                 .Where(p => p.Tag is BanBium)
                 .ToList();
 
-            // Batch updates để giảm reflow
             flpBanBia.SuspendLayout();
 
             try
             {
-                // Update existing cards
                 foreach (var card in existingCards)
                 {
                     var ban = card.Tag as BanBium;
@@ -1092,7 +1315,6 @@ namespace Billiard.WinForm.Forms.QLBan
                     }
                 }
 
-                // Add new cards if needed
                 var existingIds = existingCards.Select(c => ((BanBium)c.Tag).MaBan).ToList();
                 var newTables = filteredTables.Where(t => !existingIds.Contains(t.MaBan)).ToList();
 
@@ -1115,13 +1337,13 @@ namespace Billiard.WinForm.Forms.QLBan
                 flpBanBia.ResumeLayout(true);
             }
 
-            await Task.Yield(); // Cho UI breathe
+            await Task.Yield();
         }
+
         private void UpdateCardForBanSmooth(Panel card, BanBium updatedBan)
         {
             var oldBan = card.Tag as BanBium;
 
-            // Chỉ update nếu có thay đổi thực sự
             if (oldBan.TrangThai == updatedBan.TrangThai &&
                 oldBan.GioBatDau == updatedBan.GioBatDau &&
                 oldBan.MaKh == updatedBan.MaKh)
@@ -1135,7 +1357,6 @@ namespace Billiard.WinForm.Forms.QLBan
             {
                 card.Tag = updatedBan;
 
-                // Update status nếu thay đổi
                 if (oldBan.TrangThai != updatedBan.TrangThai)
                 {
                     card.BackColor = GetCardBackColor(updatedBan.TrangThai);
@@ -1149,14 +1370,52 @@ namespace Billiard.WinForm.Forms.QLBan
                     }
                 }
 
-                // Update info label
                 var lblInfo = card.Controls.Find("lblInfo", false).FirstOrDefault() as Label;
                 if (lblInfo != null)
                 {
                     UpdateInfoLabelText(lblInfo, updatedBan);
                 }
 
-                // Update customer label
+                // ✅ Update time info cho bàn đang chơi
+                var lblTimeInfo = card.Controls.Find("lblTimeInfo", false).FirstOrDefault() as Label;
+                if (updatedBan.TrangThai == "Đang chơi")
+                {
+                    if (lblTimeInfo == null)
+                    {
+                        lblTimeInfo = CreateTimeInfoLabel(updatedBan);
+                        card.Controls.Add(lblTimeInfo);
+                    }
+                    else
+                    {
+                        UpdateTimeInfoText(lblTimeInfo, updatedBan);
+                    }
+                }
+                else if (lblTimeInfo != null)
+                {
+                    card.Controls.Remove(lblTimeInfo);
+                    lblTimeInfo.Dispose();
+                }
+
+                // ✅ Update booking time info cho bàn đã đặt
+                var lblBookingTimeInfo = card.Controls.Find("lblBookingTimeInfo", false).FirstOrDefault() as Label;
+                if (updatedBan.TrangThai == "Đã đặt")
+                {
+                    if (lblBookingTimeInfo == null)
+                    {
+                        lblBookingTimeInfo = CreateBookingTimeInfoLabel(updatedBan);
+                        card.Controls.Add(lblBookingTimeInfo);
+                    }
+                    else
+                    {
+                        UpdateBookingTimeInfoText(lblBookingTimeInfo, updatedBan);
+                    }
+                }
+                else if (lblBookingTimeInfo != null)
+                {
+                    card.Controls.Remove(lblBookingTimeInfo);
+                    lblBookingTimeInfo.Dispose();
+                }
+
                 var lblCustomer = card.Controls.Find("lblCustomer", false).FirstOrDefault() as Label;
                 if (updatedBan.TrangThai == "Đang chơi")
                 {
@@ -1170,6 +1429,18 @@ namespace Billiard.WinForm.Forms.QLBan
                         lblCustomer.Text = $"👤 {updatedBan.MaKhNavigation?.TenKh ?? "Khách lẻ"}";
                     }
                 }
+                else if (updatedBan.TrangThai == "Đã đặt")
+                {
+                    if (lblCustomer == null)
+                    {
+                        lblCustomer = CreateCustomerLabelForReserved(updatedBan);
+                        card.Controls.Add(lblCustomer);
+                    }
+                    else
+                    {
+                        lblCustomer.Text = $"👤 {updatedBan.MaKhNavigation?.TenKh ?? "Khách đặt"}";
+                    }
+                }
                 else if (lblCustomer != null)
                 {
                     card.Controls.Remove(lblCustomer);
@@ -1181,6 +1452,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 card.ResumeLayout(true);
             }
         }
+
         private bool HasTableChanges(List<BanBium> newTables)
         {
             if (_allTables == null || _allTables.Count != newTables.Count)
@@ -1229,7 +1501,6 @@ namespace Billiard.WinForm.Forms.QLBan
                 }
             }
 
-            // Add new cards
             var existingIds = existingCards.Select(c => ((BanBium)c.Tag).MaBan).ToList();
             var newTables = filteredTables.Where(t => !existingIds.Contains(t.MaBan)).ToList();
 
@@ -1347,7 +1618,8 @@ namespace Billiard.WinForm.Forms.QLBan
             {
                 "Trống" => Color.FromArgb(240, 253, 244),
                 "Đang chơi" => Color.FromArgb(254, 242, 242),
-                "Đã đặt" => Color.FromArgb(255, 251, 235)
+                "Đã đặt" => Color.FromArgb(255, 251, 235),
+                _ => Color.White
             };
         }
 
@@ -1421,12 +1693,33 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private void BtnXemSoDo_Click(object sender, EventArgs e)
         {
-            MessageBox.Show(
-                "Chức năng 'Xem sơ đồ bàn' đang trong quá trình phát triển.\nVui lòng quay lại sau!",
-                "Thông báo",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information
-            );
+            try
+            {
+                using (var soDoBanForm = new SoDoBanForm(_banBiaService))
+                {
+                    soDoBanForm.SetMainForm(_mainForm);
+
+                    soDoBanForm.OnTableSelected += (s, selectedBan) =>
+                    {
+                        var selectedCard = flpBanBia.Controls
+                            .OfType<Panel>()
+                            .FirstOrDefault(p => p.Tag is BanBium ban && ban.MaBan == selectedBan.MaBan);
+
+                        if (selectedCard != null)
+                        {
+                            flpBanBia.ScrollControlIntoView(selectedCard);
+                            ShowTableDetail(selectedBan);
+                        }
+                    };
+
+                    soDoBanForm.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở sơ đồ bàn: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void BtnXemBanDat_Click(object sender, EventArgs e)
