@@ -67,6 +67,61 @@ namespace Billiard.BLL.Services.HoaDonServices
                 .ToListAsync();
         }
 
+        public async Task<(List<HoaDon> Data, int TotalCount)> GetListHoaDonPagingAsync(
+            string keyword,
+            string status,
+            DateTime fromDate,
+            DateTime toDate,
+            int pageIndex,
+            int pageSize)
+        {
+            // 1. Khởi tạo truy vấn & Eager Loading (Include các bảng liên quan để hiển thị tên)
+            var query = _context.HoaDons
+                .Include(h => h.MaBanNavigation) // Để lấy Tên Bàn
+                .Include(h => h.MaKhNavigation)  // Để lấy Tên Khách, SĐT
+                .Include(h => h.MaNvNavigation)  // Để lấy Tên Nhân Viên
+                .AsNoTracking()                  // Tối ưu hiệu năng (không theo dõi thay đổi vì chỉ để xem)
+                .AsQueryable();
+
+            // 2. Lọc theo Ngày (Bắt buộc)
+            // Logic: Thời gian bắt đầu nằm trong khoảng Từ ngày -> Đến ngày
+            query = query.Where(h => h.ThoiGianBatDau >= fromDate && h.ThoiGianBatDau <= toDate);
+
+            // 3. Lọc theo Trạng thái
+            if (!string.IsNullOrEmpty(status) && status != "Tất cả")
+            {
+                query = query.Where(h => h.TrangThai == status);
+            }
+
+            // 4. Tìm kiếm theo Từ khóa (Mã HĐ, Tên KH, SĐT)
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                keyword = keyword.ToLower(); // Chuyển về chữ thường để tìm không phân biệt hoa thường
+
+                // Lưu ý: Cần xử lý null cho MaKhNavigation (trường hợp khách vãng lai)
+                query = query.Where(h =>
+                    h.MaHd.ToString().Contains(keyword) || // Tìm theo Mã HĐ
+                    (h.MaKhNavigation != null && (h.MaKhNavigation.TenKh.ToLower().Contains(keyword) || h.MaKhNavigation.Sdt.Contains(keyword))) // Tìm theo Tên/SĐT
+                );
+            }
+
+            // 5. Đếm tổng số bản ghi (Quan trọng để tính số trang)
+            // Phải đếm TRƯỚC khi phân trang
+            int totalCount = await query.CountAsync();
+
+            // 6. Phân trang & Sắp xếp
+            var data = await query
+                .OrderByDescending(h => h.ThoiGianBatDau) // Hóa đơn mới nhất lên đầu
+                .Skip((pageIndex - 1) * pageSize)         // Bỏ qua các dòng của trang trước
+                .Take(pageSize)                           // Lấy số dòng của trang hiện tại
+                .ToListAsync();
+
+            // 7. Trả về kết quả (Tuple)
+            return (data, totalCount);
+        }
+
+
+
         #endregion
 
         #region Thao tác với hóa đơn đang chơi (cho QLBanForm)
@@ -265,7 +320,6 @@ namespace Billiard.BLL.Services.HoaDonServices
         }
 
         #endregion
-
 
         #region Lịch sử hóa đơn cho User
         public async Task<List<HoaDon>> GetHistoryByCustomerAsync(int maKh)

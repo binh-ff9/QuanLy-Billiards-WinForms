@@ -1,6 +1,6 @@
 ﻿namespace Billiard.WinForm.Forms.HoaDon
 {
-    partial class ChiTietHoaDonControl
+    partial class HoaDonRowControl
     {
         /// <summary> 
         /// Required designer variable.
@@ -30,12 +30,12 @@
         {
             SuspendLayout();
             // 
-            // ChiTietHoaDonControl
+            // HoaDonRowControl
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            Name = "ChiTietHoaDonControl";
-            Size = new Size(550, 1000);
+            Name = "HoaDonRowControl";
+            Size = new Size(796, 150);
             ResumeLayout(false);
         }
 

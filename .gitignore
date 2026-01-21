@@ -15,3 +15,4 @@ packages/
 # (QUAN TRỌNG) Bỏ qua file chứa mật khẩu database
 # Nếu bạn dùng project API, file này nên được giữ bí mật
 appsettings.Development.json
+appsettings.json

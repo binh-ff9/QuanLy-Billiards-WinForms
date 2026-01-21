@@ -27,6 +27,7 @@ namespace Billiard.WinForm
         private Form _activeForm;
         private System.Timers.Timer _refreshTimer;
 
+
         // Session info
         public int MaNV { get; set; }
         public string TenNV { get; set; }
@@ -285,8 +286,7 @@ namespace Billiard.WinForm
                     case "btnKhachHang":
                         var khForm = Program.GetService<KhachHangForm>();
                         khForm.SetMainForm(this);
-                        OpenChildForm(khForm);
-                        break;
+                        OpenChildForm(khForm); break;
                     case "btnThongKe":
                         OpenChildForm(Program.GetService<ThongKeForm>());
                         break;
@@ -529,6 +529,28 @@ namespace Billiard.WinForm
         {
             pnlDetail.Visible = false;
         }
+        public void SwitchToHoaDonTab(string sdt)
+        {
+            // 1. Visually activate the Invoice button in sidebar
+            // Assuming the button name is "btnHoaDon" - check your designer for exact name
+            var btnHoaDon = pnlSidebar.Controls.Find("btnHoaDon", true).FirstOrDefault() as Button;
+            if (btnHoaDon != null)
+            {
+                ActivateButton(btnHoaDon);
+            }
+
+            // 2. Create and Open the Invoice Form
+            var hoaDonForm = Program.GetService<HoaDonForm>();
+            hoaDonForm.SetMainForm(this);
+
+            // 3. Open the form inside the panel
+            OpenChildForm(hoaDonForm);
+
+            // 4. Trigger the filter
+            // Ensure HoaDonForm has the public method FilterBySdt(string sdt) defined
+            hoaDonForm.FilterBySdt(sdt);
+        }
+
 
         #endregion
 
