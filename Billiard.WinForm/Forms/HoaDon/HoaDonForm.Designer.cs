@@ -28,7 +28,6 @@
         /// </summary>
         private void InitializeComponent()
         {
-            dataGridViewHoaDon = new DataGridView();
             pnlFilters = new Panel();
             dtpDenNgay = new DateTimePicker();
             label1 = new Label();
@@ -41,22 +40,11 @@
             btnChuaThanhToan = new Button();
             btnDaThanhToan = new Button();
             lblTrangThai = new Label();
-            ((System.ComponentModel.ISupportInitialize)dataGridViewHoaDon).BeginInit();
+            pnlListHoaDon = new FlowLayoutPanel();
+            pnlRightContainer = new Panel();
             pnlFilters.SuspendLayout();
             pnlTrangThaiFilters.SuspendLayout();
             SuspendLayout();
-            // 
-            // dataGridViewHoaDon
-            // 
-            dataGridViewHoaDon.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewHoaDon.Dock = DockStyle.Fill;
-            dataGridViewHoaDon.GridColor = SystemColors.InactiveCaption;
-            dataGridViewHoaDon.Location = new Point(0, 127);
-            dataGridViewHoaDon.Name = "dataGridViewHoaDon";
-            dataGridViewHoaDon.RowHeadersWidth = 51;
-            dataGridViewHoaDon.Size = new Size(800, 323);
-            dataGridViewHoaDon.TabIndex = 0;
-            dataGridViewHoaDon.CellClick += dataGridViewHoaDon_CellClick;
             // 
             // pnlFilters
             // 
@@ -71,7 +59,7 @@
             pnlFilters.Dock = DockStyle.Top;
             pnlFilters.Location = new Point(0, 0);
             pnlFilters.Name = "pnlFilters";
-            pnlFilters.Size = new Size(800, 127);
+            pnlFilters.Size = new Size(1172, 101);
             pnlFilters.TabIndex = 1;
             // 
             // dtpDenNgay
@@ -106,10 +94,10 @@
             btnXuatBaoCao.FlatStyle = FlatStyle.Flat;
             btnXuatBaoCao.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnXuatBaoCao.ForeColor = Color.White;
-            btnXuatBaoCao.Location = new Point(553, 8);
+            btnXuatBaoCao.Location = new Point(503, 13);
             btnXuatBaoCao.Margin = new Padding(3, 4, 3, 4);
             btnXuatBaoCao.Name = "btnXuatBaoCao";
-            btnXuatBaoCao.Size = new Size(171, 53);
+            btnXuatBaoCao.Size = new Size(152, 34);
             btnXuatBaoCao.TabIndex = 4;
             btnXuatBaoCao.Text = "➕ Xuất báo cáo";
             btnXuatBaoCao.UseVisualStyleBackColor = false;
@@ -128,7 +116,7 @@
             // txtSearch
             // 
             txtSearch.Font = new Font("Segoe UI", 11F);
-            txtSearch.Location = new Point(12, 88);
+            txtSearch.Location = new Point(528, 56);
             txtSearch.Margin = new Padding(3, 4, 3, 4);
             txtSearch.Name = "txtSearch";
             txtSearch.PlaceholderText = "🔍 Tìm kiếm hóa đơn...(Tên Khách hàng, mã hóa đơn, số điện thoại)";
@@ -207,17 +195,38 @@
             lblTrangThai.TabIndex = 4;
             lblTrangThai.Text = "Trạng thái:";
             // 
+            // pnlListHoaDon
+            // 
+            pnlListHoaDon.AutoScroll = true;
+            pnlListHoaDon.BackColor = Color.White;
+            pnlListHoaDon.Dock = DockStyle.Fill;
+            pnlListHoaDon.FlowDirection = FlowDirection.TopDown;
+            pnlListHoaDon.Location = new Point(0, 101);
+            pnlListHoaDon.Name = "pnlListHoaDon";
+            pnlListHoaDon.Size = new Size(916, 349);
+            pnlListHoaDon.TabIndex = 13;
+            pnlListHoaDon.WrapContents = false;
+            // 
+            // pnlRightContainer
+            // 
+            pnlRightContainer.Dock = DockStyle.Right;
+            pnlRightContainer.Location = new Point(916, 101);
+            pnlRightContainer.Name = "pnlRightContainer";
+            pnlRightContainer.Size = new Size(256, 349);
+            pnlRightContainer.TabIndex = 14;
+            pnlRightContainer.Visible = false;
+            // 
             // HoaDonForm
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 450);
-            Controls.Add(dataGridViewHoaDon);
+            ClientSize = new Size(1172, 450);
+            Controls.Add(pnlListHoaDon);
+            Controls.Add(pnlRightContainer);
             Controls.Add(pnlFilters);
             Name = "HoaDonForm";
             Text = "HoaDonForm";
             Load += HoaDonForm_Load;
-            ((System.ComponentModel.ISupportInitialize)dataGridViewHoaDon).EndInit();
             pnlFilters.ResumeLayout(false);
             pnlFilters.PerformLayout();
             pnlTrangThaiFilters.ResumeLayout(false);
@@ -225,8 +234,6 @@
         }
 
         #endregion
-
-        private DataGridView dataGridViewHoaDon;
         private Panel pnlFilters;
         private FlowLayoutPanel pnlTrangThaiFilters;
         private Button btnTatCa;
@@ -239,5 +246,7 @@
         private Label label1;
         private DateTimePicker dtpTuNgay;
         private Button btnXuatBaoCao;
+        private FlowLayoutPanel pnlListHoaDon;
+        private Panel pnlRightContainer;
     }
 }

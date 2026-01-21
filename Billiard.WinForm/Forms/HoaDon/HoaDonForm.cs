@@ -10,6 +10,10 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using ClosedXML.Excel;
+using DocumentFormat.OpenXml.Wordprocessing;
+using Microsoft.Extensions.DependencyInjection;
+using Color = System.Drawing.Color;
+using Control = System.Windows.Forms.Control;
 
 
 namespace Billiard.WinForm.Forms.HoaDon
@@ -24,28 +28,64 @@ namespace Billiard.WinForm.Forms.HoaDon
 
         private MainForm _mainForm;
 
+
+        private int _currentPage = 1;
+        private int _pageSize = 15;
+        private int _totalRecords = 0;
+
+        // UI Controls for Pagination (Created dynamically)
+        private Panel pnlPagination;
+        private FlowLayoutPanel flowPageNumbers;
+        private Button btnFirst, btnLast, btnPrev, btnNext;
+
+        private System.Threading.Timer _searchDebounceTimer;
+
         public HoaDonForm(HoaDonService hoaDonService)
         {
             InitializeComponent();
             _hoaDonService = hoaDonService;
+            
+            SetupDateTimePickers();
+            SetupPaginationUI(); // Tạo thanh phân trang
 
-            dataGridViewHoaDon.CellFormatting += DataGridViewHoaDon_CellFormatting;
+            // Đăng ký sự kiện
+            txtSearch.TextChanged += (s, e) =>
+            {
+                _searchDebounceTimer?.Change(System.Threading.Timeout.Infinite, 0);
+                _searchDebounceTimer = new System.Threading.Timer(async state =>
+                {
+                    if (this.IsHandleCreated)
+                    {
+                        this.Invoke(new Action(async () =>
+                        {
+                            _currentPage = 1;
+                            await LoadDataAsync();
+                        }));
+                    }
+                }, null, 500, System.Threading.Timeout.Infinite);
+            };
 
-            txtSearch.TextChanged += SearchInput_Changed;
-            dtpTuNgay.ValueChanged += Filter_Changed;
-            dtpDenNgay.ValueChanged += Filter_Changed;
-            btnTatCa.Click += (s, e) => SetStatusFilter("Tất cả", btnTatCa);
-            btnChuaThanhToan.Click += (s, e) => SetStatusFilter("Đang chơi", btnChuaThanhToan);
-            btnDaThanhToan.Click += (s, e) => SetStatusFilter("Đã thanh toán", btnDaThanhToan);
+            dtpTuNgay.ValueChanged += async (s, e) => { _currentPage = 1; await LoadDataAsync(); };
+            dtpDenNgay.ValueChanged += async (s, e) => { _currentPage = 1; await LoadDataAsync(); };
+
+            btnTatCa.Click += async (s, e) => await SetStatusFilter("Tất cả", btnTatCa);
+            btnChuaThanhToan.Click += async (s, e) => await SetStatusFilter("Đang chơi", btnChuaThanhToan);
+            btnDaThanhToan.Click += async (s, e) => await SetStatusFilter("Đã thanh toán", btnDaThanhToan);
+
             btnXuatBaoCao.Click += btnXuatBaoCao_Click;
+
+            pnlListHoaDon.SizeChanged += (s, e) =>
+            {
+                pnlListHoaDon.SuspendLayout();
+                foreach (Control c in pnlListHoaDon.Controls) c.Width = pnlListHoaDon.ClientSize.Width - 25;
+                pnlListHoaDon.ResumeLayout();
+            };
         }
 
         private async void HoaDonForm_Load(object sender, EventArgs e)
         {
-            SetupDateTimePickers();
-            await LoadDataAsync();
-
             HighlightButton(btnTatCa);
+            await LoadDataAsync();
         }
 
 
@@ -56,346 +96,399 @@ namespace Billiard.WinForm.Forms.HoaDon
 
         private async Task LoadDataAsync()
         {
-            try
+            using (var scope = Program.ServiceProvider.CreateScope())
             {
-                this.Cursor = Cursors.WaitCursor;
-                var rawData = await _hoaDonService.GetTatCaHoaDonAsync();
+                var scopedService = scope.ServiceProvider.GetRequiredService<HoaDonService>();
 
-                _originalData = rawData.Select(h => new
+                try
                 {
-                    MaHoaDon = h.MaHd,
-                    Ban = h.MaBanNavigation?.TenBan ?? "N/A",
-                    NhanVien = h.MaNvNavigation?.TenNv ?? "N/A",
-                    KhachHang = h.MaKhNavigation?.TenKh ?? "Vãng lai",
-                    SDT = h.MaKhNavigation?.Sdt ?? "",
-                    NgayTao = h.ThoiGianBatDau,
-                    BatDau = h.ThoiGianBatDau,
-                    KetThuc = h.ThoiGianKetThuc,
-                    TongTien = h.TongTien,
-                    TrangThai = h.TrangThai
+                    this.Cursor = Cursors.WaitCursor;
 
-                }).ToList<dynamic>();
+                    string keyword = txtSearch.Text.Trim();
+                    DateTime fromDate = dtpTuNgay.Value.Date;
+                    DateTime toDate = dtpDenNgay.Value.Date.AddDays(1).AddSeconds(-1);
 
-                ApplyFilters();
+                    // Gọi Service phân trang
+                    var result = await scopedService.GetListHoaDonPagingAsync(
+                        keyword, _currentStatusFilter, fromDate, toDate, _currentPage, _pageSize
+                    );
 
+                    var listHoaDon = result.Data;
+                    _totalRecords = result.TotalCount;
 
-                ConfigureDataGridView();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Lỗi khi tải danh sách hóa đơn: {ex.Message}", "Lỗi",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                this.Cursor = Cursors.Default;
+                    // --- [RENDER GIAO DIỆN FLOWLAYOUT] ---
+                    pnlListHoaDon.SuspendLayout();
+                    pnlListHoaDon.Controls.Clear();
+
+                    if (listHoaDon.Count == 0)
+                    {
+                        ShowEmptyState();
+                    }
+                    else
+                    {
+                        foreach (var hd in listHoaDon)
+                        {
+                            // Tạo dòng mới
+                            var row = new HoaDonRowControl();
+                            row.SetData(hd);
+
+                            // Chỉnh kích thước full chiều ngang
+                            row.Width = pnlListHoaDon.ClientSize.Width - 25; // Trừ 25px cho thanh cuộn
+                            row.Margin = new Padding(0); // Sát nhau
+
+                            // Gán sự kiện click để xem chi tiết
+                            row.Clicked += (s, e) => ShowDetailInvoice(hd.MaHd);
+
+                            pnlListHoaDon.Controls.Add(row);
+                        }
+                    }
+
+                    RenderPagination(); // Vẽ lại phân trang
+                    pnlListHoaDon.ResumeLayout();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Lỗi: {ex.Message}");
+                }
+                finally
+                {
+                    if (this.IsHandleCreated) this.Invoke(new Action(() => this.Cursor = Cursors.Default));
+                }
             }
         }
 
+        private void ShowEmptyState()
+        {
+            Label lbl = new Label
+            {
+                Text = "Không tìm thấy hóa đơn nào 🔍",
+                AutoSize = false,
+                Dock = DockStyle.Top,
+                Height = 100,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = new System.Drawing.Font("Segoe UI", 12),
+                ForeColor = System.Drawing.Color.Gray
+            };
+            pnlListHoaDon.Controls.Add(lbl);
+        }
+
+        #region Right Panel Container
+        private async void ShowDetailInvoice(int maHd)
+        {
+            // Lấy dữ liệu chi tiết từ DB
+            using (var scope = Program.ServiceProvider.CreateScope())
+            {
+                var svc = scope.ServiceProvider.GetRequiredService<HoaDonService>();
+                var fullInfo = await svc.GetChiTietHoaDon(maHd);
+
+                if (fullInfo != null && _mainForm != null)
+                {
+                    // A. TẠO MỚI (Dynamic) - Không dùng cái có sẵn
+                    var detailControl = new ChiTietHoaDonControl();
+
+                    // B. Đổ dữ liệu vào
+                    detailControl.LoadData(fullInfo);
+
+                    // C. Dặn dò: "Khi nào nút X ở trong ông bị bấm, hãy nhờ MainForm ẩn đi"
+                    detailControl.OnCloseClick += (s, e) => HideDetailPanel();
+
+                    // D. Gọi MainForm: "Hiện cái này lên giúp tôi"
+                    ShowRightPanel(detailControl, 550);
+                }
+            }
+        }
+        private void ShowRightPanel(UserControl userControl, int width = 350)
+        {
+            pnlRightContainer.Width = width;
+
+            pnlRightContainer.Controls.Clear();
+
+            pnlRightContainer.Controls.Add(userControl);
+
+            pnlRightContainer.Visible = true;
+
+        }
+        private void HideDetailPanel()
+        {
+            pnlRightContainer.Visible = false;
+            pnlRightContainer.Controls.Clear();
+        }
+
+        #endregion
+
         #region Filters
-        private void SetStatusFilter(string status, Button activeBtn)
+        private async Task SetStatusFilter(string status, Button activeBtn)
         {
             _currentStatusFilter = status;
             HighlightButton(activeBtn);
-            ApplyFilters();
+            _currentPage = 1;
+            await LoadDataAsync();
+        }
+        public void FilterBySdt(string sdt)
+        {
+            txtSearch.Text = sdt;
+            txtSearch.Focus();
+            txtSearch.SelectAll();
         }
         private void SetupDateTimePickers()
         {
-            // Format: 19/11/2025
-            dtpTuNgay.Format = DateTimePickerFormat.Custom;
+            dtpTuNgay.Format = DateTimePickerFormat.Custom; 
             dtpTuNgay.CustomFormat = "dd/MM/yyyy";
 
-            dtpDenNgay.Format = DateTimePickerFormat.Custom;
+            dtpDenNgay.Format = DateTimePickerFormat.Custom; 
             dtpDenNgay.CustomFormat = "dd/MM/yyyy";
 
-            // Set mặc định: Từ đầu tháng đến hiện tại
-            var today = DateTime.Now;
-            dtpTuNgay.Value = new DateTime(today.Year, 1, 1);
-            dtpDenNgay.Value = today;
+            dtpTuNgay.Value = new DateTime(DateTime.Now.Year, 1, 1);
+            dtpDenNgay.Value = DateTime.Now;
         }
 
         private void HighlightButton(Button btn)
         {
-            // Reset màu các nút (Giả sử màu gốc là White, màu chọn là Blueviolet)
-            btnTatCa.BackColor = Color.White;
-            btnTatCa.ForeColor = Color.Black;
-            btnChuaThanhToan.BackColor = Color.White;
-            btnChuaThanhToan.ForeColor = Color.Black;
-            btnDaThanhToan.BackColor = Color.White;
-            btnDaThanhToan.ForeColor = Color.Black;
-
-            // Set màu nút đang chọn
-            btn.BackColor = Color.MediumSlateBlue; // Màu tím giống trong hình
-            btn.ForeColor = Color.White;
-        }
-        private void SearchInput_Changed(object sender, EventArgs e) => ApplyFilters();
-        private void Filter_Changed(object sender, EventArgs e) => ApplyFilters();
-
-
-        private void ApplyFilters()
-        {
-            if (_originalData == null || !_originalData.Any()) return;
-
-            var keyword = txtSearch.Text.ToLower().Trim();
-            var fromDate = dtpTuNgay.Value.Date; // Lấy 00:00:00
-            var toDate = dtpDenNgay.Value.Date.AddDays(1).AddSeconds(-1); // Lấy 23:59:59
-
-            var filteredList = _originalData.Where(item =>
-            {
-                // A. Lọc theo Trạng thái
-                bool matchStatus = _currentStatusFilter == "Tất cả" || item.TrangThai == _currentStatusFilter;
-
-                // B. Lọc theo Ngày (Dựa trên NgayTao/BatDau)
-                bool matchDate = false;
-                if (item.NgayTao != null)
-                {
-                    DateTime date = (DateTime)item.NgayTao;
-                    matchDate = date >= fromDate && date <= toDate;
-                }
-
-                // C. Lọc theo Từ khóa (Tên KH, Mã HĐ, SĐT)
-                bool matchSearch = true;
-                if (!string.IsNullOrEmpty(keyword))
-                {
-                    string tenKH = item.KhachHang.ToString().ToLower();
-                    string sdt = item.SDT.ToString().ToLower();
-                    string maHD = item.MaHoaDon.ToString();
-
-                    matchSearch = tenKH.Contains(keyword) ||
-                                  sdt.Contains(keyword) ||
-                                  maHD.Contains(keyword);
-                }
-
-                return matchStatus && matchDate && matchSearch;
-            }).ToList();
-
-            // Đổ dữ liệu đã lọc vào Grid
-            dataGridViewHoaDon.DataSource = filteredList;
-
-            // Ẩn các cột phụ không cần thiết (như SDT, NgayTao nếu không muốn hiện)
-            if (dataGridViewHoaDon.Columns["SDT"] != null) dataGridViewHoaDon.Columns["SDT"].Visible = false;
-            if (dataGridViewHoaDon.Columns["NgayTao"] != null) dataGridViewHoaDon.Columns["NgayTao"].Visible = false;
-
-            ConfigureDataGridView();
-
+            btnTatCa.BackColor = Color.White; btnTatCa.ForeColor = Color.Black;
+            btnChuaThanhToan.BackColor = Color.White; btnChuaThanhToan.ForeColor = Color.Black;
+            btnDaThanhToan.BackColor = Color.White; btnDaThanhToan.ForeColor = Color.Black;
+            btn.BackColor = Color.MediumSlateBlue; btn.ForeColor = Color.White;
         }
 
-        // Hỗ trợ  bên tab Khách Hàng
-        public void FilterBySdt(string sdt)
-        {
-            txtSearch.Text = sdt;
 
-            txtSearch.Focus();
-            txtSearch.SelectAll();
-        }
+        private void SearchInput_Changed(object sender, EventArgs e) => LoadDataAsync();
+        private void Filter_Changed(object sender, EventArgs e) => LoadDataAsync();
 
+
+        
         #endregion
-
-        // Cấu hình bảng
-        #region CSS bảng
-        private void ConfigureDataGridView()
+        #region Phân trang
+        private void SetupPaginationUI()
         {
-            // --- 1. Cài đặt tổng quan ---
-            {
-                dataGridViewHoaDon.ReadOnly = true;
-                dataGridViewHoaDon.AllowUserToAddRows = false;
-                dataGridViewHoaDon.AllowUserToDeleteRows = false;
-                dataGridViewHoaDon.AllowUserToResizeRows = false;
-                dataGridViewHoaDon.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                dataGridViewHoaDon.MultiSelect = false;
-                dataGridViewHoaDon.RowHeadersVisible = false; // Ẩn cột header bên trái
-                dataGridViewHoaDon.BackgroundColor = Color.White;
-                dataGridViewHoaDon.BorderStyle = BorderStyle.None;
-            }
-            // --- 2. Tùy chỉnh Header ---
-            dataGridViewHoaDon.EnableHeadersVisualStyles = false; // Cho phép tùy chỉnh màu header
-            dataGridViewHoaDon.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(241, 245, 249); // Màu nền xám nhạt
-            dataGridViewHoaDon.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(30, 41, 59); // Màu chữ
-            dataGridViewHoaDon.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            dataGridViewHoaDon.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewHoaDon.ColumnHeadersHeight = 40; // Tăng chiều cao header
+            pnlPagination = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Color.White, Padding = new Padding(10) };
 
-            // --- 3. Tùy chỉnh các dòng ---
-            dataGridViewHoaDon.DefaultCellStyle.Font = new Font("Segoe UI", 9.5F);
-            dataGridViewHoaDon.DefaultCellStyle.SelectionBackColor = Color.FromArgb(99, 102, 241); // Màu tím khi chọn
-            dataGridViewHoaDon.DefaultCellStyle.SelectionForeColor = Color.White;
-            dataGridViewHoaDon.RowTemplate.Height = 35; // Chiều cao mỗi dòng
+            var table = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
 
-            // Thêm "Zebra Stripes" (màu xen kẽ)
-            dataGridViewHoaDon.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
-            dataGridViewHoaDon.AlternatingRowsDefaultCellStyle.SelectionBackColor = Color.FromArgb(99, 102, 241);
-            dataGridViewHoaDon.AlternatingRowsDefaultCellStyle.SelectionForeColor = Color.White;
+            var centerFlow = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
+            flowPageNumbers = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, WrapContents = false };
 
+            btnFirst = CreateNavButton("«", async () => await GoToPage(1));
+            btnPrev = CreateNavButton("❮", async () => await GoToPage(_currentPage - 1));
+            btnNext = CreateNavButton("❯", async () => await GoToPage(_currentPage + 1));
+            btnLast = CreateNavButton("»", async () => {
+                int total = (int)Math.Ceiling((double)_totalRecords / _pageSize);
+                await GoToPage(total);
+            });
 
-            // --- 4. Tùy chỉnh từng cột (Quan trọng) ---
+            centerFlow.Controls.AddRange(new Control[] { btnFirst, btnPrev, flowPageNumbers, btnNext, btnLast });
+            table.Controls.Add(centerFlow, 1, 0);
+            pnlPagination.Controls.Add(table);
 
-            // Đặt lại tên Header
-            if (dataGridViewHoaDon.Columns["MaHoaDon"] != null)
-            {
-                dataGridViewHoaDon.Columns["MaHoaDon"].HeaderText = "Mã HĐ";
-                dataGridViewHoaDon.Columns["MaHoaDon"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                dataGridViewHoaDon.Columns["MaHoaDon"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            }
-            if (dataGridViewHoaDon.Columns["Ban"] != null)
-            {
-                dataGridViewHoaDon.Columns["Ban"].HeaderText = "Bàn";
-                dataGridViewHoaDon.Columns["Ban"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            }
+            this.Controls.Add(pnlPagination);
+            pnlPagination.BringToFront();
 
-            if (dataGridViewHoaDon.Columns["NhanVien"] != null)
-            {
-                dataGridViewHoaDon.Columns["NhanVien"].HeaderText = "Nhân viên";
-                dataGridViewHoaDon.Columns["NhanVien"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            }
-
-            if (dataGridViewHoaDon.Columns["KhachHang"] != null)
-            {
-                dataGridViewHoaDon.Columns["KhachHang"].HeaderText = "Khách hàng";
-                dataGridViewHoaDon.Columns["KhachHang"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            }
-
-            if (dataGridViewHoaDon.Columns["BatDau"] != null)
-            {
-                dataGridViewHoaDon.Columns["BatDau"].HeaderText = "Bắt đầu";
-                dataGridViewHoaDon.Columns["BatDau"].DefaultCellStyle.Format = "dd/MM/yy HH:mm";
-                dataGridViewHoaDon.Columns["BatDau"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            }
-
-            if (dataGridViewHoaDon.Columns["KetThuc"] != null)
-            {
-                dataGridViewHoaDon.Columns["KetThuc"].HeaderText = "Kết thúc";
-                dataGridViewHoaDon.Columns["KetThuc"].DefaultCellStyle.Format = "dd/MM/yy HH:mm";
-                dataGridViewHoaDon.Columns["KetThuc"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            }
-
-            if (dataGridViewHoaDon.Columns["TongTien"] != null)
-            {
-                dataGridViewHoaDon.Columns["TongTien"].HeaderText = "Tổng tiền";
-                dataGridViewHoaDon.Columns["TongTien"].DefaultCellStyle.Format = "N0"; // Định dạng số
-                dataGridViewHoaDon.Columns["TongTien"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight; // Căn phải
-                dataGridViewHoaDon.Columns["TongTien"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            }
-
-            if (dataGridViewHoaDon.Columns["TrangThai"] != null)
-            {
-                dataGridViewHoaDon.Columns["TrangThai"].HeaderText = "Trạng thái";
-                dataGridViewHoaDon.Columns["TrangThai"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                dataGridViewHoaDon.Columns["TrangThai"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-            }
+            pnlListHoaDon.BringToFront();
         }
-
-        private void DataGridViewHoaDon_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        private void RenderPagination()
         {
-            if (dataGridViewHoaDon.Columns[e.ColumnIndex].Name == "TrangThai" && e.Value != null)
-            {
-                string status = e.Value.ToString();
+            flowPageNumbers.SuspendLayout();
+            flowPageNumbers.Controls.Clear();
+            int totalPages = (int)Math.Ceiling((double)_totalRecords / _pageSize);
+            if (totalPages == 0) totalPages = 1;
 
-                // 2. Xử lý logic màu sắc
-                if (status == "Đang chơi") // Hoặc trạng thái chưa thanh toán của bạn
-                {
-                    e.CellStyle.ForeColor = Color.FromArgb(220, 38, 38); // Màu Đỏ (Red)
-                    e.CellStyle.Font = new Font(e.CellStyle.Font, FontStyle.Bold); // In đậm cho chú ý
-                }
-                else if (status == "Đã thanh toán")
-                {
-                    e.CellStyle.ForeColor = Color.FromArgb(22, 163, 74); // Màu Xanh lá (Green)
-                    e.CellStyle.Font = new Font(e.CellStyle.Font, FontStyle.Bold);
-                }
-                // Các trạng thái khác (nếu có) sẽ dùng màu mặc định
-            }
-        }
-        #endregion
+            btnFirst.Enabled = btnPrev.Enabled = (_currentPage > 1);
+            btnNext.Enabled = btnLast.Enabled = (_currentPage < totalPages);
+            StyleDisabledButton(btnFirst); StyleDisabledButton(btnPrev);
+            StyleDisabledButton(btnNext); StyleDisabledButton(btnLast);
 
-        private void btnXuatBaoCao_Click(object sender, EventArgs e)
-        {
-            if (dataGridViewHoaDon.Rows.Count == 0)
-            {
-                MessageBox.Show("Không có dữ liệu để xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+            int delta = 2;
+            int left = _currentPage - delta, right = _currentPage + delta;
 
-            using (SaveFileDialog sfd = new SaveFileDialog() { Filter = "Excel Workbook|*.xlsx" })
+            // Logic vẽ số trang (rút gọn)
+            for (int i = 1; i <= totalPages; i++)
             {
-                if (sfd.ShowDialog() == DialogResult.OK)
+                if (i == 1 || i == totalPages || (i >= left && i <= right))
                 {
-                    try
+                    var btn = new Button
                     {
+                        Text = i.ToString(),
+                        Size = new Size(40, 36),
+                        FlatStyle = FlatStyle.Flat,
+                        Margin = new Padding(2),
+                        Cursor = Cursors.Hand
+                    };
+
+                    if (i == _currentPage)
+                    {
+                        btn.BackColor = Color.FromArgb(99, 102, 241);
+                        btn.ForeColor = Color.White;
+                        btn.FlatAppearance.BorderSize = 0;
+                    }
+                    else
+                    {
+                        btn.BackColor = Color.White;
+
+                        // --- [SỬA QUAN TRỌNG TẠI ĐÂY] ---
+                        int pageNum = i; // Tạo biến tạm để lưu giá trị i hiện tại
+                        btn.Click += async (s, e) => await GoToPage(pageNum); // Dùng biến tạm pageNum
+                                                                              // --------------------------------
+                    }
+                    flowPageNumbers.Controls.Add(btn);
+                }
+                else if ((i == left - 1) || (i == right + 1))
+                {
+                    flowPageNumbers.Controls.Add(new Label
+                    {
+                        Text = "...",
+                        AutoSize = false,
+                        Size = new Size(30, 36),
+                        TextAlign = ContentAlignment.BottomCenter
+                    });
+                }
+            }
+            flowPageNumbers.ResumeLayout();
+        }
+
+        private async Task GoToPage(int page)
+        {
+            int total = (int)Math.Ceiling((double)_totalRecords / _pageSize);
+            if (page < 1 || page > (total == 0 ? 1 : total) || page == _currentPage) return;
+            _currentPage = page;
+            await LoadDataAsync();
+        }
+
+        private Button CreateNavButton(string text, Action onClick)
+        {
+            var btn = new Button { Text = text, Size = new Size(40, 36), FlatStyle = FlatStyle.Flat, BackColor = Color.White, Cursor = Cursors.Hand };
+            btn.Click += (s, e) => onClick();
+            return btn;
+        }
+
+        private void StyleDisabledButton(Button btn)
+        {
+            btn.BackColor = btn.Enabled ? Color.White : Color.FromArgb(248, 250, 252);
+            btn.ForeColor = btn.Enabled ? Color.Black : Color.LightGray;
+        }
+        #endregion
+
+        private async void btnXuatBaoCao_Click(object sender, EventArgs e)
+        {
+            // Tạo SaveFileDialog để người dùng chọn nơi lưu
+            SaveFileDialog sfd = new SaveFileDialog();
+            sfd.Filter = "Excel Workbook|*.xlsx";
+            sfd.FileName = $"BaoCaoHoaDon_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+
+            if (sfd.ShowDialog() == DialogResult.OK)
+            {
+                try
+                {
+                    this.Cursor = Cursors.WaitCursor; // Hiển thị con trỏ quay tròn
+
+                    using (var scope = Program.ServiceProvider.CreateScope())
+                    {
+                        var svc = scope.ServiceProvider.GetRequiredService<HoaDonService>();
+
+                        // 1. LẤY DỮ LIỆU (QUAN TRỌNG)
+                        // Ta truyền PageSize = int.MaxValue để lấy TOÀN BỘ dữ liệu thay vì chỉ 1 trang
+                        string keyword = txtSearch.Text.Trim();
+                        DateTime fromDate = dtpTuNgay.Value.Date;
+                        DateTime toDate = dtpDenNgay.Value.Date.AddDays(1).AddSeconds(-1);
+
+                        var result = await svc.GetListHoaDonPagingAsync(
+                            keyword, _currentStatusFilter, fromDate, toDate, 1, int.MaxValue
+                        );
+
+                        var listData = result.Data;
+
+                        if (listData == null || listData.Count == 0)
+                        {
+                            MessageBox.Show("Không có dữ liệu nào để xuất!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+
+                        // 2. TẠO FILE EXCEL BẰNG CLOSEDXML
                         using (var workbook = new XLWorkbook())
                         {
-                            var worksheet = workbook.Worksheets.Add("BaoCaoHoaDon");
+                            var worksheet = workbook.Worksheets.Add("Danh Sách Hóa Đơn");
 
-                            // Lấy từ DataSource
-                            var data = dataGridViewHoaDon.DataSource as System.Collections.IList;
-
-                            // Tạo Header
+                            // --- A. TẠO HEADER ---
                             worksheet.Cell(1, 1).Value = "Mã HĐ";
                             worksheet.Cell(1, 2).Value = "Bàn";
-                            worksheet.Cell(1, 3).Value = "Khách hàng";
-                            worksheet.Cell(1, 4).Value = "Tổng tiền";
-                            worksheet.Cell(1, 5).Value = "Trạng thái";
-                            worksheet.Cell(1, 6).Value = "Thời gian";
+                            worksheet.Cell(1, 3).Value = "Khách Hàng";
+                            worksheet.Cell(1, 4).Value = "Giờ Vào";
+                            worksheet.Cell(1, 5).Value = "Giờ Ra";
+                            worksheet.Cell(1, 6).Value = "Tổng Tiền";
+                            worksheet.Cell(1, 7).Value = "Trạng Thái";
+                            worksheet.Cell(1, 8).Value = "Ghi Chú";
 
-                            // Style Header
-                            var headerRange = worksheet.Range("A1:F1");
+                            // Style cho Header (Nền xanh, Chữ trắng, In đậm)
+                            var headerRange = worksheet.Range("A1:H1");
                             headerRange.Style.Font.Bold = true;
-                            headerRange.Style.Fill.BackgroundColor = XLColor.CornflowerBlue;
+                            headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#4F46E5"); // Màu xanh Indigo
                             headerRange.Style.Font.FontColor = XLColor.White;
+                            headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-                            // Đổ dữ liệu
+                            // --- B. ĐỔ DỮ LIỆU ---
                             int row = 2;
-                            foreach (dynamic item in data)
+                            foreach (var item in listData)
                             {
-                                worksheet.Cell(row, 1).Value = item.MaHoaDon;
-                                worksheet.Cell(row, 2).Value = item.Ban;
-                                worksheet.Cell(row, 3).Value = item.KhachHang;
-                                worksheet.Cell(row, 4).Value = item.TongTien;
-                                worksheet.Cell(row, 5).Value = item.TrangThai;
-                                worksheet.Cell(row, 6).Value = item.BatDau;
+                                worksheet.Cell(row, 1).Value = item.MaHd;
+                                worksheet.Cell(row, 2).Value = item.MaBanNavigation.TenBan ?? "Mang về";
+                                worksheet.Cell(row, 3).Value = item.MaKhNavigation?.TenKh ?? "Khách lẻ";
+
+                                // Xử lý ngày tháng (để Excel hiểu là Date)
+                                if (item.ThoiGianBatDau != null) worksheet.Cell(row, 4).Value = item.ThoiGianBatDau;
+                                if (item.ThoiGianKetThuc != null) worksheet.Cell(row, 5).Value = item.ThoiGianKetThuc;
+
+                                worksheet.Cell(row, 6).Value = item.TongTien;
+                                worksheet.Cell(row, 7).Value = item.TrangThai;
+                                worksheet.Cell(row, 8).Value = item.GhiChu;
+
+                                // Style màu sắc cho trạng thái (Optional)
+                                if (item.TrangThai == "Đã thanh toán")
+                                    worksheet.Cell(row, 7).Style.Font.FontColor = XLColor.Green;
+                                else
+                                    worksheet.Cell(row, 7).Style.Font.FontColor = XLColor.Red;
+
                                 row++;
                             }
 
-                            // Tự động chỉnh độ rộng cột
+                            // --- C. FORMAT CỘT ---
+                            var dataRange = worksheet.Range(2, 1, row - 1, 8);
+
+                            // Format cột tiền tệ (VNĐ)
+                            worksheet.Column(6).Style.NumberFormat.Format = "#,##0";
+
+                            // Format cột ngày giờ
+                            worksheet.Column(4).Style.DateFormat.Format = "dd/MM/yyyy HH:mm";
+                            worksheet.Column(5).Style.DateFormat.Format = "dd/MM/yyyy HH:mm";
+
+                            // Kẻ khung viền cho toàn bộ bảng
+                            dataRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                            dataRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+
+                            // Tự động căn chỉnh độ rộng cột theo nội dung
                             worksheet.Columns().AdjustToContents();
 
+                            // 3. LƯU FILE
                             workbook.SaveAs(sfd.FileName);
                         }
-                        MessageBox.Show("Xuất báo cáo thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
-                    catch (Exception ex)
+
+                    // Mở file ngay sau khi lưu xong
+                    if (MessageBox.Show("Xuất báo cáo thành công! Bạn có muốn mở file ngay không?", "Thành công", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                     {
-                        MessageBox.Show("Lỗi khi xuất file: " + ex.Message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo() { FileName = sfd.FileName, UseShellExecute = true });
                     }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Có lỗi xảy ra khi xuất Excel: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                finally
+                {
+                    this.Cursor = Cursors.Default;
                 }
             }
         }
 
-        private async void dataGridViewHoaDon_CellClick(object sender, DataGridViewCellEventArgs e)
-        {
-            if (e.RowIndex < 0) return;
-
-            try
-            {
-                if (dataGridViewHoaDon.Rows[e.RowIndex].Cells["MaHoaDon"].Value == null) return;
-
-                int maHd = Convert.ToInt32(dataGridViewHoaDon.Rows[e.RowIndex].Cells["MaHoaDon"].Value);
-
-                var fullInfo = await _hoaDonService.GetChiTietHoaDon(maHd);
-
-                if (fullInfo != null && _mainForm != null)
-                {
-                    var detailControl = new ChiTietHoaDonControl();
-                    detailControl.LoadData(fullInfo);
-
-                   
-                    _mainForm.UpdateDetailPanel("Chi Tiết hóa đơn", detailControl,450);
-
-                }
-
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Loiox xem chi tietse: " + ex.Message);
-            }
-         }           
     }
 }
