@@ -41,8 +41,11 @@
             btnBachKim = new Button();
             lblTrangThai = new Label();
             flowLayoutPanel1 = new FlowLayoutPanel();
+            pnlRightContainer = new Panel();
+            chiTietKhachHangControl1 = new ChiTietKhachHangControl();
             pnlFilters.SuspendLayout();
             pnlTrangThaiFilters.SuspendLayout();
+            pnlRightContainer.SuspendLayout();
             SuspendLayout();
             // 
             // pnlFilters
@@ -56,7 +59,7 @@
             pnlFilters.Dock = DockStyle.Top;
             pnlFilters.Location = new Point(0, 0);
             pnlFilters.Name = "pnlFilters";
-            pnlFilters.Size = new Size(800, 127);
+            pnlFilters.Size = new Size(1195, 127);
             pnlFilters.TabIndex = 3;
             // 
             // btnDaXoa
@@ -67,7 +70,7 @@
             btnDaXoa.FlatStyle = FlatStyle.Flat;
             btnDaXoa.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnDaXoa.ForeColor = Color.White;
-            btnDaXoa.Location = new Point(609, 67);
+            btnDaXoa.Location = new Point(205, 76);
             btnDaXoa.Margin = new Padding(3, 4, 3, 4);
             btnDaXoa.Name = "btnDaXoa";
             btnDaXoa.Size = new Size(160, 34);
@@ -84,7 +87,7 @@
             btnThem.FlatStyle = FlatStyle.Flat;
             btnThem.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnThem.ForeColor = Color.White;
-            btnThem.Location = new Point(414, 67);
+            btnThem.Location = new Point(12, 76);
             btnThem.Margin = new Padding(3, 4, 3, 4);
             btnThem.Name = "btnThem";
             btnThem.Size = new Size(187, 34);
@@ -101,7 +104,7 @@
             btnXuatBaoCao.FlatStyle = FlatStyle.Flat;
             btnXuatBaoCao.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnXuatBaoCao.ForeColor = Color.White;
-            btnXuatBaoCao.Location = new Point(607, 14);
+            btnXuatBaoCao.Location = new Point(371, 76);
             btnXuatBaoCao.Margin = new Padding(3, 4, 3, 4);
             btnXuatBaoCao.Name = "btnXuatBaoCao";
             btnXuatBaoCao.Size = new Size(162, 31);
@@ -113,7 +116,7 @@
             // txtSearch
             // 
             txtSearch.Font = new Font("Segoe UI", 11F);
-            txtSearch.Location = new Point(12, 67);
+            txtSearch.Location = new Point(662, 21);
             txtSearch.Margin = new Padding(3, 4, 3, 4);
             txtSearch.Name = "txtSearch";
             txtSearch.PlaceholderText = "🔍 Tìm kiếm thành viên...(SĐT, Tên)";
@@ -236,21 +239,42 @@
             flowLayoutPanel1.Location = new Point(0, 127);
             flowLayoutPanel1.Name = "flowLayoutPanel1";
             flowLayoutPanel1.Padding = new Padding(20, 0, 0, 0);
-            flowLayoutPanel1.Size = new Size(800, 323);
+            flowLayoutPanel1.Size = new Size(870, 323);
             flowLayoutPanel1.TabIndex = 4;
+            // 
+            // pnlRightContainer
+            // 
+            pnlRightContainer.Controls.Add(chiTietKhachHangControl1);
+            pnlRightContainer.Dock = DockStyle.Right;
+            pnlRightContainer.Location = new Point(870, 127);
+            pnlRightContainer.Name = "pnlRightContainer";
+            pnlRightContainer.Size = new Size(325, 323);
+            pnlRightContainer.TabIndex = 0;
+            pnlRightContainer.Visible = false;
+            // 
+            // chiTietKhachHangControl1
+            // 
+            chiTietKhachHangControl1.BackColor = Color.White;
+            chiTietKhachHangControl1.Dock = DockStyle.Fill;
+            chiTietKhachHangControl1.Location = new Point(0, 0);
+            chiTietKhachHangControl1.Name = "chiTietKhachHangControl1";
+            chiTietKhachHangControl1.Size = new Size(325, 323);
+            chiTietKhachHangControl1.TabIndex = 0;
             // 
             // KhachHangForm
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 450);
+            ClientSize = new Size(1195, 450);
             Controls.Add(flowLayoutPanel1);
+            Controls.Add(pnlRightContainer);
             Controls.Add(pnlFilters);
             Name = "KhachHangForm";
             Text = "KhachHangForm";
             pnlFilters.ResumeLayout(false);
             pnlFilters.PerformLayout();
             pnlTrangThaiFilters.ResumeLayout(false);
+            pnlRightContainer.ResumeLayout(false);
             ResumeLayout(false);
         }
 
@@ -275,5 +299,7 @@
         private Button btnVang;
         private Button btnBachKim;
         private Button btnDaXoa;
+        private Panel pnlRightContainer;
+        private ChiTietKhachHangControl chiTietKhachHangControl1;
     }
 }
