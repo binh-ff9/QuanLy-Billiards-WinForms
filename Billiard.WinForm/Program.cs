@@ -64,7 +64,7 @@ namespace Billiard.WinForm
             ConfigureServices(serviceCollection);
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
+            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -94,6 +94,7 @@ namespace Billiard.WinForm
             // BanBia services (Transient)
             services.AddTransient<BanBiaService>();
             services.AddTransient<DatBanService>();
+            services.AddTransient<GioHoatDongService>();
             services.AddTransient<LoaiBanService>();
             services.AddTransient<KhuVucService>();
 
