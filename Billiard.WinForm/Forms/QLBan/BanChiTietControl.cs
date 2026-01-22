@@ -3,6 +3,7 @@ using Billiard.BLL.Services.HoaDonServices;
 using Billiard.BLL.Services.QLBan;
 using Billiard.BLL.Services.VietQR;
 using Billiard.DAL.Entities;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Drawing;
 using System.Linq;
@@ -83,7 +84,30 @@ namespace Billiard.WinForm.Forms.QLBan
             _isLoading = true;
             try
             {
-                var newBan = await Task.Run(() => _banBiaService.GetTableByIdAsync(_ban.MaBan), token);
+                // ✅ DELAY để đợi transaction hoàn tất
+                await Task.Delay(200, token);
+
+                if (token.IsCancellationRequested) return;
+
+                // ✅ RETRY LOGIC để tránh conflict
+                BanBium newBan = null;
+                int retryCount = 0;
+                int maxRetries = 3;
+
+                while (retryCount < maxRetries && newBan == null)
+                {
+                    try
+                    {
+                        newBan = await Task.Run(() => _banBiaService.GetTableByIdAsync(_ban.MaBan), token);
+                        break;
+                    }
+                    catch (InvalidOperationException) when (retryCount < maxRetries - 1)
+                    {
+                        // DbContext conflict - retry sau delay
+                        retryCount++;
+                        await Task.Delay(100 * retryCount, token);
+                    }
+                }
 
                 if (token.IsCancellationRequested) return;
 
@@ -95,7 +119,6 @@ namespace Billiard.WinForm.Forms.QLBan
 
                 _ban = newBan;
 
-                // QUAN TRỌNG: Không reload nếu không cần thiết
                 if (!forceReload && !HasDataChanged(_ban, newBan) && pnlContent.Controls.Count > 0)
                 {
                     await UpdateExistingControlsAsync();
@@ -1151,7 +1174,6 @@ namespace Billiard.WinForm.Forms.QLBan
 
             try
             {
-                // Disable button để tránh double-click
                 btn.Enabled = false;
                 this.Cursor = Cursors.WaitCursor;
 
@@ -1159,16 +1181,17 @@ namespace Billiard.WinForm.Forms.QLBan
 
                 if (success)
                 {
-                    // Đợi DB commit
+                    // ✅ DELAY để đợi DB commit
+                    await Task.Delay(200);
+
+                    // ✅ Trigger event TRƯỚC để update card ngay
+                    OnDataChanged?.Invoke(this, EventArgs.Empty);
+
+                    // ✅ Delay nhỏ để UI update
                     await Task.Delay(100);
 
-                    // Cập nhật data
-                    var newBan = await _banBiaService.GetTableByIdAsync(_ban.MaBan);
-                    if (newBan != null) _ban = newBan;
-
-                    // Force reload để lấy dữ liệu mới
+                    // Force reload detail
                     await LoadBanDetail(forceReload: true);
-                    OnDataChanged?.Invoke(this, EventArgs.Empty);
 
                     MessageBox.Show("Đã xóa dịch vụ!", "Thành công",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1359,16 +1382,17 @@ namespace Billiard.WinForm.Forms.QLBan
                     {
                         this.Cursor = Cursors.WaitCursor;
 
-                        // Đợi DB commit
-                        await Task.Delay(100);
+                        // ✅ DELAY để đợi DB commit
+                        await Task.Delay(200);
 
-                        // Lấy data mới
-                        var newBan = await _banBiaService.GetTableByIdAsync(_ban.MaBan);
-                        if (newBan != null) _ban = newBan;
+                        // ✅ Trigger event TRƯỚC để update card
+                        OnDataChanged?.Invoke(this, EventArgs.Empty);
+
+                        // ✅ Delay nhỏ
+                        await Task.Delay(100);
 
                         // Force reload
                         await LoadBanDetail(forceReload: true);
-                        OnDataChanged?.Invoke(this, EventArgs.Empty);
 
                         this.Cursor = Cursors.Default;
                     }
@@ -1409,14 +1433,23 @@ namespace Billiard.WinForm.Forms.QLBan
 
                     if (thanhToanResult == DialogResult.OK)
                     {
+                        // ✅ DELAY trước khi reload để đợi DB commit
+                        await Task.Delay(200);
+
                         MessageBox.Show(
                             $"Đã thanh toán thành công!\nBàn {_ban.TenBan} đã được trả về trống.",
                             "Thành công",
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
 
+                        // ✅ Trigger event trước để cập nhật list
                         OnDataChanged?.Invoke(this, EventArgs.Empty);
-                        await LoadBanDetail();
+
+                        // ✅ Delay thêm trước khi reload detail
+                        await Task.Delay(100);
+
+                        // ✅ Force reload với scope mới
+                        await LoadBanDetail(forceReload: true);
                     }
                 }
             }

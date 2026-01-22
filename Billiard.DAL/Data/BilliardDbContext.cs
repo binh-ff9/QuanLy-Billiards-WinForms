@@ -450,6 +450,9 @@ public partial class BilliardDbContext : DbContext
             entity.Property(e => e.ThoiGianKetThuc)
                 .HasColumnType("datetime")
                 .HasColumnName("thoi_gian_ket_thuc");
+            entity.Property(e => e.ThoiGianThanhToan)
+                .HasColumnType("datetime")
+                .HasColumnName("thoi_gian_thanh_toan");
             entity.Property(e => e.ThoiLuongPhut)
                 .HasComputedColumnSql("(case when [thoi_gian_ket_thuc] IS NOT NULL then datediff(minute,[thoi_gian_bat_dau],[thoi_gian_ket_thuc]) else (0) end)", true)
                 .HasColumnName("thoi_luong_phut");
