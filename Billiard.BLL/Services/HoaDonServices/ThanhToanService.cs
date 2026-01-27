@@ -1,6 +1,7 @@
-﻿using Billiard.DAL.Data;
+﻿using Billiard.BLL.Services.QLBan;
+using Billiard.DAL.Data;
 using Billiard.DAL.Entities;
-using Billiard.BLL.Services.QLBan;
+using Emgu.CV.Ocl;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Threading.Tasks;
@@ -522,16 +523,57 @@ namespace Billiard.BLL.Services.HoaDonServices
                 System.Diagnostics.Debug.WriteLine($"  - Phương thức: {phuongThuc}");
                 System.Diagnostics.Debug.WriteLine($"  - Trạng thái mới: {hoaDon.TrangThai}");
 
-                // ✅ 4. CẬP NHẬT BÀN
+                // ✅ 4. CẬP NHẬT BÀN - KIỂM TRA ĐƠN ĐẶT TIẾP THEO
                 if (hoaDon.MaBanNavigation != null)
                 {
                     var ban = hoaDon.MaBanNavigation;
-                    System.Diagnostics.Debug.WriteLine($"  - Bàn {ban.TenBan}: {ban.TrangThai} → Trống");
+                    System.Diagnostics.Debug.WriteLine($"  - Bàn {ban.TenBan}: {ban.TrangThai} → Kiểm tra đơn đặt tiếp theo");
 
-                    ban.TrangThai = "Trống";
-                    ban.GioBatDau = null;
-                    ban.MaKh = null;
-                    ban.GhiChu = null;
+                    // ✅ TÌM ĐƠN ĐẶT TIẾP THEO (sử dụng cùng DbContext)
+                    var now = DateTime.Now;
+                    var nextReservation = await _context.DatBans
+                        .Include(d => d.MaBanNavigation)
+                        .Include(d => d.MaKhNavigation)
+                        .Where(d => d.MaBan == ban.MaBan
+                            && (d.TrangThai == "Đang chờ" || d.TrangThai == "Đã đặt")
+                            && d.ThoiGianBatDau.HasValue
+                            && d.ThoiGianBatDau.Value >= now)
+                        .OrderBy(d => d.ThoiGianBatDau)
+                        .FirstOrDefaultAsync();
+
+                    if (nextReservation != null)
+                    {
+                        // ✅ CÓ ĐƠN ĐẶT TIẾP THEO - CHUYỂN BÀN SANG "ĐÃ ĐẶT"
+                        System.Diagnostics.Debug.WriteLine($"  ✓ Tìm thấy đơn đặt tiếp theo:");
+                        System.Diagnostics.Debug.WriteLine($"    - Mã đơn: {nextReservation.MaDat}");
+                        System.Diagnostics.Debug.WriteLine($"    - Khách: {nextReservation.TenKhach}");
+                        System.Diagnostics.Debug.WriteLine($"    - Thời gian: {nextReservation.ThoiGianBatDau:HH:mm} - {nextReservation.ThoiGianKetThuc:HH:mm}");
+
+                        // Cập nhật trạng thái bàn
+                        ban.TrangThai = "Đã đặt";
+                        ban.MaKh = nextReservation.MaKh;
+                        ban.GhiChu = nextReservation.GhiChu;
+                        ban.GioBatDau = null; // Reset giờ bắt đầu, chờ xác nhận
+
+                        // ✅ QUAN TRỌNG: Cập nhật trạng thái đơn đặt thành "Đã đặt" (nếu đang là "Đang chờ")
+                        if (nextReservation.TrangThai == "Đang chờ")
+                        {
+                            nextReservation.TrangThai = "Đã đặt";
+                            _context.Entry(nextReservation).State = EntityState.Modified;
+                            System.Diagnostics.Debug.WriteLine($"    - Đã cập nhật trạng thái đơn đặt: 'Đang chờ' → 'Đã đặt'");
+                        }
+
+                        System.Diagnostics.Debug.WriteLine($"  ✓ Đã chuyển bàn {ban.TenBan} sang 'Đã đặt' cho ca tiếp theo");
+                    }
+                    else
+                    {
+                        // ✅ KHÔNG CÓ ĐƠN ĐẶT TIẾP THEO - TRẢ VỀ TRỐNG
+                        System.Diagnostics.Debug.WriteLine($"  - Không có đơn đặt tiếp theo, bàn {ban.TenBan} về 'Trống'");
+                        ban.TrangThai = "Trống";
+                        ban.GioBatDau = null;
+                        ban.MaKh = null;
+                        ban.GhiChu = null;
+                    }
                 }
 
                 // ✅ 5. MARK ENTITIES AS MODIFIED
@@ -567,7 +609,6 @@ namespace Billiard.BLL.Services.HoaDonServices
                 return false;
             }
         }
-
         /// <summary>
         /// Lưu vào sổ quỹ
         /// </summary>
