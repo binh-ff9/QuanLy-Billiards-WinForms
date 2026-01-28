@@ -630,10 +630,58 @@ namespace Billiard.BLL.Services.QLBan
 
         public async Task<HoaDon> GetActiveInvoiceAsync(int maBan)
         {
-            return await _context.HoaDons
-                .Include(h => h.ChiTietHoaDons)
-                    .ThenInclude(ct => ct.MaDvNavigation)
-                .FirstOrDefaultAsync(h => h.MaBan == maBan && h.TrangThai == "Đang chơi");
+            // ✅ Retry logic để xử lý trường hợp DB chưa commit xong hoặc có cache
+            int maxRetries = 3;
+            int delayMs = 100;
+
+            for (int i = 0; i < maxRetries; i++)
+            {
+                // ✅ AsNoTracking: Bắt buộc EF đọc từ DB mới nhất, không dùng cache
+                var hoaDon = await _context.HoaDons
+                    .AsNoTracking()
+                    .Include(h => h.ChiTietHoaDons)
+                        .ThenInclude(ct => ct.MaDvNavigation)
+                    .FirstOrDefaultAsync(h => h.MaBan == maBan && h.TrangThai == "Đang chơi");
+
+                if (hoaDon != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"✓ [Attempt {i + 1}] Tìm thấy hóa đơn HD{hoaDon.MaHd} cho bàn {maBan}");
+                    return hoaDon;
+                }
+
+                // Nếu chưa tìm thấy và vẫn còn lần thử
+                if (i < maxRetries - 1)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⏳ [Attempt {i + 1}/{maxRetries}] Chưa tìm thấy hóa đơn cho bàn {maBan}, retry sau {delayMs}ms...");
+                    await Task.Delay(delayMs);
+                    delayMs *= 2; // Exponential backoff: 100ms → 200ms → 400ms
+                }
+            }
+
+            // Sau tất cả các lần thử vẫn không tìm thấy
+            System.Diagnostics.Debug.WriteLine($"❌ KHÔNG TÌM THẤY hóa đơn đang chơi cho bàn {maBan} sau {maxRetries} lần thử");
+
+            // ✅ THÊM: Log tất cả hóa đơn của bàn để debug
+            var allInvoices = await _context.HoaDons
+                .AsNoTracking()
+                .Where(h => h.MaBan == maBan)
+                .Select(h => new { h.MaHd, h.TrangThai, h.ThoiGianBatDau })
+                .ToListAsync();
+
+            if (allInvoices.Any())
+            {
+                System.Diagnostics.Debug.WriteLine($"📋 Danh sách hóa đơn của bàn {maBan}:");
+                foreach (var inv in allInvoices)
+                {
+                    System.Diagnostics.Debug.WriteLine($"  - HD{inv.MaHd}: {inv.TrangThai} (Bắt đầu: {inv.ThoiGianBatDau:HH:mm dd/MM})");
+                }
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"📋 Bàn {maBan} CHƯA CÓ hóa đơn nào trong DB!");
+            }
+
+            return null;
         }
 
         // Lấy chi tiết hóa đơn
