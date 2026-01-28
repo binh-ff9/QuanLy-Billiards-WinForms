@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows.Forms;
 using Billiard.DAL.Entities;
 using Billiard.BLL.Services;
+using System.IO;
 
 namespace Billiard.WinForm.Forms
 {
@@ -82,6 +83,7 @@ namespace Billiard.WinForm.Forms
             };
 
             // Image
+            // Image
             PictureBox picImage = new PictureBox
             {
                 Location = new Point(10, 10),
@@ -90,17 +92,31 @@ namespace Billiard.WinForm.Forms
                 BackColor = Color.FromArgb(248, 249, 250)
             };
 
+
+
             if (!string.IsNullOrEmpty(service.HinhAnh))
             {
                 try
                 {
-                    string imagePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", service.HinhAnh);
-                    if (System.IO.File.Exists(imagePath))
+                    // Debug: In ra đường dẫn để kiểm tra
+                    var startPath = Application.StartupPath;
+                    var projectRoot = Directory.GetParent(Directory.GetParent(Directory.GetParent(
+                        Directory.GetParent(startPath).FullName).FullName).FullName).FullName;
+                    var imagePath = Path.Combine(projectRoot,"Forms", "Resources", "img", service.HinhAnh);
+
+                
+                    if (File.Exists(imagePath))
                     {
-                        picImage.Image = Image.FromFile(imagePath);
+                        using (var img = Image.FromFile(imagePath))
+                        {
+                            picImage.Image = new Bitmap(img);
+                        }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Lỗi: {ex.Message}");
+                }
             }
 
             // Service Name
