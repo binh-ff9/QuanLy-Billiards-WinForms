@@ -159,6 +159,26 @@ namespace Billiard.WinForm.Forms.QLBan
                 return;
             }
 
+            // ✅ FIX 3: Kiểm tra trạng thái bàn thực tế để không cho phép hủy khi đang chơi
+            var datBan = await _datBanService.GetByIdAsync(maDat);
+            if (datBan != null && datBan.MaBan.HasValue)
+            {
+                var ban = await _banBiaService.GetTableByIdAsync(datBan.MaBan.Value);
+
+                // ✅ NẾU BÀN ĐANG CHƠI → KHÔNG CHO PHÉP HỦY
+                if (dgvDatBan.Columns[e.ColumnIndex].Name == "Cancel" && ban != null && ban.TrangThai == "Đang chơi")
+                {
+                    MessageBox.Show(
+                        $"Không thể hủy đặt bàn khi bàn đang chơi!\n\n" +
+                        $"Bàn {tenBan} hiện tại đang ở trạng thái: {ban.TrangThai}\n" +
+                        $"Vui lòng thanh toán hoặc kết thúc ca chơi trước.",
+                        "Không thể hủy",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return;
+                }
+            }
+
             // Xử lý nút "Xác nhận" (Actions)
             if (dgvDatBan.Columns[e.ColumnIndex].Name == "Actions")
             {
@@ -176,12 +196,12 @@ namespace Billiard.WinForm.Forms.QLBan
 
                         if (success)
                         {
-                            var datBan = await _datBanService.GetByIdAsync(maDat);
-                            if (datBan != null)
+                            var datBanUpdate = await _datBanService.GetByIdAsync(maDat);
+                            if (datBanUpdate != null)
                             {
-                                if (datBan.MaBan.HasValue)
+                                if (datBanUpdate.MaBan.HasValue)
                                 {
-                                    var ban = await _banBiaService.GetTableByIdAsync(datBan.MaBan.Value);
+                                    var ban = await _banBiaService.GetTableByIdAsync(datBanUpdate.MaBan.Value);
                                     if (ban != null)
                                     {
                                         ban.TrangThai = "Đã đặt";

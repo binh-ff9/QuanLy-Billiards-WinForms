@@ -285,6 +285,10 @@ namespace Billiard.WinForm
                         break;
                     case "btnKhachHang":
                         var khForm = Program.GetService<KhachHangForm>();
+                        khForm.OnSwitchToHoaDonTab += (s, sdt) =>
+                        {
+                            SwitchToHoaDonTab(sdt);
+                        };
                         khForm.SetMainForm(this);
                         OpenChildForm(khForm); break;
                     case "btnThongKe":
