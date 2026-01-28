@@ -27,6 +27,7 @@
             this.tabControl = new System.Windows.Forms.TabControl();
             this.tabPhieuNhap = new System.Windows.Forms.TabPage();
             this.panelPhieuNhapBottom = new System.Windows.Forms.Panel();
+            this.btnTaoPhieuXuat = new System.Windows.Forms.Button();
             this.btnXemChiTiet = new System.Windows.Forms.Button();
             this.btnTaoPhieuNhap = new System.Windows.Forms.Button();
             this.dgvPhieuNhap = new System.Windows.Forms.DataGridView();
@@ -192,6 +193,7 @@
             // panelPhieuNhapBottom
             // 
             this.panelPhieuNhapBottom.BackColor = System.Drawing.Color.White;
+            this.panelPhieuNhapBottom.Controls.Add(this.btnTaoPhieuXuat);
             this.panelPhieuNhapBottom.Controls.Add(this.btnXemChiTiet);
             this.panelPhieuNhapBottom.Controls.Add(this.btnTaoPhieuNhap);
             this.panelPhieuNhapBottom.Dock = System.Windows.Forms.DockStyle.Bottom;
@@ -199,6 +201,22 @@
             this.panelPhieuNhapBottom.Name = "panelPhieuNhapBottom";
             this.panelPhieuNhapBottom.Size = new System.Drawing.Size(936, 60);
             this.panelPhieuNhapBottom.TabIndex = 1;
+            // 
+            // btnTaoPhieuXuat
+            // 
+            this.btnTaoPhieuXuat.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(231)))), ((int)(((byte)(76)))), ((int)(((byte)(60)))));
+            this.btnTaoPhieuXuat.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnTaoPhieuXuat.FlatAppearance.BorderSize = 0;
+            this.btnTaoPhieuXuat.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnTaoPhieuXuat.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.btnTaoPhieuXuat.ForeColor = System.Drawing.Color.White;
+            this.btnTaoPhieuXuat.Location = new System.Drawing.Point(350, 12);
+            this.btnTaoPhieuXuat.Name = "btnTaoPhieuXuat";
+            this.btnTaoPhieuXuat.Size = new System.Drawing.Size(150, 38);
+            this.btnTaoPhieuXuat.TabIndex = 2;
+            this.btnTaoPhieuXuat.Text = "Tạo phiếu xuất";
+            this.btnTaoPhieuXuat.UseVisualStyleBackColor = false;
+            this.btnTaoPhieuXuat.Click += new System.EventHandler(this.btnTaoPhieuXuat_Click);
             // 
             // btnXemChiTiet
             // 
@@ -453,6 +471,7 @@
         private System.Windows.Forms.Panel panelPhieuNhapBottom;
         private System.Windows.Forms.Button btnTaoPhieuNhap;
         private System.Windows.Forms.Button btnXemChiTiet;
+        private System.Windows.Forms.Button btnTaoPhieuXuat;
         private System.Windows.Forms.DataGridView dgvChiTiet;
         private System.Windows.Forms.Panel panelChiTietTop;
         private System.Windows.Forms.Label lblThongTinPhieu;

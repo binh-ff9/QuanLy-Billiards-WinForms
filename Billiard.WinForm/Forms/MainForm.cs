@@ -304,6 +304,7 @@ namespace Billiard.WinForm
                         // ✅ THAY ĐỔI: Mở CaiDatForm thay vì VietQRConfigForm
                         var caiDatForm = Program.GetService<CaiDatForm>();
                         caiDatForm.SetMainForm(this);
+                        caiDatForm.SetMaNhanVien(MaNV);
                         OpenChildForm(caiDatForm);
                         break;
                 }

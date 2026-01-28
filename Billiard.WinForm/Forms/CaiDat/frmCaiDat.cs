@@ -9,6 +9,10 @@ namespace Billiard.WinForm.Forms.CaiDat
     {
         private Button currentButton;
         private MainForm _mainForm;
+        private int _maNv;  // ✅ Lưu mã nhân viên
+
+        // ✅ THÊM: Lưu instance của ucPhieuNhapXuat
+        private ucPhieuNhapXuat _ucPhieuNhapXuat;
 
         public CaiDatForm()
         {
@@ -18,6 +22,18 @@ namespace Billiard.WinForm.Forms.CaiDat
         public void SetMainForm(MainForm mainForm)
         {
             _mainForm = mainForm;
+        }
+
+        // ✅ THÊM: Method set mã nhân viên
+        public void SetMaNhanVien(int maNv)
+        {
+            _maNv = maNv;
+
+            // Nếu ucPhieuNhapXuat đã được tạo, cập nhật mã nhân viên
+            if (_ucPhieuNhapXuat != null)
+            {
+                _ucPhieuNhapXuat.SetMaNhanVien(maNv);
+            }
         }
 
         private void CaiDatForm_Load(object sender, EventArgs e)
@@ -35,7 +51,9 @@ namespace Billiard.WinForm.Forms.CaiDat
 
         private void btnPhieuNhapXuat_Click(object sender, EventArgs e)
         {
-            LoadUserControl(new ucPhieuNhapXuat());
+            // ✅ SỬA: Tạo instance mới với _maNv và lưu lại
+            _ucPhieuNhapXuat = new ucPhieuNhapXuat(_maNv);
+            LoadUserControl(_ucPhieuNhapXuat);
             HighlightButton(btnPhieuNhapXuat);
         }
 

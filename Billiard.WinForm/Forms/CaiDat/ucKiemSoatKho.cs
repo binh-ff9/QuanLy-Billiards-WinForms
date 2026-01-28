@@ -108,7 +108,7 @@ namespace Billiard.WinForm.Forms
                         item.DonVi,
                         item.SoLuongTon,
                         item.NguongCanhBao,
-                        item.Gia.ToString("#,##0") + " đ",
+                        string.Format("{0:N0} đ", item.Gia),
                         item.TrangThai,
                         item.NgayNhapGanNhat.HasValue ? item.NgayNhapGanNhat.Value.ToString("dd/MM/yyyy") : ""
                     );
