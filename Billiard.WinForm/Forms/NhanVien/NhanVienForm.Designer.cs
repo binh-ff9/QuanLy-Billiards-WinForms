@@ -22,6 +22,7 @@
             btnAdd = new Button();
             btnAttendance = new Button();
             btnSchedule = new Button();
+            btnSalary = new Button();
             panelFilter = new Panel();
             lblFilterStatus = new Label();
             btnFilterAll = new Button();
@@ -34,12 +35,15 @@
             btnRoleCashier = new Button();
             btnRoleStaff = new Button();
             txtSearch = new TextBox();
-            panelContent = new Panel();
+            // [MODIFIED] Thay đổi từ panelContent thành tableLayoutMain
+            tableLayoutMain = new TableLayoutPanel();
+            panelEmployeeList = new Panel();
             flowLayoutEmployees = new FlowLayoutPanel();
-            btnSalary = new Button();
+            pnlDetailContainer = new Panel();
             panelHeader.SuspendLayout();
             panelFilter.SuspendLayout();
-            panelContent.SuspendLayout();
+            tableLayoutMain.SuspendLayout();
+            panelEmployeeList.SuspendLayout();
             SuspendLayout();
             // 
             // panelHeader
@@ -77,7 +81,7 @@
             btnAdd.FlatStyle = FlatStyle.Flat;
             btnAdd.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnAdd.ForeColor = Color.White;
-            btnAdd.Location = new Point(721, 22);
+            btnAdd.Location = new Point(1205, 22);
             btnAdd.Name = "btnAdd";
             btnAdd.Size = new Size(150, 42);
             btnAdd.TabIndex = 1;
@@ -94,7 +98,7 @@
             btnAttendance.FlatStyle = FlatStyle.Flat;
             btnAttendance.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnAttendance.ForeColor = Color.White;
-            btnAttendance.Location = new Point(561, 22);
+            btnAttendance.Location = new Point(1045, 22);
             btnAttendance.Name = "btnAttendance";
             btnAttendance.Size = new Size(150, 42);
             btnAttendance.TabIndex = 2;
@@ -111,13 +115,30 @@
             btnSchedule.FlatStyle = FlatStyle.Flat;
             btnSchedule.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnSchedule.ForeColor = Color.Black;
-            btnSchedule.Location = new Point(401, 22);
+            btnSchedule.Location = new Point(885, 22);
             btnSchedule.Name = "btnSchedule";
             btnSchedule.Size = new Size(150, 42);
             btnSchedule.TabIndex = 3;
             btnSchedule.Text = "📅 Ca làm";
             btnSchedule.UseVisualStyleBackColor = false;
             btnSchedule.Click += btnSchedule_Click;
+            // 
+            // btnSalary
+            // 
+            btnSalary.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnSalary.BackColor = Color.FromArgb(0, 192, 192);
+            btnSalary.Cursor = Cursors.Hand;
+            btnSalary.FlatAppearance.BorderSize = 0;
+            btnSalary.FlatStyle = FlatStyle.Flat;
+            btnSalary.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            btnSalary.ForeColor = Color.Black;
+            btnSalary.Location = new Point(725, 22);
+            btnSalary.Name = "btnSalary";
+            btnSalary.Size = new Size(150, 42);
+            btnSalary.TabIndex = 4;
+            btnSalary.Text = "Lương";
+            btnSalary.UseVisualStyleBackColor = false;
+            btnSalary.Click += btnSalary_Click;
             // 
             // panelFilter
             // 
@@ -178,7 +199,7 @@
             btnFilterActive.Name = "btnFilterActive";
             btnFilterActive.Size = new Size(100, 35);
             btnFilterActive.TabIndex = 2;
-            btnFilterActive.Tag = "DangLam";
+            btnFilterActive.Tag = "Đang làm";
             btnFilterActive.Text = "Đang làm";
             btnFilterActive.UseVisualStyleBackColor = false;
             btnFilterActive.Click += FilterStatus_Click;
@@ -194,7 +215,7 @@
             btnFilterInactive.Name = "btnFilterInactive";
             btnFilterInactive.Size = new Size(100, 35);
             btnFilterInactive.TabIndex = 3;
-            btnFilterInactive.Tag = "Nghi";
+            btnFilterInactive.Tag = "Nghỉ việc";
             btnFilterInactive.Text = "Nghỉ việc";
             btnFilterInactive.UseVisualStyleBackColor = false;
             btnFilterInactive.Click += FilterStatus_Click;
@@ -205,9 +226,9 @@
             lblFilterRole.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             lblFilterRole.Location = new Point(40, 53);
             lblFilterRole.Name = "lblFilterRole";
-            lblFilterRole.Size = new Size(139, 28);
+            lblFilterRole.Size = new Size(118, 28);
             lblFilterRole.TabIndex = 4;
-            lblFilterRole.Text = "Nhóm quyền:";
+            lblFilterRole.Text = "Phân quyền:";
             // 
             // btnRoleAll
             // 
@@ -301,17 +322,32 @@
             txtSearch.TabIndex = 10;
             txtSearch.TextChanged += txtSearch_TextChanged;
             // 
-            // panelContent
+            // tableLayoutMain
+            // [NEW] TableLayoutPanel để chia layout thành 2 cột
+            tableLayoutMain.ColumnCount = 2;
+            tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 0F)); // Mặc định ẩn
+            tableLayoutMain.Controls.Add(panelEmployeeList, 0, 0);
+            tableLayoutMain.Controls.Add(pnlDetailContainer, 1, 0);
+            tableLayoutMain.Dock = DockStyle.Fill;
+            tableLayoutMain.Location = new Point(0, 230);
+            tableLayoutMain.Name = "tableLayoutMain";
+            tableLayoutMain.RowCount = 1;
+            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableLayoutMain.Size = new Size(1385, 520);
+            tableLayoutMain.TabIndex = 2;
             // 
-            panelContent.AutoScroll = true;
-            panelContent.BackColor = Color.FromArgb(248, 249, 250);
-            panelContent.Controls.Add(flowLayoutEmployees);
-            panelContent.Dock = DockStyle.Fill;
-            panelContent.Location = new Point(0, 230);
-            panelContent.Name = "panelContent";
-            panelContent.Padding = new Padding(20);
-            panelContent.Size = new Size(1385, 520);
-            panelContent.TabIndex = 2;
+            // panelEmployeeList
+            // [NEW] Panel chứa danh sách nhân viên
+            panelEmployeeList.AutoScroll = true;
+            panelEmployeeList.BackColor = Color.FromArgb(248, 249, 250);
+            panelEmployeeList.Controls.Add(flowLayoutEmployees);
+            panelEmployeeList.Dock = DockStyle.Fill;
+            panelEmployeeList.Location = new Point(0, 0);
+            panelEmployeeList.Name = "panelEmployeeList";
+            panelEmployeeList.Padding = new Padding(20);
+            panelEmployeeList.Size = new Size(1385, 520);
+            panelEmployeeList.TabIndex = 0;
             // 
             // flowLayoutEmployees
             // 
@@ -323,29 +359,22 @@
             flowLayoutEmployees.Size = new Size(1345, 480);
             flowLayoutEmployees.TabIndex = 0;
             // 
-            // btnSalary
-            // 
-            btnSalary.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnSalary.BackColor = Color.FromArgb(0, 192, 192);
-            btnSalary.Cursor = Cursors.Hand;
-            btnSalary.FlatAppearance.BorderSize = 0;
-            btnSalary.FlatStyle = FlatStyle.Flat;
-            btnSalary.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            btnSalary.ForeColor = Color.Black;
-            btnSalary.Location = new Point(245, 20);
-            btnSalary.Name = "btnSalary";
-            btnSalary.Size = new Size(150, 42);
-            btnSalary.TabIndex = 4;
-            btnSalary.Text = "Lương";
-            btnSalary.UseVisualStyleBackColor = false;
-            btnSalary.Click += btnSalary_Click;
+            // pnlDetailContainer
+            // [NEW] Panel chứa chi tiết nhân viên
+            pnlDetailContainer.BackColor = Color.White;
+            pnlDetailContainer.Dock = DockStyle.Fill;
+            pnlDetailContainer.Location = new Point(1385, 0);
+            pnlDetailContainer.Name = "pnlDetailContainer";
+            pnlDetailContainer.Size = new Size(0, 520);
+            pnlDetailContainer.TabIndex = 1;
+            pnlDetailContainer.Visible = false;
             // 
             // NhanVienForm
             // 
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1385, 750);
-            Controls.Add(panelContent);
+            Controls.Add(tableLayoutMain);
             Controls.Add(panelFilter);
             Controls.Add(panelHeader);
             Font = new Font("Segoe UI", 9F);
@@ -357,7 +386,8 @@
             panelHeader.PerformLayout();
             panelFilter.ResumeLayout(false);
             panelFilter.PerformLayout();
-            panelContent.ResumeLayout(false);
+            tableLayoutMain.ResumeLayout(false);
+            panelEmployeeList.ResumeLayout(false);
             ResumeLayout(false);
         }
 
@@ -368,6 +398,7 @@
         private System.Windows.Forms.Button btnAdd;
         private System.Windows.Forms.Button btnAttendance;
         private System.Windows.Forms.Button btnSchedule;
+        private System.Windows.Forms.Button btnSalary;
         private System.Windows.Forms.Panel panelFilter;
         private System.Windows.Forms.Label lblFilterStatus;
         private System.Windows.Forms.Button btnFilterAll;
@@ -380,8 +411,10 @@
         private System.Windows.Forms.Button btnRoleCashier;
         private System.Windows.Forms.Button btnRoleStaff;
         private System.Windows.Forms.TextBox txtSearch;
-        private System.Windows.Forms.Panel panelContent;
+        // [NEW] TableLayoutPanel và panels mới
+        private System.Windows.Forms.TableLayoutPanel tableLayoutMain;
+        private System.Windows.Forms.Panel panelEmployeeList;
         private System.Windows.Forms.FlowLayoutPanel flowLayoutEmployees;
-        private Button btnSalary;
+        private System.Windows.Forms.Panel pnlDetailContainer;
     }
 }

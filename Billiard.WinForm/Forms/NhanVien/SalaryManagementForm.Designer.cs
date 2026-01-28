@@ -20,8 +20,6 @@
             DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
             panelMain = new Panel();
-            panelActions = new Panel();
-            btnClose = new Button();
             dgvSalary = new DataGridView();
             colMaNV = new DataGridViewTextBoxColumn();
             colTenNV = new DataGridViewTextBoxColumn();
@@ -34,8 +32,13 @@
             colThuong = new DataGridViewTextBoxColumn();
             colPhat = new DataGridViewTextBoxColumn();
             colTongLuong = new DataGridViewTextBoxColumn();
+            colTrangThai = new DataGridViewTextBoxColumn();
             colActions = new DataGridViewButtonColumn();
             panelStats = new Panel();
+            cardAvgSalary = new Panel();
+            lblAvgSalary = new Label();
+            lblTitleAvgSalary = new Label();
+            lblIconAvgSalary = new Label();
             cardSalary = new Panel();
             lblTotalSalary = new Label();
             lblTitleSalary = new Label();
@@ -49,6 +52,12 @@
             lblTitleEmployees = new Label();
             lblIconEmployees = new Label();
             panelFilter = new Panel();
+            txtSearch = new TextBox();
+            lblSearch = new Label();
+            cboStatus = new ComboBox();
+            lblStatus = new Label();
+            cboNhom = new ComboBox();
+            lblNhom = new Label();
             btnExport = new Button();
             btnCalculateAll = new Button();
             btnRefresh = new Button();
@@ -56,59 +65,28 @@
             lblYear = new Label();
             cboMonth = new ComboBox();
             lblMonth = new Label();
-            panelHeader = new Panel();
-            lblTitle = new Label();
             panelMain.SuspendLayout();
-            panelActions.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvSalary).BeginInit();
             panelStats.SuspendLayout();
+            cardAvgSalary.SuspendLayout();
             cardSalary.SuspendLayout();
             cardHours.SuspendLayout();
             cardEmployees.SuspendLayout();
             panelFilter.SuspendLayout();
-            panelHeader.SuspendLayout();
             SuspendLayout();
             // 
             // panelMain
             // 
             panelMain.AutoScroll = true;
-            panelMain.Controls.Add(panelActions);
             panelMain.Controls.Add(dgvSalary);
             panelMain.Controls.Add(panelStats);
             panelMain.Controls.Add(panelFilter);
-            panelMain.Controls.Add(panelHeader);
             panelMain.Dock = DockStyle.Fill;
             panelMain.Location = new Point(0, 0);
             panelMain.Name = "panelMain";
             panelMain.Padding = new Padding(20);
-            panelMain.Size = new Size(1483, 800);
+            panelMain.Size = new Size(1628, 900);
             panelMain.TabIndex = 0;
-            // 
-            // panelActions
-            // 
-            panelActions.BackColor = Color.Transparent;
-            panelActions.Controls.Add(btnClose);
-            panelActions.Dock = DockStyle.Bottom;
-            panelActions.Location = new Point(20, 720);
-            panelActions.Name = "panelActions";
-            panelActions.Size = new Size(1443, 60);
-            panelActions.TabIndex = 4;
-            // 
-            // btnClose
-            // 
-            btnClose.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btnClose.BackColor = Color.FromArgb(108, 117, 125);
-            btnClose.Cursor = Cursors.Hand;
-            btnClose.FlatAppearance.BorderSize = 0;
-            btnClose.FlatStyle = FlatStyle.Flat;
-            btnClose.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            btnClose.ForeColor = Color.White;
-            btnClose.Location = new Point(1303, 8);
-            btnClose.Name = "btnClose";
-            btnClose.Size = new Size(120, 45);
-            btnClose.TabIndex = 0;
-            btnClose.Text = "Đóng";
-            btnClose.UseVisualStyleBackColor = false;
             // 
             // dgvSalary
             // 
@@ -126,17 +104,18 @@
             dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
             dataGridViewCellStyle2.WrapMode = DataGridViewTriState.True;
             dgvSalary.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
-            dgvSalary.ColumnHeadersHeight = 40;
-            dgvSalary.Columns.AddRange(new DataGridViewColumn[] { colMaNV, colTenNV, colChucVu, colSoNgayLam, colTongGioLam, colLuongTheoGio, colLuongCoBan, colPhuCap, colThuong, colPhat, colTongLuong, colActions });
+            dgvSalary.ColumnHeadersHeight = 70;
+            dgvSalary.Columns.AddRange(new DataGridViewColumn[] { colMaNV, colTenNV, colChucVu, colSoNgayLam, colTongGioLam, colLuongTheoGio, colLuongCoBan, colPhuCap, colThuong, colPhat, colTongLuong, colTrangThai, colActions });
             dgvSalary.Dock = DockStyle.Fill;
-            dgvSalary.Location = new Point(20, 347);
+            dgvSalary.EnableHeadersVisualStyles = false;
+            dgvSalary.Location = new Point(20, 331);
             dgvSalary.Name = "dgvSalary";
             dgvSalary.ReadOnly = true;
             dgvSalary.RowHeadersVisible = false;
-            dgvSalary.RowHeadersWidth = 62;
-            dgvSalary.RowTemplate.Height = 40;
+            dgvSalary.RowHeadersWidth = 70;
+            dgvSalary.RowTemplate.Height = 50;
             dgvSalary.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dgvSalary.Size = new Size(1443, 433);
+            dgvSalary.Size = new Size(1588, 549);
             dgvSalary.TabIndex = 3;
             dgvSalary.CellContentClick += DgvSalary_CellContentClick;
             // 
@@ -154,7 +133,7 @@
             colTenNV.MinimumWidth = 8;
             colTenNV.Name = "colTenNV";
             colTenNV.ReadOnly = true;
-            colTenNV.Width = 200;
+            colTenNV.Width = 180;
             // 
             // colChucVu
             // 
@@ -170,7 +149,7 @@
             colSoNgayLam.MinimumWidth = 8;
             colSoNgayLam.Name = "colSoNgayLam";
             colSoNgayLam.ReadOnly = true;
-            colSoNgayLam.Width = 90;
+            colSoNgayLam.Width = 85;
             // 
             // colTongGioLam
             // 
@@ -178,6 +157,7 @@
             colTongGioLam.MinimumWidth = 8;
             colTongGioLam.Name = "colTongGioLam";
             colTongGioLam.ReadOnly = true;
+            colTongGioLam.Width = 150;
             // 
             // colLuongTheoGio
             // 
@@ -185,11 +165,11 @@
             colLuongTheoGio.MinimumWidth = 8;
             colLuongTheoGio.Name = "colLuongTheoGio";
             colLuongTheoGio.ReadOnly = true;
-            colLuongTheoGio.Width = 120;
+            colLuongTheoGio.Width = 110;
             // 
             // colLuongCoBan
             // 
-            colLuongCoBan.HeaderText = "Lương cơ bản";
+            colLuongCoBan.HeaderText = "Lương theo giờ";
             colLuongCoBan.MinimumWidth = 8;
             colLuongCoBan.Name = "colLuongCoBan";
             colLuongCoBan.ReadOnly = true;
@@ -225,7 +205,15 @@
             colTongLuong.MinimumWidth = 8;
             colTongLuong.Name = "colTongLuong";
             colTongLuong.ReadOnly = true;
-            colTongLuong.Width = 150;
+            colTongLuong.Width = 140;
+            // 
+            // colTrangThai
+            // 
+            colTrangThai.HeaderText = "Trạng thái";
+            colTrangThai.MinimumWidth = 8;
+            colTrangThai.Name = "colTrangThai";
+            colTrangThai.ReadOnly = true;
+            colTrangThai.Width = 110;
             // 
             // colActions
             // 
@@ -235,156 +223,219 @@
             colActions.ReadOnly = true;
             colActions.Text = "Chi tiết";
             colActions.UseColumnTextForButtonValue = true;
-            colActions.Width = 120;
+            colActions.Width = 150;
             // 
             // panelStats
             // 
-            panelStats.BackColor = Color.White;
+            panelStats.BackColor = Color.Transparent;
+            panelStats.Controls.Add(cardAvgSalary);
             panelStats.Controls.Add(cardSalary);
             panelStats.Controls.Add(cardHours);
             panelStats.Controls.Add(cardEmployees);
             panelStats.Dock = DockStyle.Top;
-            panelStats.Location = new Point(20, 178);
+            panelStats.Location = new Point(20, 186);
             panelStats.Name = "panelStats";
-            panelStats.Padding = new Padding(20, 15, 20, 15);
-            panelStats.Size = new Size(1443, 169);
+            panelStats.Padding = new Padding(0, 10, 0, 10);
+            panelStats.Size = new Size(1588, 145);
             panelStats.TabIndex = 2;
+            // 
+            // cardAvgSalary
+            // 
+            cardAvgSalary.BackColor = Color.White;
+            cardAvgSalary.Controls.Add(lblAvgSalary);
+            cardAvgSalary.Controls.Add(lblTitleAvgSalary);
+            cardAvgSalary.Controls.Add(lblIconAvgSalary);
+            cardAvgSalary.Dock = DockStyle.Left;
+            cardAvgSalary.Location = new Point(1188, 10);
+            cardAvgSalary.Name = "cardAvgSalary";
+            cardAvgSalary.Padding = new Padding(20, 15, 20, 15);
+            cardAvgSalary.Size = new Size(396, 125);
+            cardAvgSalary.TabIndex = 3;
+            // 
+            // lblAvgSalary
+            // 
+            lblAvgSalary.Dock = DockStyle.Bottom;
+            lblAvgSalary.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
+            lblAvgSalary.ForeColor = Color.FromArgb(234, 179, 8);
+            lblAvgSalary.Location = new Point(90, 70);
+            lblAvgSalary.Name = "lblAvgSalary";
+            lblAvgSalary.Size = new Size(286, 40);
+            lblAvgSalary.TabIndex = 2;
+            lblAvgSalary.Text = "0đ";
+            lblAvgSalary.TextAlign = ContentAlignment.MiddleRight;
+            // 
+            // lblTitleAvgSalary
+            // 
+            lblTitleAvgSalary.Dock = DockStyle.Top;
+            lblTitleAvgSalary.Font = new Font("Segoe UI", 10F);
+            lblTitleAvgSalary.ForeColor = Color.FromArgb(100, 116, 139);
+            lblTitleAvgSalary.Location = new Point(90, 15);
+            lblTitleAvgSalary.Name = "lblTitleAvgSalary";
+            lblTitleAvgSalary.Size = new Size(286, 28);
+            lblTitleAvgSalary.TabIndex = 1;
+            lblTitleAvgSalary.Text = "Lương TB/người";
+            // 
+            // lblIconAvgSalary
+            // 
+            lblIconAvgSalary.Dock = DockStyle.Left;
+            lblIconAvgSalary.Font = new Font("Segoe UI", 24F);
+            lblIconAvgSalary.Location = new Point(20, 15);
+            lblIconAvgSalary.Name = "lblIconAvgSalary";
+            lblIconAvgSalary.Size = new Size(70, 95);
+            lblIconAvgSalary.TabIndex = 0;
+            lblIconAvgSalary.Text = "📊";
+            lblIconAvgSalary.TextAlign = ContentAlignment.TopCenter;
             // 
             // cardSalary
             // 
-            cardSalary.BackColor = Color.FromArgb(34, 197, 94);
+            cardSalary.BackColor = Color.White;
             cardSalary.Controls.Add(lblTotalSalary);
             cardSalary.Controls.Add(lblTitleSalary);
             cardSalary.Controls.Add(lblIconSalary);
-            cardSalary.Location = new Point(806, 15);
+            cardSalary.Dock = DockStyle.Left;
+            cardSalary.Location = new Point(792, 10);
             cardSalary.Name = "cardSalary";
-            cardSalary.Size = new Size(320, 96);
+            cardSalary.Padding = new Padding(20, 15, 20, 15);
+            cardSalary.Size = new Size(396, 125);
             cardSalary.TabIndex = 2;
             // 
             // lblTotalSalary
             // 
-            lblTotalSalary.AutoSize = true;
-            lblTotalSalary.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
-            lblTotalSalary.ForeColor = Color.White;
-            lblTotalSalary.Location = new Point(70, 35);
+            lblTotalSalary.Dock = DockStyle.Bottom;
+            lblTotalSalary.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
+            lblTotalSalary.ForeColor = Color.FromArgb(34, 197, 94);
+            lblTotalSalary.Location = new Point(90, 70);
             lblTotalSalary.Name = "lblTotalSalary";
-            lblTotalSalary.Size = new Size(58, 45);
+            lblTotalSalary.Size = new Size(286, 40);
             lblTotalSalary.TabIndex = 2;
             lblTotalSalary.Text = "0đ";
+            lblTotalSalary.TextAlign = ContentAlignment.MiddleRight;
             // 
             // lblTitleSalary
             // 
-            lblTitleSalary.AutoSize = true;
-            lblTitleSalary.Font = new Font("Segoe UI", 9F);
-            lblTitleSalary.ForeColor = Color.FromArgb(230, 230, 255);
-            lblTitleSalary.Location = new Point(70, 15);
+            lblTitleSalary.Dock = DockStyle.Top;
+            lblTitleSalary.Font = new Font("Segoe UI", 10F);
+            lblTitleSalary.ForeColor = Color.FromArgb(100, 116, 139);
+            lblTitleSalary.Location = new Point(90, 15);
             lblTitleSalary.Name = "lblTitleSalary";
-            lblTitleSalary.Size = new Size(105, 25);
+            lblTitleSalary.Size = new Size(286, 28);
             lblTitleSalary.TabIndex = 1;
-            lblTitleSalary.Text = "Tổng lương";
+            lblTitleSalary.Text = "Tổng lương tháng";
             // 
             // lblIconSalary
             // 
-            lblIconSalary.AutoSize = true;
+            lblIconSalary.Dock = DockStyle.Left;
             lblIconSalary.Font = new Font("Segoe UI", 24F);
-            lblIconSalary.ForeColor = Color.White;
-            lblIconSalary.Location = new Point(0, 15);
+            lblIconSalary.Location = new Point(20, 15);
             lblIconSalary.Name = "lblIconSalary";
-            lblIconSalary.Size = new Size(94, 65);
+            lblIconSalary.Size = new Size(70, 95);
             lblIconSalary.TabIndex = 0;
             lblIconSalary.Text = "💰";
+            lblIconSalary.TextAlign = ContentAlignment.TopCenter;
             // 
             // cardHours
             // 
-            cardHours.BackColor = Color.FromArgb(245, 158, 11);
+            cardHours.BackColor = Color.White;
             cardHours.Controls.Add(lblTotalHours);
             cardHours.Controls.Add(lblTitleHours);
             cardHours.Controls.Add(lblIconHours);
-            cardHours.Location = new Point(409, 15);
+            cardHours.Dock = DockStyle.Left;
+            cardHours.Location = new Point(396, 10);
             cardHours.Name = "cardHours";
-            cardHours.Size = new Size(320, 96);
+            cardHours.Padding = new Padding(20, 15, 20, 15);
+            cardHours.Size = new Size(396, 125);
             cardHours.TabIndex = 1;
             // 
             // lblTotalHours
             // 
-            lblTotalHours.AutoSize = true;
-            lblTotalHours.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
-            lblTotalHours.ForeColor = Color.White;
-            lblTotalHours.Location = new Point(70, 35);
+            lblTotalHours.Dock = DockStyle.Bottom;
+            lblTotalHours.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
+            lblTotalHours.ForeColor = Color.FromArgb(59, 130, 246);
+            lblTotalHours.Location = new Point(90, 70);
             lblTotalHours.Name = "lblTotalHours";
-            lblTotalHours.Size = new Size(57, 45);
+            lblTotalHours.Size = new Size(286, 40);
             lblTotalHours.TabIndex = 2;
             lblTotalHours.Text = "0h";
+            lblTotalHours.TextAlign = ContentAlignment.MiddleRight;
             // 
             // lblTitleHours
             // 
-            lblTitleHours.AutoSize = true;
-            lblTitleHours.Font = new Font("Segoe UI", 9F);
-            lblTitleHours.ForeColor = Color.FromArgb(230, 230, 255);
-            lblTitleHours.Location = new Point(70, 15);
+            lblTitleHours.Dock = DockStyle.Top;
+            lblTitleHours.Font = new Font("Segoe UI", 10F);
+            lblTitleHours.ForeColor = Color.FromArgb(100, 116, 139);
+            lblTitleHours.Location = new Point(90, 15);
             lblTitleHours.Name = "lblTitleHours";
-            lblTitleHours.Size = new Size(118, 25);
+            lblTitleHours.Size = new Size(286, 28);
             lblTitleHours.TabIndex = 1;
             lblTitleHours.Text = "Tổng giờ làm";
             // 
             // lblIconHours
             // 
-            lblIconHours.AutoSize = true;
+            lblIconHours.Dock = DockStyle.Left;
             lblIconHours.Font = new Font("Segoe UI", 24F);
-            lblIconHours.ForeColor = Color.White;
-            lblIconHours.Location = new Point(0, 15);
+            lblIconHours.Location = new Point(20, 15);
             lblIconHours.Name = "lblIconHours";
-            lblIconHours.Size = new Size(94, 65);
+            lblIconHours.Size = new Size(70, 95);
             lblIconHours.TabIndex = 0;
             lblIconHours.Text = "⏰";
+            lblIconHours.TextAlign = ContentAlignment.TopCenter;
             // 
             // cardEmployees
             // 
-            cardEmployees.BackColor = Color.FromArgb(59, 130, 246);
+            cardEmployees.BackColor = Color.White;
             cardEmployees.Controls.Add(lblTotalEmployees);
             cardEmployees.Controls.Add(lblTitleEmployees);
             cardEmployees.Controls.Add(lblIconEmployees);
-            cardEmployees.Location = new Point(20, 15);
+            cardEmployees.Dock = DockStyle.Left;
+            cardEmployees.Location = new Point(0, 10);
             cardEmployees.Name = "cardEmployees";
-            cardEmployees.Size = new Size(320, 96);
+            cardEmployees.Padding = new Padding(20, 15, 20, 15);
+            cardEmployees.Size = new Size(396, 125);
             cardEmployees.TabIndex = 0;
             // 
             // lblTotalEmployees
             // 
-            lblTotalEmployees.AutoSize = true;
-            lblTotalEmployees.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
-            lblTotalEmployees.ForeColor = Color.White;
-            lblTotalEmployees.Location = new Point(70, 35);
+            lblTotalEmployees.Dock = DockStyle.Bottom;
+            lblTotalEmployees.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
+            lblTotalEmployees.ForeColor = Color.FromArgb(139, 92, 246);
+            lblTotalEmployees.Location = new Point(90, 70);
             lblTotalEmployees.Name = "lblTotalEmployees";
-            lblTotalEmployees.Size = new Size(38, 45);
+            lblTotalEmployees.Size = new Size(286, 40);
             lblTotalEmployees.TabIndex = 2;
             lblTotalEmployees.Text = "0";
+            lblTotalEmployees.TextAlign = ContentAlignment.MiddleRight;
             // 
             // lblTitleEmployees
             // 
-            lblTitleEmployees.AutoSize = true;
-            lblTitleEmployees.Font = new Font("Segoe UI", 9F);
-            lblTitleEmployees.ForeColor = Color.FromArgb(230, 230, 255);
-            lblTitleEmployees.Location = new Point(70, 15);
+            lblTitleEmployees.Dock = DockStyle.Top;
+            lblTitleEmployees.Font = new Font("Segoe UI", 10F);
+            lblTitleEmployees.ForeColor = Color.FromArgb(100, 116, 139);
+            lblTitleEmployees.Location = new Point(90, 15);
             lblTitleEmployees.Name = "lblTitleEmployees";
-            lblTitleEmployees.Size = new Size(134, 25);
+            lblTitleEmployees.Size = new Size(286, 28);
             lblTitleEmployees.TabIndex = 1;
-            lblTitleEmployees.Text = "Tổng nhân viên";
+            lblTitleEmployees.Text = "Số nhân viên";
             // 
             // lblIconEmployees
             // 
-            lblIconEmployees.AutoSize = true;
+            lblIconEmployees.Dock = DockStyle.Left;
             lblIconEmployees.Font = new Font("Segoe UI", 24F);
-            lblIconEmployees.ForeColor = Color.White;
-            lblIconEmployees.Location = new Point(-5, 15);
+            lblIconEmployees.Location = new Point(20, 15);
             lblIconEmployees.Name = "lblIconEmployees";
-            lblIconEmployees.Size = new Size(94, 65);
+            lblIconEmployees.Size = new Size(70, 95);
             lblIconEmployees.TabIndex = 0;
             lblIconEmployees.Text = "👥";
+            lblIconEmployees.TextAlign = ContentAlignment.TopCenter;
             // 
             // panelFilter
             // 
             panelFilter.BackColor = Color.White;
+            panelFilter.Controls.Add(txtSearch);
+            panelFilter.Controls.Add(lblSearch);
+            panelFilter.Controls.Add(cboStatus);
+            panelFilter.Controls.Add(lblStatus);
+            panelFilter.Controls.Add(cboNhom);
+            panelFilter.Controls.Add(lblNhom);
             panelFilter.Controls.Add(btnExport);
             panelFilter.Controls.Add(btnCalculateAll);
             panelFilter.Controls.Add(btnRefresh);
@@ -393,55 +444,115 @@
             panelFilter.Controls.Add(cboMonth);
             panelFilter.Controls.Add(lblMonth);
             panelFilter.Dock = DockStyle.Top;
-            panelFilter.Location = new Point(20, 102);
+            panelFilter.Location = new Point(20, 20);
             panelFilter.Name = "panelFilter";
-            panelFilter.Padding = new Padding(20, 15, 20, 15);
-            panelFilter.Size = new Size(1443, 76);
+            panelFilter.Padding = new Padding(15, 15, 15, 20);
+            panelFilter.Size = new Size(1588, 166);
             panelFilter.TabIndex = 1;
+            // 
+            // txtSearch
+            // 
+            txtSearch.Font = new Font("Segoe UI", 10F);
+            txtSearch.Location = new Point(685, 18);
+            txtSearch.Name = "txtSearch";
+            txtSearch.PlaceholderText = "Tìm theo tên hoặc mã NV...";
+            txtSearch.Size = new Size(250, 34);
+            txtSearch.TabIndex = 12;
+            txtSearch.TextChanged += TxtSearch_TextChanged;
+            // 
+            // lblSearch
+            // 
+            lblSearch.AutoSize = true;
+            lblSearch.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblSearch.Location = new Point(585, 21);
+            lblSearch.Name = "lblSearch";
+            lblSearch.Size = new Size(105, 28);
+            lblSearch.TabIndex = 11;
+            lblSearch.Text = "Tìm kiếm:";
+            // 
+            // cboStatus
+            // 
+            cboStatus.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboStatus.Font = new Font("Segoe UI", 10F);
+            cboStatus.FormattingEnabled = true;
+            cboStatus.Location = new Point(381, 18);
+            cboStatus.Name = "cboStatus";
+            cboStatus.Size = new Size(180, 36);
+            cboStatus.TabIndex = 10;
+            cboStatus.SelectedIndexChanged += CboStatus_SelectedIndexChanged;
+            // 
+            // lblStatus
+            // 
+            lblStatus.AutoSize = true;
+            lblStatus.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblStatus.Location = new Point(257, 24);
+            lblStatus.Name = "lblStatus";
+            lblStatus.Size = new Size(113, 28);
+            lblStatus.TabIndex = 9;
+            lblStatus.Text = "Trạng thái:";
+            // 
+            // cboNhom
+            // 
+            cboNhom.DropDownStyle = ComboBoxStyle.DropDownList;
+            cboNhom.Font = new Font("Segoe UI", 10F);
+            cboNhom.FormattingEnabled = true;
+            cboNhom.Location = new Point(381, 59);
+            cboNhom.Name = "cboNhom";
+            cboNhom.Size = new Size(180, 36);
+            cboNhom.TabIndex = 8;
+            cboNhom.SelectedIndexChanged += CboNhom_SelectedIndexChanged;
+            // 
+            // lblNhom
+            // 
+            lblNhom.AutoSize = true;
+            lblNhom.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            lblNhom.Location = new Point(257, 67);
+            lblNhom.Name = "lblNhom";
+            lblNhom.Size = new Size(118, 28);
+            lblNhom.TabIndex = 7;
+            lblNhom.Text = "Phòng ban:";
             // 
             // btnExport
             // 
-            btnExport.BackColor = Color.FromArgb(23, 162, 184);
+            btnExport.BackColor = Color.FromArgb(34, 197, 94);
             btnExport.Cursor = Cursors.Hand;
             btnExport.FlatAppearance.BorderSize = 0;
             btnExport.FlatStyle = FlatStyle.Flat;
             btnExport.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnExport.ForeColor = Color.White;
-            btnExport.Location = new Point(763, 18);
+            btnExport.Location = new Point(353, 110);
             btnExport.Name = "btnExport";
-            btnExport.Size = new Size(130, 40);
+            btnExport.Size = new Size(160, 45);
             btnExport.TabIndex = 6;
             btnExport.Text = "📥 Xuất Excel";
             btnExport.UseVisualStyleBackColor = false;
-            btnExport.Click += BtnExport_Click;
             // 
             // btnCalculateAll
             // 
-            btnCalculateAll.BackColor = Color.FromArgb(34, 197, 94);
+            btnCalculateAll.BackColor = Color.FromArgb(102, 126, 234);
             btnCalculateAll.Cursor = Cursors.Hand;
             btnCalculateAll.FlatAppearance.BorderSize = 0;
             btnCalculateAll.FlatStyle = FlatStyle.Flat;
             btnCalculateAll.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnCalculateAll.ForeColor = Color.White;
-            btnCalculateAll.Location = new Point(593, 18);
+            btnCalculateAll.Location = new Point(175, 110);
             btnCalculateAll.Name = "btnCalculateAll";
-            btnCalculateAll.Size = new Size(160, 40);
+            btnCalculateAll.Size = new Size(172, 45);
             btnCalculateAll.TabIndex = 5;
             btnCalculateAll.Text = "💵 Tính lương tất cả";
             btnCalculateAll.UseVisualStyleBackColor = false;
-            btnCalculateAll.Click += BtnCalculateAll_Click;
             // 
             // btnRefresh
             // 
-            btnRefresh.BackColor = Color.FromArgb(102, 126, 234);
+            btnRefresh.BackColor = Color.FromArgb(59, 130, 246);
             btnRefresh.Cursor = Cursors.Hand;
             btnRefresh.FlatAppearance.BorderSize = 0;
             btnRefresh.FlatStyle = FlatStyle.Flat;
             btnRefresh.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnRefresh.ForeColor = Color.White;
-            btnRefresh.Location = new Point(463, 18);
+            btnRefresh.Location = new Point(15, 110);
             btnRefresh.Name = "btnRefresh";
-            btnRefresh.Size = new Size(120, 40);
+            btnRefresh.Size = new Size(154, 45);
             btnRefresh.TabIndex = 4;
             btnRefresh.Text = "🔄 Làm mới";
             btnRefresh.UseVisualStyleBackColor = false;
@@ -451,7 +562,7 @@
             cboYear.DropDownStyle = ComboBoxStyle.DropDownList;
             cboYear.Font = new Font("Segoe UI", 10F);
             cboYear.FormattingEnabled = true;
-            cboYear.Location = new Point(305, 18);
+            cboYear.Location = new Point(131, 61);
             cboYear.Name = "cboYear";
             cboYear.Size = new Size(100, 36);
             cboYear.TabIndex = 3;
@@ -460,11 +571,11 @@
             // 
             lblYear.AutoSize = true;
             lblYear.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblYear.Location = new Point(237, 21);
+            lblYear.Location = new Point(15, 64);
             lblYear.Name = "lblYear";
-            lblYear.Size = new Size(62, 28);
+            lblYear.Size = new Size(96, 28);
             lblYear.TabIndex = 2;
-            lblYear.Text = "Năm:";
+            lblYear.Text = "📅 Năm:";
             // 
             // cboMonth
             // 
@@ -486,62 +597,32 @@
             lblMonth.TabIndex = 0;
             lblMonth.Text = "📅 Tháng:";
             // 
-            // panelHeader
-            // 
-            panelHeader.BackColor = Color.White;
-            panelHeader.Controls.Add(lblTitle);
-            panelHeader.Dock = DockStyle.Top;
-            panelHeader.Location = new Point(20, 20);
-            panelHeader.Name = "panelHeader";
-            panelHeader.Padding = new Padding(20, 15, 20, 15);
-            panelHeader.Size = new Size(1443, 82);
-            panelHeader.TabIndex = 0;
-            // 
-            // lblTitle
-            // 
-            lblTitle.AutoSize = true;
-            lblTitle.Font = new Font("Segoe UI", 20F, FontStyle.Bold);
-            lblTitle.ForeColor = Color.FromArgb(26, 26, 46);
-            lblTitle.Location = new Point(20, 15);
-            lblTitle.Name = "lblTitle";
-            lblTitle.Size = new Size(464, 54);
-            lblTitle.TabIndex = 0;
-            lblTitle.Text = "💰 Quản lý bảng lương";
-            // 
             // SalaryManagementForm
             // 
             AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = Color.FromArgb(248, 249, 250);
-            ClientSize = new Size(1483, 800);
+            ClientSize = new Size(1628, 900);
             Controls.Add(panelMain);
             Font = new Font("Segoe UI", 9F);
             Name = "SalaryManagementForm";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "💰 Quản lý bảng lương";
             panelMain.ResumeLayout(false);
-            panelActions.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)dgvSalary).EndInit();
             panelStats.ResumeLayout(false);
+            cardAvgSalary.ResumeLayout(false);
             cardSalary.ResumeLayout(false);
-            cardSalary.PerformLayout();
             cardHours.ResumeLayout(false);
-            cardHours.PerformLayout();
             cardEmployees.ResumeLayout(false);
-            cardEmployees.PerformLayout();
             panelFilter.ResumeLayout(false);
             panelFilter.PerformLayout();
-            panelHeader.ResumeLayout(false);
-            panelHeader.PerformLayout();
             ResumeLayout(false);
-
         }
 
         #endregion
 
         private System.Windows.Forms.Panel panelMain;
-        private System.Windows.Forms.Panel panelHeader;
-        private System.Windows.Forms.Label lblTitle;
         private System.Windows.Forms.Panel panelFilter;
         private System.Windows.Forms.Label lblMonth;
         private System.Windows.Forms.ComboBox cboMonth;
@@ -550,6 +631,12 @@
         private System.Windows.Forms.Button btnRefresh;
         private System.Windows.Forms.Button btnCalculateAll;
         private System.Windows.Forms.Button btnExport;
+        private System.Windows.Forms.Label lblNhom;
+        private System.Windows.Forms.ComboBox cboNhom;
+        private System.Windows.Forms.Label lblStatus;
+        private System.Windows.Forms.ComboBox cboStatus;
+        private System.Windows.Forms.Label lblSearch;
+        private System.Windows.Forms.TextBox txtSearch;
         private System.Windows.Forms.Panel panelStats;
         private System.Windows.Forms.Panel cardEmployees;
         private System.Windows.Forms.Label lblIconEmployees;
@@ -563,6 +650,10 @@
         private System.Windows.Forms.Label lblTotalSalary;
         private System.Windows.Forms.Label lblTitleSalary;
         private System.Windows.Forms.Label lblIconSalary;
+        private System.Windows.Forms.Panel cardAvgSalary;
+        private System.Windows.Forms.Label lblAvgSalary;
+        private System.Windows.Forms.Label lblTitleAvgSalary;
+        private System.Windows.Forms.Label lblIconAvgSalary;
         private System.Windows.Forms.DataGridView dgvSalary;
         private System.Windows.Forms.DataGridViewTextBoxColumn colMaNV;
         private System.Windows.Forms.DataGridViewTextBoxColumn colTenNV;
@@ -575,8 +666,7 @@
         private System.Windows.Forms.DataGridViewTextBoxColumn colThuong;
         private System.Windows.Forms.DataGridViewTextBoxColumn colPhat;
         private System.Windows.Forms.DataGridViewTextBoxColumn colTongLuong;
+        private System.Windows.Forms.DataGridViewTextBoxColumn colTrangThai;
         private System.Windows.Forms.DataGridViewButtonColumn colActions;
-        private System.Windows.Forms.Panel panelActions;
-        private System.Windows.Forms.Button btnClose;
     }
 }

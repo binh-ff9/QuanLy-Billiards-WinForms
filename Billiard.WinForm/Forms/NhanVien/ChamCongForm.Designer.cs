@@ -34,9 +34,11 @@
             // 
             AutoScaleDimensions = new SizeF(12F, 30F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 783);
+            ClientSize = new Size(1200, 800);
             Name = "ChamCongForm";
-            Text = "ChamCongForm";
+            Text = "Chấm Công Nhân Viên";
+            MinimumSize = new Size(1200, 800);
+            StartPosition = FormStartPosition.CenterScreen;
             ResumeLayout(false);
         }
 

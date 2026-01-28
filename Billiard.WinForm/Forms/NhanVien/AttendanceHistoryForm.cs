@@ -91,15 +91,6 @@ namespace Billiard.WinForm.Forms.NhanVien
                 BackColor = Color.White
             };
 
-            var lblTitle = new Label
-            {
-                Text = $"📅 Lịch sử chấm công",
-                Font = new Font("Segoe UI", 18F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(26, 26, 46),
-                AutoSize = true,
-                Location = new Point(20, 15)
-            };
-
             var lblEmployee = new Label
             {
                 Text = $"👤 {_tenNV}",
@@ -109,7 +100,7 @@ namespace Billiard.WinForm.Forms.NhanVien
                 Location = new Point(20, 50)
             };
 
-            panel.Controls.AddRange(new Control[] { lblTitle, lblEmployee });
+            panel.Controls.AddRange(new Control[] { lblEmployee });
             return panel;
         }
 
@@ -317,13 +308,6 @@ namespace Billiard.WinForm.Forms.NhanVien
                     BackColor = Color.White
                 };
 
-                var lblIcon = new Label
-                {
-                    Text = "📅",
-                    Font = new Font("Segoe UI", 48F),
-                    AutoSize = true,
-                    Location = new Point(420, 80)
-                };
 
                 var lblText = new Label
                 {
@@ -334,7 +318,7 @@ namespace Billiard.WinForm.Forms.NhanVien
                     Location = new Point(300, 160)
                 };
 
-                empty.Controls.AddRange(new Control[] { lblIcon, lblText });
+                empty.Controls.AddRange(new Control[] { lblText });
                 flowAttendance.Controls.Add(empty);
                 return;
             }

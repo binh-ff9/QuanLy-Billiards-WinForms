@@ -2,7 +2,6 @@
 using Billiard.DAL.Entities;
 using System;
 using System.Drawing;
-using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -11,19 +10,21 @@ namespace Billiard.WinForm.Forms.NhanVien
     public partial class ChiTietNhanVienControl : UserControl
     {
         private readonly NhanVienService _nhanVienService;
+        private readonly LichLamViecService _lichLamViecService;
         private DAL.Entities.NhanVien _nhanVien;
         private readonly int _currentUserId;
         private readonly string _currentUserRole;
-        private Panel pnlContent;
+        private FlowLayoutPanel flowLayout = null!;
         private bool _isLoading = false;
 
-        public event EventHandler OnDataChanged;
-        public event EventHandler OnEditClicked;
-        public event EventHandler OnDeleted;
+        public event EventHandler? OnDataChanged;
+        public event EventHandler? OnEditClicked;
+        public event EventHandler? OnDeleted;
 
         public ChiTietNhanVienControl(NhanVienService nhanVienService, DAL.Entities.NhanVien nhanVien, int currentUserId, string currentUserRole)
         {
             _nhanVienService = nhanVienService;
+            _lichLamViecService = new LichLamViecService();
             _nhanVien = nhanVien;
             _currentUserId = currentUserId;
             _currentUserRole = currentUserRole;
@@ -34,16 +35,19 @@ namespace Billiard.WinForm.Forms.NhanVien
 
         private void InitializeLayout()
         {
-            pnlContent = new Panel
+            // Sử dụng FlowLayoutPanel để tự động grid các card
+            flowLayout = new FlowLayoutPanel
             {
-                AutoScroll = true,
                 Dock = DockStyle.Fill,
+                AutoScroll = true,
                 BackColor = Color.White,
                 Padding = new Padding(20),
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
                 AutoSize = false
             };
 
-            this.Controls.Add(pnlContent);
+            Controls.Add(flowLayout);
         }
 
         protected override async void OnLoad(EventArgs e)
@@ -59,46 +63,57 @@ namespace Billiard.WinForm.Forms.NhanVien
             _isLoading = true;
             try
             {
-                this.Cursor = Cursors.WaitCursor;
-                pnlContent.Controls.Clear();
+                Cursor = Cursors.WaitCursor;
+                flowLayout.Controls.Clear();
 
                 // Reload data
-                _nhanVien = _nhanVienService.GetEmployeeById(_nhanVien.MaNv);
-                if (_nhanVien == null)
+                var nhanVien = _nhanVienService.GetEmployeeById(_nhanVien.MaNv);
+                if (nhanVien == null)
                 {
                     ShowError("Không tìm thấy thông tin nhân viên");
                     return;
                 }
+                _nhanVien = nhanVien;
 
-                int yPos = 0;
-                int panelWidth = pnlContent.ClientSize.Width - 40;
+                // Tính toán chiều rộng card dựa trên chiều rộng control
+                int cardWidth = 410;
 
                 // Header
-                yPos = AddHeader(yPos, panelWidth);
+                flowLayout.Controls.Add(CreateHeader(cardWidth));
+
+                // Separator
+                flowLayout.Controls.Add(CreateSeparator(cardWidth));
 
                 // Thông tin cơ bản
-                yPos = AddBasicInfo(yPos, panelWidth);
+                flowLayout.Controls.Add(CreateBasicInfo(cardWidth));
 
                 // Thông tin lương
-                yPos = AddSalaryInfo(yPos, panelWidth);
+                flowLayout.Controls.Add(CreateSalaryInfo(cardWidth));
 
                 // Chấm công tháng này
-                yPos = await AddAttendanceInfo(yPos, panelWidth);
+                var attendancePanel = await CreateAttendanceInfo(cardWidth);
+                flowLayout.Controls.Add(attendancePanel);
+
+                // Lịch làm việc tháng này
+                var schedulePanel = await CreateScheduleInfo(cardWidth);
+                flowLayout.Controls.Add(schedulePanel);
 
                 // Bảng lương gần nhất
-                yPos = AddLatestSalary(yPos, panelWidth);
+                var salaryPanel = CreateLatestSalary(cardWidth);
+                if (salaryPanel != null)
+                    flowLayout.Controls.Add(salaryPanel);
 
                 // Action buttons
                 if (_currentUserRole == "Admin" || _currentUserRole == "Quản lý")
                 {
-                    AddActionButtons(yPos, panelWidth);
+                    flowLayout.Controls.Add(CreateActionButtons(cardWidth));
                 }
 
-                this.Cursor = Cursors.Default;
+                Cursor = Cursors.Default;
             }
             catch (Exception ex)
             {
-                this.Cursor = Cursors.Default;
+                Cursor = Cursors.Default;
                 ShowError($"Lỗi khi tải dữ liệu: {ex.Message}");
             }
             finally
@@ -108,29 +123,30 @@ namespace Billiard.WinForm.Forms.NhanVien
         }
 
         #region Header
-        private int AddHeader(int yPos, int panelWidth)
+        private Panel CreateHeader(int width)
         {
             var pnlHeader = new Panel
             {
-                Location = new Point(0, yPos),
-                Size = new Size(panelWidth, 120),
-                BackColor = Color.White
+                Width = width,
+                Height = 170,
+                BackColor = Color.White,
+                Margin = new Padding(0, 0, 0, 15)
             };
 
             // Avatar placeholder
             var pnlAvatar = new Panel
             {
-                Location = new Point((panelWidth - 80) / 2, 10),
-                Size = new Size(80, 80),
-                BackColor = GetRoleColor(_nhanVien.MaNhomNavigation?.TenNhom ?? "")
+                Location = new Point((width - 80) / 2, 10),
+                Size = new Size(70, 70),
+                BackColor = GetRoleColor(_nhanVien.MaNhomNavigation?.TenNhom)
             };
 
             var lblInitial = new Label
             {
-                Text = _nhanVien.TenNv?.Length > 0 ? _nhanVien.TenNv.Substring(0, 1).ToUpper() : "?",
+                Text = !string.IsNullOrEmpty(_nhanVien.TenNv) ? _nhanVien.TenNv[..1].ToUpper() : "?",
                 Font = new Font("Segoe UI", 32F, FontStyle.Bold),
                 ForeColor = Color.White,
-                Size = new Size(80, 80),
+                Size = new Size(70, 70),
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
@@ -141,7 +157,7 @@ namespace Billiard.WinForm.Forms.NhanVien
                 {
                     var pic = new PictureBox
                     {
-                        Size = new Size(80, 80),
+                        Size = new Size(70, 70),
                         Image = Image.FromFile($"asset/img/{_nhanVien.FaceidAnh}"),
                         SizeMode = PictureBoxSizeMode.Zoom
                     };
@@ -161,15 +177,13 @@ namespace Billiard.WinForm.Forms.NhanVien
             var lblName = new Label
             {
                 Text = _nhanVien.TenNv,
-                Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(26, 26, 46),
-                Location = new Point(0, 95),
-                Size = new Size(panelWidth, 30),
+                Location = new Point(0, 85),
+                Size = new Size(width, 45),
                 TextAlign = ContentAlignment.TopCenter,
                 AutoSize = false
             };
-
-            pnlHeader.Controls.AddRange(new Control[] { pnlAvatar, lblName });
 
             // Nhóm quyền badge (bên dưới tên)
             var lblRole = new Label
@@ -177,82 +191,105 @@ namespace Billiard.WinForm.Forms.NhanVien
                 Text = _nhanVien.MaNhomNavigation?.TenNhom ?? "Nhân viên",
                 Font = new Font("Segoe UI", 9F),
                 ForeColor = Color.FromArgb(107, 114, 128),
-                Location = new Point(0, 120),
-                Size = new Size(panelWidth, 20),
+                Location = new Point(0, 125),
+                Size = new Size(width, 20),
                 TextAlign = ContentAlignment.TopCenter,
                 AutoSize = false
             };
-            pnlHeader.Controls.Add(lblRole);
-            pnlHeader.Height = 145;
 
-            // Trạng thái badge (góc phải)
+            // Trạng thái badge (góc phải) - Sửa lại để kiểm tra đúng giá trị
+            string statusText = "Nghỉ việc";
+            Color statusColor = Color.FromArgb(220, 53, 69);
+
+            if (!string.IsNullOrEmpty(_nhanVien.TrangThai))
+            {
+                // Kiểm tra nhiều biến thể của trạng thái
+                var trangThai = _nhanVien.TrangThai.Trim().ToLower();
+                if (trangThai == "đang làm" || trangThai == "danglam" || trangThai == "đanglàm")
+                {
+                    statusText = "Đang làm việc";
+                    statusColor = Color.FromArgb(40, 167, 69);
+                }
+                else if (trangThai == "nghỉ" || trangThai == "nghi" || trangThai == "nghỉ việc" || trangThai == "nghiviec")
+                {
+                    statusText = "Nghỉ việc";
+                    statusColor = Color.FromArgb(220, 53, 69);
+                }
+            }
+
             var lblStatus = new Label
             {
-                Text = _nhanVien.TrangThai == "DangLam" ? "Đang làm việc" : "Nghỉ việc",
+                Text = statusText,
                 Font = new Font("Segoe UI", 8F, FontStyle.Bold),
                 ForeColor = Color.White,
-                BackColor = _nhanVien.TrangThai == "DangLam" ? Color.FromArgb(40, 167, 69) : Color.FromArgb(220, 53, 69),
+                BackColor = statusColor,
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Size = new Size(100, 24),
-                Location = new Point(panelWidth - 100, 10)
+                Location = new Point(width - 100, 10)
             };
-            pnlHeader.Controls.Add(lblStatus);
 
-            pnlContent.Controls.Add(pnlHeader);
+            pnlHeader.Controls.AddRange([pnlAvatar, lblName, lblRole, lblStatus]);
 
-            // Separator
-            var separator = new Panel
+            return pnlHeader;
+        }
+
+        private static Panel CreateSeparator(int width)
+        {
+            return new Panel
             {
-                Location = new Point(0, yPos + 150),
-                Size = new Size(panelWidth, 1),
-                BackColor = Color.FromArgb(233, 236, 239)
+                Width = width,
+                Height = 1,
+                BackColor = Color.FromArgb(233, 236, 239),
+                Margin = new Padding(0, 0, 0, 15)
             };
-            pnlContent.Controls.Add(separator);
-
-            return yPos + 165;
         }
         #endregion
 
         #region Basic Info
-        private int AddBasicInfo(int yPos, int panelWidth)
+        private Panel CreateBasicInfo(int width)
         {
-            var pnlBasic = CreateCard(panelWidth, Color.FromArgb(248, 249, 250));
-            pnlBasic.Location = new Point(0, yPos);
+            var pnlBasic = CreateCard(width, Color.FromArgb(248, 249, 250));
 
-            int cardYPos = 15;
+            int yPos = 15;
 
             // Title
             var lblTitle = new Label
             {
-                Text = "📋 Thông tin cơ bản",
+                Text = "👤 Thông tin cơ bản",
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(26, 26, 46),
-                Location = new Point(15, cardYPos),
+                Location = new Point(15, yPos),
                 AutoSize = true
             };
             pnlBasic.Controls.Add(lblTitle);
-            cardYPos += 35;
+            yPos += 35;
 
-            // Info rows
-            cardYPos = AddInfoRow(pnlBasic, "Số điện thoại:", _nhanVien.Sdt ?? "-", cardYPos, panelWidth);
-            cardYPos = AddInfoRow(pnlBasic, "Email:", _nhanVien.Email ?? "Chưa cập nhật", cardYPos, panelWidth);
-            cardYPos = AddInfoRow(pnlBasic, "Ca làm việc:", GetShiftText(_nhanVien.CaMacDinh), cardYPos, panelWidth);
+            // Mã nhân viên
+            yPos = AddInfoRow(pnlBasic, "Mã NV:", $"#{_nhanVien.MaNv}", yPos, width);
 
-            pnlBasic.Height = cardYPos + 15;
-            pnlContent.Controls.Add(pnlBasic);
+            // Số điện thoại
+            yPos = AddInfoRow(pnlBasic, "Số điện thoại:", _nhanVien.Sdt ?? "Chưa cập nhật", yPos, width);
 
-            return yPos + cardYPos + 30;
+            // Email
+            yPos = AddInfoRow(pnlBasic, "Email:", string.IsNullOrEmpty(_nhanVien.Email) ? "Chưa cập nhật" : _nhanVien.Email, yPos, width);
+
+            // Ca mặc định
+            yPos = AddInfoRow(pnlBasic, "Ca mặc định:", GetShiftText(_nhanVien.CaMacDinh ?? "Sang"), yPos, width);
+
+            pnlBasic.Height = yPos + 15;
+            pnlBasic.Margin = new Padding(0, 0, 0, 15);
+
+            return pnlBasic;
         }
         #endregion
 
         #region Salary Info
-        private int AddSalaryInfo(int yPos, int panelWidth)
+        private Panel CreateSalaryInfo(int width)
         {
-            var pnlSalary = CreateCard(panelWidth, Color.FromArgb(254, 249, 195));
-            pnlSalary.Location = new Point(0, yPos);
+            var pnlSalary = CreateCard(width, Color.FromArgb(240, 249, 255));
 
-            int cardYPos = 15;
+            int yPos = 15;
 
             // Title
             var lblTitle = new Label
@@ -260,98 +297,146 @@ namespace Billiard.WinForm.Forms.NhanVien
                 Text = "💰 Thông tin lương",
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(26, 26, 46),
-                Location = new Point(15, cardYPos),
+                Location = new Point(15, yPos),
                 AutoSize = true
             };
             pnlSalary.Controls.Add(lblTitle);
-            cardYPos += 35;
+            yPos += 35;
 
-            // Salary rows
-            cardYPos = AddInfoRow(pnlSalary, "Lương cơ bản:", $"{(_nhanVien.LuongCoBan ?? 0):N0}đ", cardYPos, panelWidth, false, Color.FromArgb(40, 167, 69));
-            cardYPos = AddInfoRow(pnlSalary, "Phụ cấp:", $"{(_nhanVien.PhuCap ?? 0):N0}đ", cardYPos, panelWidth, false, Color.FromArgb(255, 193, 7));
+            // Lương cơ bản
+            yPos = AddInfoRow(pnlSalary, "Lương cơ bản:", $"{_nhanVien.LuongCoBan ?? 0:N0}đ", yPos, width);
 
-            // Separator
-            var separator = new Panel
-            {
-                Location = new Point(15, cardYPos),
-                Size = new Size(panelWidth - 30, 1),
-                BackColor = Color.FromArgb(226, 232, 240)
-            };
-            pnlSalary.Controls.Add(separator);
-            cardYPos += 10;
+            // Phụ cấp
+            yPos = AddInfoRow(pnlSalary, "Phụ cấp:", $"{_nhanVien.PhuCap ?? 0:N0}đ", yPos, width);
 
-            // Total
-            var tongLuong = (_nhanVien.LuongCoBan ?? 0) + (_nhanVien.PhuCap ?? 0);
-            cardYPos = AddInfoRow(pnlSalary, "Tổng:", $"{tongLuong:N0}đ", cardYPos, panelWidth, true, Color.FromArgb(220, 38, 38));
+            pnlSalary.Height = yPos + 15;
+            pnlSalary.Margin = new Padding(0, 0, 0, 15);
 
-            pnlSalary.Height = cardYPos + 15;
-            pnlContent.Controls.Add(pnlSalary);
-
-            return yPos + cardYPos + 30;
+            return pnlSalary;
         }
         #endregion
 
         #region Attendance Info
-        private async Task<int> AddAttendanceInfo(int yPos, int panelWidth)
+        private async Task<Panel> CreateAttendanceInfo(int width)
         {
-            var pnlAttendance = CreateCard(panelWidth, Color.FromArgb(240, 253, 244));
-            pnlAttendance.Location = new Point(0, yPos);
+            var pnlAttendance = CreateCard(width, Color.FromArgb(255, 251, 235));
 
-            int cardYPos = 15;
+            int yPos = 15;
 
             // Title
             var lblTitle = new Label
             {
-                Text = $"📊 Chấm công tháng {DateTime.Now.Month}/{DateTime.Now.Year}",
+                Text = $"📅 Chấm công tháng {DateTime.Now:MM/yyyy}",
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(26, 26, 46),
-                Location = new Point(15, cardYPos),
+                Location = new Point(15, yPos),
                 AutoSize = true
             };
             pnlAttendance.Controls.Add(lblTitle);
-            cardYPos += 35;
+            yPos += 35;
 
             // Get stats
-            var stats = _nhanVienService.GetMonthlyStats(_nhanVien.MaNv, DateTime.Now.Month, DateTime.Now.Year);
+            var currentMonth = DateTime.Now.Month;
+            var currentYear = DateTime.Now.Year;
 
-            cardYPos = AddInfoRow(pnlAttendance, "Số ngày làm:", $"{stats.totalDays} ngày", cardYPos, panelWidth);
-            cardYPos = AddInfoRow(pnlAttendance, "Tổng giờ làm:", $"{stats.totalHours:F2} giờ", cardYPos, panelWidth, false, Color.FromArgb(102, 126, 234));
-            cardYPos = AddInfoRow(pnlAttendance, "Số lần đi trễ:", $"{stats.lateDays} lần", cardYPos, panelWidth, false, Color.FromArgb(220, 53, 69));
+            // Sửa lại cách gọi method để lấy stats
+            var stats = _nhanVienService.GetMonthlyStats(_nhanVien.MaNv, currentMonth, currentYear);
 
-            // View detail button
-            var btnViewAttendance = new Button
-            {
-                Text = "📅 Xem chi tiết chấm công",
-                Location = new Point(15, cardYPos + 10),
-                Size = new Size(panelWidth - 30, 35),
-                BackColor = Color.FromArgb(233, 236, 239),
-                ForeColor = Color.FromArgb(30, 41, 59),
-                Font = new Font("Segoe UI", 9F),
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand
-            };
-            btnViewAttendance.FlatAppearance.BorderSize = 0;
+            // Số ngày công
+            yPos = AddInfoRow(pnlAttendance, "Số ngày công:", $"{stats.totalDays} ngày", yPos, width);
+
+            // Tổng giờ làm
+            yPos = AddInfoRow(pnlAttendance, "Tổng giờ làm:", $"{stats.totalHours:F1} giờ", yPos, width);
+
+            // Số ngày đi trễ
+            yPos = AddInfoRow(pnlAttendance, "Số ngày đi trễ:", $"{stats.lateDays} ngày", yPos, width, false, stats.lateDays > 0 ? Color.FromArgb(220, 53, 69) : Color.FromArgb(40, 167, 69));
+
+            // Button xem chi tiết
+            var btnViewAttendance = CreateActionButton("📊 Xem chi tiết chấm công", Color.FromArgb(52, 152, 219), width - 30);
+            btnViewAttendance.Location = new Point(15, yPos + 10);
             btnViewAttendance.Click += BtnViewAttendance_Click;
             pnlAttendance.Controls.Add(btnViewAttendance);
-            cardYPos += 50;
+            yPos += 60;
 
-            pnlAttendance.Height = cardYPos + 15;
-            pnlContent.Controls.Add(pnlAttendance);
+            pnlAttendance.Height = yPos + 15;
+            pnlAttendance.Margin = new Padding(0, 0, 0, 15);
 
-            return yPos + cardYPos + 30;
+            return await Task.FromResult(pnlAttendance);
+        }
+        #endregion
+
+        #region Schedule Info
+        private async Task<Panel> CreateScheduleInfo(int width)
+        {
+            var pnlSchedule = CreateCard(width, Color.FromArgb(243, 244, 246));
+
+            int yPos = 15;
+
+            // Title
+            var lblTitle = new Label
+            {
+                Text = $"📆 Lịch làm việc tháng {DateTime.Now:MM/yyyy}",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(26, 26, 46),
+                Location = new Point(15, yPos),
+                AutoSize = true
+            };
+            pnlSchedule.Controls.Add(lblTitle);
+            yPos += 35;
+
+            try
+            {
+                // Lấy thống kê lịch làm việc từ LichLamViecService
+                var currentMonth = DateTime.Now.Month;
+                var currentYear = DateTime.Now.Year;
+
+                var scheduleStats = _lichLamViecService.GetMonthlyStats(_nhanVien.MaNv, currentMonth, currentYear);
+
+                // Số ca làm việc
+                yPos = AddInfoRow(pnlSchedule, "Số ca đã xếp:", $"{scheduleStats.totalShifts} ca", yPos, width);
+
+                // Tổng giờ trong lịch
+                yPos = AddInfoRow(pnlSchedule, "Tổng giờ dự kiến:", $"{scheduleStats.totalHours:F1} giờ", yPos, width);
+
+                // Lấy số ca trong tuần này
+                var weekStart = DateTime.Now.AddDays(-(int)DateTime.Now.DayOfWeek);
+                var weekSchedules = _lichLamViecService.GetScheduleByEmployee(_nhanVien.MaNv, currentMonth, currentYear)
+                    .Where(s => s.Ngay >= DateOnly.FromDateTime(weekStart) && s.Ngay < DateOnly.FromDateTime(weekStart.AddDays(7)))
+                    .Count();
+
+                yPos = AddInfoRow(pnlSchedule, "Số ca tuần này:", $"{weekSchedules} ca", yPos, width);
+            }
+            catch (Exception ex)
+            {
+                var lblError = new Label
+                {
+                    Text = "Không thể tải thông tin lịch làm việc",
+                    Font = new Font("Segoe UI", 9F, FontStyle.Italic),
+                    ForeColor = Color.FromArgb(220, 53, 69),
+                    Location = new Point(15, yPos),
+                    Size = new Size(width - 30, 25),
+                    AutoSize = false
+                };
+                pnlSchedule.Controls.Add(lblError);
+                yPos += 30;
+            }
+
+            pnlSchedule.Height = yPos + 15;
+            pnlSchedule.Margin = new Padding(0, 0, 0, 15);
+
+            return await Task.FromResult(pnlSchedule);
         }
         #endregion
 
         #region Latest Salary
-        private int AddLatestSalary(int yPos, int panelWidth)
+        private Panel? CreateLatestSalary(int width)
         {
             var bangLuong = _nhanVienService.GetLatestSalary(_nhanVien.MaNv);
-            if (bangLuong == null) return yPos;
+            if (bangLuong == null) return null;
 
-            var pnlBangLuong = CreateCard(panelWidth, Color.FromArgb(248, 250, 252));
-            pnlBangLuong.Location = new Point(0, yPos);
+            var pnlBangLuong = CreateCard(width, Color.FromArgb(248, 250, 252));
 
-            int cardYPos = 15;
+            int yPos = 15;
 
             // Title
             var lblTitle = new Label
@@ -359,60 +444,68 @@ namespace Billiard.WinForm.Forms.NhanVien
                 Text = $"💵 Bảng lương {bangLuong.Thang}/{bangLuong.Nam}",
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(26, 26, 46),
-                Location = new Point(15, cardYPos),
+                Location = new Point(15, yPos),
                 AutoSize = true
             };
             pnlBangLuong.Controls.Add(lblTitle);
-            cardYPos += 35;
+            yPos += 35;
 
             // Salary details
-            cardYPos = AddInfoRow(pnlBangLuong, "Lương cơ bản:", $"{bangLuong.LuongCoBan:N0}đ", cardYPos, panelWidth);
-            cardYPos = AddInfoRow(pnlBangLuong, "Phụ cấp:", $"{bangLuong.PhuCap:N0}đ", cardYPos, panelWidth);
-            cardYPos = AddInfoRow(pnlBangLuong, "Thưởng:", $"+{bangLuong.Thuong:N0}đ", cardYPos, panelWidth, false, Color.FromArgb(40, 167, 69));
-            cardYPos = AddInfoRow(pnlBangLuong, "Phạt:", $"-{bangLuong.Phat:N0}đ", cardYPos, panelWidth, false, Color.FromArgb(220, 53, 69));
+            yPos = AddInfoRow(pnlBangLuong, "Lương cơ bản:", $"{bangLuong.LuongCoBan:N0}đ", yPos, width);
+            yPos = AddInfoRow(pnlBangLuong, "Phụ cấp:", $"{bangLuong.PhuCap:N0}đ", yPos, width);
+            yPos = AddInfoRow(pnlBangLuong, "Tổng giờ:", $"{bangLuong.TongGio:F1} giờ", yPos, width);
+            yPos = AddInfoRow(pnlBangLuong, "Thưởng:", $"+{bangLuong.Thuong:N0}đ", yPos, width, false, Color.FromArgb(40, 167, 69));
+            yPos = AddInfoRow(pnlBangLuong, "Phạt:", $"-{bangLuong.Phat:N0}đ", yPos, width, false, Color.FromArgb(220, 53, 69));
 
             // Separator
             var separator = new Panel
             {
-                Location = new Point(15, cardYPos + 5),
-                Size = new Size(panelWidth - 30, 2),
+                Location = new Point(15, yPos + 5),
+                Size = new Size(width - 30, 2),
                 BackColor = Color.FromArgb(222, 226, 230)
             };
             pnlBangLuong.Controls.Add(separator);
-            cardYPos += 15;
+            yPos += 15;
 
             // Total
-            cardYPos = AddInfoRow(pnlBangLuong, "Tổng lương:", $"{bangLuong.TongLuong:N0}đ", cardYPos, panelWidth, true, Color.FromArgb(220, 38, 38));
+            yPos = AddInfoRow(pnlBangLuong, "Tổng lương:", $"{bangLuong.TongLuong:N0}đ", yPos, width, true, Color.FromArgb(220, 38, 38));
 
-            pnlBangLuong.Height = cardYPos + 15;
-            pnlContent.Controls.Add(pnlBangLuong);
+            pnlBangLuong.Height = yPos + 15;
+            pnlBangLuong.Margin = new Padding(0, 0, 0, 15);
 
-            return yPos + cardYPos + 30;
+            return pnlBangLuong;
         }
         #endregion
 
         #region Action Buttons
-        private void AddActionButtons(int yPos, int panelWidth)
+        private Panel CreateActionButtons(int width)
         {
-            yPos += 20;
+            var pnlButtons = new Panel
+            {
+                Width = width,
+                Height = 110,
+                BackColor = Color.Transparent,
+                Margin = new Padding(0, 15, 0, 20)
+            };
 
             // Edit button
-            var btnEdit = CreateActionButton("✏️ Chỉnh sửa", Color.FromArgb(102, 126, 234), panelWidth);
-            btnEdit.Location = new Point(0, yPos);
+            var btnEdit = CreateActionButton("✏️ Chỉnh sửa", Color.FromArgb(102, 126, 234), width);
+            btnEdit.Location = new Point(0, 0);
             btnEdit.Click += BtnEdit_Click;
-            pnlContent.Controls.Add(btnEdit);
-            yPos += 55;
+            pnlButtons.Controls.Add(btnEdit);
 
             // History button
-            var btnHistory = CreateActionButton("📜 Xem lịch sử hoạt động", Color.FromArgb(108, 117, 125), panelWidth);
-            btnHistory.Location = new Point(0, yPos);
+            var btnHistory = CreateActionButton("📜 Xem lịch sử hoạt động", Color.FromArgb(108, 117, 125), width);
+            btnHistory.Location = new Point(0, 55);
             btnHistory.Click += BtnHistory_Click;
-            pnlContent.Controls.Add(btnHistory);
+            pnlButtons.Controls.Add(btnHistory);
+
+            return pnlButtons;
         }
         #endregion
 
         #region Helper Methods
-        private Panel CreateCard(int width, Color bgColor)
+        private static Panel CreateCard(int width, Color bgColor)
         {
             var card = new Panel
             {
@@ -426,16 +519,14 @@ namespace Billiard.WinForm.Forms.NhanVien
                 var rect = card.ClientRectangle;
                 rect.Width -= 1;
                 rect.Height -= 1;
-                using (var pen = new Pen(Color.FromArgb(226, 232, 240), 1))
-                {
-                    e.Graphics.DrawRectangle(pen, rect);
-                }
+                using var pen = new Pen(Color.FromArgb(226, 232, 240), 1);
+                e.Graphics.DrawRectangle(pen, rect);
             };
 
             return card;
         }
 
-        private int AddInfoRow(Panel panel, string label, string value, int yPos, int panelWidth, bool bold = false, Color? valueColor = null)
+        private static int AddInfoRow(Panel panel, string label, string value, int yPos, int panelWidth, bool bold = false, Color? valueColor = null)
         {
             var rowPanel = new Panel
             {
@@ -464,13 +555,13 @@ namespace Billiard.WinForm.Forms.NhanVien
                 TextAlign = ContentAlignment.MiddleRight
             };
 
-            rowPanel.Controls.AddRange(new Control[] { lblLabel, lblValue });
+            rowPanel.Controls.AddRange([lblLabel, lblValue]);
             panel.Controls.Add(rowPanel);
 
             return yPos + 30;
         }
 
-        private Button CreateActionButton(string text, Color backColor, int panelWidth)
+        private static Button CreateActionButton(string text, Color backColor, int panelWidth)
         {
             var btn = new Button
             {
@@ -497,7 +588,7 @@ namespace Billiard.WinForm.Forms.NhanVien
             return btn;
         }
 
-        private Color GetRoleColor(string role)
+        private static Color GetRoleColor(string? role)
         {
             return role switch
             {
@@ -509,7 +600,7 @@ namespace Billiard.WinForm.Forms.NhanVien
             };
         }
 
-        private string GetShiftText(string shift)
+        private static string GetShiftText(string shift)
         {
             return shift switch
             {
@@ -521,14 +612,14 @@ namespace Billiard.WinForm.Forms.NhanVien
             };
         }
 
-        private void ShowError(string message)
+        private static void ShowError(string message)
         {
             MessageBox.Show(message, "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         #endregion
 
         #region Event Handlers
-        private void BtnEdit_Click(object sender, EventArgs e)
+        private void BtnEdit_Click(object? sender, EventArgs e)
         {
             var editForm = new EditNhanVienForm(_nhanVien.MaNv, _currentUserId);
             if (editForm.ShowDialog() == DialogResult.OK)
@@ -538,13 +629,21 @@ namespace Billiard.WinForm.Forms.NhanVien
             }
         }
 
-        private void BtnHistory_Click(object sender, EventArgs e)
+        private void BtnHistory_Click(object? sender, EventArgs e)
         {
-            MessageBox.Show($"Xem lịch sử hoạt động của {_nhanVien.TenNv}\n(Chức năng đang phát triển)",
-                "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            try
+            {
+                var historyForm = new ActivityHistoryForm(_nhanVien.MaNv, _nhanVien.TenNv);
+                historyForm.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở lịch sử hoạt động: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
-        private void BtnViewAttendance_Click(object sender, EventArgs e)
+        private void BtnViewAttendance_Click(object? sender, EventArgs e)
         {
             try
             {
