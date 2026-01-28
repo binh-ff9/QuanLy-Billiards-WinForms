@@ -53,6 +53,7 @@
             headerPanel.Padding = new Padding(20);
             headerPanel.Size = new Size(1200, 80);
             headerPanel.TabIndex = 0;
+            headerPanel.Paint += headerPanel_Paint;
             // 
             // btnAdd
             // 
