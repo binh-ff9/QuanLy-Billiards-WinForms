@@ -176,7 +176,7 @@ namespace Billiard.WinForm.Forms.KhachHang
 
             btnLuu = new Button
             {
-                Text = _maKh == null ? "✨ Thêm mới" : "💾 Lưu thay đổi",
+                Text = _maKh == null ? "✨ Thêm mới" : "Lưu thay đổi",
                 Size = new Size(140, 45),
                 Location = new Point(340, 18),
                 FlatStyle = FlatStyle.Flat,
