@@ -927,7 +927,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 var hours = totalMinutes / 60;
                 var minutes = totalMinutes % 60;
 
-                lblInfo.Text = $"⏱️ {hours}h {minutes}m";
+                //lblInfo.Text = $"⏱️ {hours}h {minutes}m";
                 lblInfo.ForeColor = Color.FromArgb(239, 68, 68);
                 lblInfo.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             }

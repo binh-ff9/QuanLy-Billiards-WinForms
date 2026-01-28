@@ -80,6 +80,10 @@ namespace Billiard.WinForm
                 return new BilliardDbContext(optionsBuilder.Options);
             });
 
+            // Đăng ký Factory cho DbContext
+            services.AddDbContextFactory<BilliardDbContext>(options =>
+                options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
+
             // ✅ Services (Transient)
             services.AddTransient<AuthService>();
             services.AddTransient<EmailService>();

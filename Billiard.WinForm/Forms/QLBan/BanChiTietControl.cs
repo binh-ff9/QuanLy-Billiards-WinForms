@@ -26,9 +26,12 @@ namespace Billiard.WinForm.Forms.QLBan
         private readonly GioHoatDongService _gioHoatDongService;
         private readonly List<System.Windows.Forms.Timer> _animationTimers = new List<System.Windows.Forms.Timer>();
 
-        // ✅ THÊM MỚI: Timer và flag cho auto-check
+        // Timer và flag cho auto-check
         private System.Windows.Forms.Timer _autoCheckTimer;
         private bool _isCheckingReservation = false;
+
+        // ✅ THÊM: Lưu trạng thái thông báo đã hiển thị để tránh spam
+        private int? _lastNotifiedReservationId = null;
 
         public event EventHandler OnDataChanged;
         public event EventHandler<BanBium> OnBanUpdated;
@@ -50,12 +53,13 @@ namespace Billiard.WinForm.Forms.QLBan
             InitializeComponent();
             InitializeLayout();
 
-            // ✅ THÊM MỚI: Khởi tạo timer tự động kiểm tra đơn đặt bàn
+            // Khởi tạo timer tự động kiểm tra đơn đặt bàn
             _autoCheckTimer = new System.Windows.Forms.Timer();
             _autoCheckTimer.Interval = 30000; // Check mỗi 30 giây
             _autoCheckTimer.Tick += AutoCheckReservation_Tick;
             _autoCheckTimer.Start();
         }
+
         private void InitializeLayout()
         {
             pnlContent = new Panel
@@ -77,7 +81,6 @@ namespace Billiard.WinForm.Forms.QLBan
             this.Controls.Add(pnlContent);
             this.BackColor = Color.FromArgb(248, 250, 252);
         }
-
         protected override async void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
@@ -88,7 +91,6 @@ namespace Billiard.WinForm.Forms.QLBan
         {
             if (_isLoading && !forceReload) return;
 
-            // ✅ THÊM: Dừng timer tạm thời khi reload
             var timerWasRunning = _autoCheckTimer?.Enabled ?? false;
             _autoCheckTimer?.Stop();
 
@@ -136,7 +138,6 @@ namespace Billiard.WinForm.Forms.QLBan
                     return;
                 }
 
-                // ✅ THÊM: Log trạng thái để debug
                 if (_ban.TrangThai != newBan.TrangThai)
                 {
                     System.Diagnostics.Debug.WriteLine($"🔄 Bàn {_ban.MaBan}: {_ban.TrangThai} → {newBan.TrangThai}");
@@ -150,7 +151,6 @@ namespace Billiard.WinForm.Forms.QLBan
                 }
                 else if (!HasDataChanged(_ban, newBan) && pnlContent.Controls.Count > 0)
                 {
-                    // ✅ CHỈ UPDATE NẾU KHÔNG CÓ THAY ĐỔI TRẠNG THÁI
                     await UpdateExistingControlsAsync();
                 }
                 else
@@ -195,7 +195,6 @@ namespace Billiard.WinForm.Forms.QLBan
             {
                 _isLoading = false;
 
-                // ✅ THÊM: Bật lại timer nếu nó đang chạy trước đó VÀ không bị cancel
                 if (timerWasRunning && !token.IsCancellationRequested)
                 {
                     _autoCheckTimer?.Start();
@@ -257,70 +256,61 @@ namespace Billiard.WinForm.Forms.QLBan
         }
         private async void AutoCheckReservation_Tick(object sender, EventArgs e)
         {
-            if (_isCheckingReservation) return;
-
-            // Chỉ kiểm tra với bàn "Đã đặt" hoặc "Đang chờ"
-            if (_ban.TrangThai != "Đã đặt" && _ban.TrangThai != "Đang chờ")
+            // ✅ BỎ KIỂM TRA: Không hiển thị thông báo nếu bàn đang chơi
+            if (_isCheckingReservation || _ban == null || _ban.TrangThai == "Đang chơi")
                 return;
 
             _isCheckingReservation = true;
+
             try
             {
                 var datBanService = Program.GetService<DatBanService>();
-                var datBans = await datBanService.GetByTableAsync(_ban.MaBan);
-                var activeDatBan = datBans.FirstOrDefault(d =>
-                    d.TrangThai == "Đang chờ" || d.TrangThai == "Đã đặt");
+                var nextReservation = await datBanService.GetNextReservationForTableAsync(_ban.MaBan);
 
-                if (activeDatBan == null || !activeDatBan.ThoiGianBatDau.HasValue)
+                if (nextReservation != null)
                 {
-                    _isCheckingReservation = false;
-                    return;
-                }
+                    var now = DateTime.Now;
 
-                var now = DateTime.Now;
-                var gioBatDau = activeDatBan.ThoiGianBatDau.Value;
-                var minutesLate = (now - gioBatDau).TotalMinutes;
-
-                // ✅ AUTO HỦY SAU 15 PHÚT - KHÔNG CẦN XÁC NHẬN
-                if (minutesLate >= 15)
-                {
-                    System.Diagnostics.Debug.WriteLine($"⏰ Auto hủy đặt bàn #{activeDatBan.MaDat} - Đã quá 15 phút");
-
-                    var success = await _banBiaService.CancelReservationAsync(activeDatBan.MaDat);
-
-                    if (success)
+                    // Ensure ThoiGianBatDau has a value (DateTime?)
+                    if (!nextReservation.ThoiGianBatDau.HasValue)
                     {
-                        System.Diagnostics.Debug.WriteLine("✓ Đã tự động hủy đặt bàn");
-
-                        // Reload để hiển thị ca tiếp theo hoặc trạng thái trống
-                        OnDataChanged?.Invoke(this, EventArgs.Empty);
-                        await LoadBanDetail(forceReload: true);
-
-                        // Thông báo cho nhân viên
-                        this.Invoke(new Action(() =>
-                        {
-                            MessageBox.Show(
-                                $"🔔 ĐÃ TỰ ĐỘNG HỦY ĐẶT BÀN\n\n" +
-                                $"Bàn: {_ban.TenBan}\n" +
-                                $"Khách: {activeDatBan.TenKhach}\n" +
-                                $"Lý do: Khách không đến sau 15 phút\n\n" +
-                                $"Hệ thống đã tự động hủy đặt bàn.",
-                                "Thông báo",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Information);
-                        }));
+                        System.Diagnostics.Debug.WriteLine($"⚠️ Next reservation #{nextReservation.MaDat} has no ThoiGianBatDau");
+                        return;
                     }
-                }
-                // ✅ THÔNG BÁO CẢNH BÁO SAU 10 PHÚT
-                else if (minutesLate >= 10)
-                {
-                    System.Diagnostics.Debug.WriteLine($"⚠️ Cảnh báo: Đơn đặt #{activeDatBan.MaDat} đã quá 10 phút");
-                    await LoadBanDetail(forceReload: true);
+
+                    // Use Value to get a non-nullable TimeSpan
+                    var timeUntilStart = nextReservation.ThoiGianBatDau.Value - now;
+
+                    // Only notify when: timeUntilStart > 0 && <= 10 minutes && not already notified
+                    if (timeUntilStart.TotalMinutes > 0 &&
+                        timeUntilStart.TotalMinutes <= 10 &&
+                        _lastNotifiedReservationId != nextReservation.MaDat)
+                    {
+                        _lastNotifiedReservationId = nextReservation.MaDat;
+
+                        var startTimeStr = nextReservation.ThoiGianBatDau.Value.ToString("HH:mm dd/MM");
+                        var minutesLeft = (int)Math.Ceiling(timeUntilStart.TotalMinutes);
+
+                        MessageBox.Show(
+                            $"⏰ Sắp đến giờ đặt bàn!\n\n" +
+                            $"Bàn: {_ban.TenBan}\n" +
+                            $"Khách: {nextReservation.TenKhach}\n" +
+                            $"Giờ bắt đầu: {startTimeStr}\n" +
+                            $"Còn {minutesLeft} phút nữa",
+                            "Thông báo",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                    // RESET thông báo nếu đơn đặt khác và vẫn còn >10 phút
+                    else if (_lastNotifiedReservationId != nextReservation.MaDat && timeUntilStart.TotalMinutes > 10)
+                    {
+                        _lastNotifiedReservationId = null;
+                    }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Lỗi khi kiểm tra đơn đặt: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"❌ Lỗi AutoCheck: {ex.Message}");
             }
             finally
             {
@@ -1321,7 +1311,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 {
                     Location = new Point(12, cardY),
                     Size = new Size(panelWidth - 24, 75),
-                    BackColor = Color.FromArgb(254, 243, 199)
+                    BackColor = Color.FromArgb(254, 243, 199) // Vàng nhạt
                 };
 
                 var lblWarningText = new Label
@@ -1680,7 +1670,7 @@ namespace Billiard.WinForm.Forms.QLBan
                     {
                         Text = "⚠️ Đã quá giờ đặt bàn",
                         Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                        ForeColor = Color.FromArgb(153, 27, 27),
+                        ForeColor = Color.FromArgb(220, 38, 38),
                         Location = new Point(10, 10),
                         AutoSize = true,
                         BackColor = Color.Transparent
@@ -1952,7 +1942,6 @@ namespace Billiard.WinForm.Forms.QLBan
                 {
                     MessageBox.Show(
                         "❌ KHÔNG THỂ GIỮ BÀN\n\n" +
-                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
                         "Có thể do:\n" +
                         "  • Gia hạn sẽ trùng với đơn đặt khác\n" +
                         "  • Đơn đặt đã bị hủy hoặc xác nhận\n" +
@@ -2227,37 +2216,37 @@ namespace Billiard.WinForm.Forms.QLBan
             }
         }
         private async void BtnBatDau_Click(object sender, EventArgs e)
-{
-    try
-    {
-        this.Cursor = Cursors.WaitCursor;
-        
-        // Lần gọi đầu tiên - kiểm tra cảnh báo
-        var result = await _banBiaService.StartTableAsync(_ban.MaBan, _maNV);
-        
-        this.Cursor = Cursors.Default;
-
-        // Nếu cần xác nhận từ user
-        if (result.needConfirmation)
         {
-            var confirmResult = MessageBox.Show(
-                result.message,
-                "Cảnh báo",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
-
-            if (confirmResult == DialogResult.Yes)
+            try
             {
-                // Gọi lại với skipWarning = true
                 this.Cursor = Cursors.WaitCursor;
-                result = await _banBiaService.StartTableAsync(_ban.MaBan, _maNV, skipWarning: true);
+
+                // Lần gọi đầu tiên - kiểm tra cảnh báo
+                var result = await _banBiaService.StartTableAsync(_ban.MaBan, _maNV);
+
                 this.Cursor = Cursors.Default;
-            }
-            else
-            {
-                return; // User hủy
-            }
-        }
+
+                // Nếu cần xác nhận từ user
+                if (result.needConfirmation)
+                {
+                    var confirmResult = MessageBox.Show(
+                        result.message,
+                        "Cảnh báo",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+
+                    if (confirmResult == DialogResult.Yes)
+                    {
+                        // Gọi lại với skipWarning = true
+                        this.Cursor = Cursors.WaitCursor;
+                        result = await _banBiaService.StartTableAsync(_ban.MaBan, _maNV, skipWarning: true);
+                        this.Cursor = Cursors.Default;
+                    }
+                    else
+                    {
+                        return; // User hủy
+                    }
+                }
 
                 if (result.isSuccess)
                 {
@@ -2293,19 +2282,19 @@ namespace Billiard.WinForm.Forms.QLBan
                     }
                 }
                 else
-        {
-            if (!result.needConfirmation) // Chỉ hiện error nếu không phải confirmation
+                {
+                    if (!result.needConfirmation) // Chỉ hiện error nếu không phải confirmation
+                    {
+                        ShowError(result.message);
+                    }
+                }
+            }
+            catch (Exception ex)
             {
-                ShowError(result.message);
+                this.Cursor = Cursors.Default;
+                ShowError($"Lỗi: {ex.Message}");
             }
         }
-    }
-    catch (Exception ex)
-    {
-        this.Cursor = Cursors.Default;
-        ShowError($"Lỗi: {ex.Message}");
-    }
-}
 
         private async void BtnCancel_Click(object sender, EventArgs e)
         {
@@ -2377,13 +2366,79 @@ namespace Billiard.WinForm.Forms.QLBan
                         return;
                     }
 
+                    // ✅ FIXED: Lưu thời gian đặt ban đầu để so sánh
+                    var gioBoKienBanDau = activeDatBan.ThoiGianBatDau;
+                    var gioKetThucDuKien = activeDatBan.ThoiGianKetThuc;
+
+                    // ✅ FIXED: Tính thời lượng đặt ban đầu
+                    var thoiLuongDat = gioKetThucDuKien.HasValue && gioBoKienBanDau.HasValue
+                        ? (gioKetThucDuKien.Value - gioBoKienBanDau.Value)
+                        : TimeSpan.Zero;
+
                     var success = await _banBiaService.ConfirmReservationAsync(activeDatBan.MaDat, _maNV);
 
                     if (success)
                     {
-                        // ✅ FIX: CHỜ DB commit hoàn toàn trước khi tiếp tục
-                        System.Diagnostics.Debug.WriteLine("⏳ Đang chờ DB commit hóa đơn mới...");
-                        await Task.Delay(300); // Delay 300ms
+                        // ✅ FIXED: Dừng timer và reset thông báo
+                        _autoCheckTimer?.Stop();
+                        _lastNotifiedReservationId = null;
+                        _cts?.Cancel();
+
+                        await Task.Delay(300); // Chờ DB commit
+
+                        // ✅ FIXED: Tải lại thông tin bàn để lấy hóa đơn mới tạo
+                        var updatedBan = await Task.Run(() => _banBiaService.GetTableByIdAsync(_ban.MaBan));
+                        if (updatedBan != null)
+                        {
+                            _ban = updatedBan;
+                        }
+
+                        // ✅ FIXED: Lấy hóa đơn vừa tạo để kiểm tra thời gian bắt đầu thực tế
+                        var hoaDon = await _banBiaService.GetActiveInvoiceAsync(_ban.MaBan);
+
+                        if (hoaDon != null)
+                        {
+                            var thoiGianBatDauThucTe = hoaDon.ThoiGianBatDau ?? DateTime.Now;
+
+                            // ✅ FIXED: Kiểm tra nếu bắt đầu sớm hơn giờ đặt
+                            if (gioBoKienBanDau.HasValue && thoiGianBatDauThucTe < gioBoKienBanDau.Value)
+                            {
+                                var thoiGianSom = gioBoKienBanDau.Value - thoiGianBatDauThucTe;
+                                var phutSom = (int)thoiGianSom.TotalMinutes;
+
+                                // ✅ FIXED: Hiển thị thông báo chi tiết về việc bắt đầu sớm
+                                var confirmMessage = $"⏰ THÔNG BÁO: Khách đến sớm {phutSom} phút!\n\n" +
+                                    $"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                                    $"📅 Thời gian đặt ban đầu:\n" +
+                                    $"   • Bắt đầu: {gioBoKienBanDau:HH:mm, dd/MM/yyyy}\n" +
+                                    $"   • Kết thúc: {gioKetThucDuKien:HH:mm, dd/MM/yyyy}\n" +
+                                    $"   • Thời lượng: {(int)thoiLuongDat.TotalHours}h {thoiLuongDat.Minutes}m\n\n" +
+                                    $"⏱️ Thời gian thực tế:\n" +
+                                    $"   • Bắt đầu: {thoiGianBatDauThucTe:HH:mm, dd/MM/yyyy}\n" +
+                                    $"   • Sớm hơn: {phutSom} phút\n\n" +
+                                    $"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                                    $"💰 CÁCH TÍNH TIỀN:\n" +
+                                    $"✓ Tính từ: {thoiGianBatDauThucTe:HH:mm} (giờ bắt đầu thực tế)\n" +
+                                    $"✓ Đến khi: Khách kết thúc chơi\n" +
+                                    $"✓ Giá: Theo thời gian chơi thực tế\n\n" +
+                                    $"📝 Lưu ý:\n" +
+                                    $"• Hệ thống sẽ tính tiền dựa trên thời gian\n" +
+                                    $"  chơi thực tế, không phải thời gian đặt\n" +
+                                    $"• Thời gian bắt đầu đã được đồng bộ";
+
+                                MessageBox.Show(confirmMessage, "Thông báo đồng bộ thời gian",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                                System.Diagnostics.Debug.WriteLine($"✅ Đồng bộ thời gian thành công:");
+                                System.Diagnostics.Debug.WriteLine($"   - Giờ đặt: {gioBoKienBanDau:HH:mm}");
+                                System.Diagnostics.Debug.WriteLine($"   - Giờ bắt đầu thực tế: {thoiGianBatDauThucTe:HH:mm}");
+                                System.Diagnostics.Debug.WriteLine($"   - Sớm hơn: {phutSom} phút");
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine($"ℹ️ Khách đến đúng giờ hoặc muộn - không cần thông báo");
+                            }
+                        }
 
                         this.Cursor = Cursors.Default;
 
@@ -2511,14 +2566,14 @@ namespace Billiard.WinForm.Forms.QLBan
         {
             try
             {
-                // ✅ REFRESH trạng thái bàn mới nhất
+                // Refresh trạng thái bàn mới nhất
                 var latestBan = await _banBiaService.GetTableByIdAsync(_ban.MaBan);
                 if (latestBan != null)
                 {
                     _ban = latestBan;
                 }
 
-                // ✅ Kiểm tra trạng thái
+                // Kiểm tra trạng thái
                 if (_ban.TrangThai != "Đang chơi")
                 {
                     ShowError($"Bàn đang ở trạng thái '{_ban.TrangThai}'. Không thể thanh toán!");
@@ -2537,10 +2592,8 @@ namespace Billiard.WinForm.Forms.QLBan
                 var thanhToanService = Program.GetService<ThanhToanService>();
                 var vietQRService = Program.GetService<VietQRService>();
 
-                // ✅ LẤY HÓA ĐƠN với retry
                 var hoaDon = await _banBiaService.GetActiveInvoiceAsync(_ban.MaBan);
 
-                // ✅ FIX: Kiểm tra lại nếu không tìm thấy
                 if (hoaDon == null)
                 {
                     System.Diagnostics.Debug.WriteLine($"⚠️ Không tìm thấy hóa đơn lần 1 khi thanh toán");
@@ -2568,12 +2621,17 @@ namespace Billiard.WinForm.Forms.QLBan
 
                     if (thanhToanResult == DialogResult.OK)
                     {
+                        // ✅ FIXED: Dừng timer và reset thông báo
                         _autoCheckTimer?.Stop();
+                        _lastNotifiedReservationId = null;
                         _cts?.Cancel();
+
+                        // ✅ CẬP NHẬT TRẠNG THÁI BÀN NGAY LẬP TỨC
                         _ban.TrangThai = "Trống";
                         _ban.GioBatDau = null;
                         _ban.MaKh = null;
                         _ban.GhiChu = null;
+
                         await Task.Delay(300); // Chờ DB commit
 
                         MessageBox.Show(
@@ -2582,12 +2640,12 @@ namespace Billiard.WinForm.Forms.QLBan
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
 
-                        // ✅ Trigger event trước
+                        // Trigger event trước
                         OnDataChanged?.Invoke(this, EventArgs.Empty);
 
                         await Task.Delay(100);
 
-                        // ✅ RELOAD với cancel token mới
+                        // RELOAD với cancel token mới
                         await LoadBanDetail(forceReload: true);
                     }
                 }
@@ -2615,7 +2673,6 @@ namespace Billiard.WinForm.Forms.QLBan
                     _autoCheckTimer = null;
                 }
 
-                // Cancel operations đang chạy
                 if (_cts != null)
                 {
                     _cts.Cancel();
@@ -2623,7 +2680,6 @@ namespace Billiard.WinForm.Forms.QLBan
                     _cts = null;
                 }
 
-                // Dispose components
                 components?.Dispose();
             }
 
