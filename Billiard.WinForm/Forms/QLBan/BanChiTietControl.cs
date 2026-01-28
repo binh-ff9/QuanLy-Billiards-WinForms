@@ -1486,10 +1486,47 @@ namespace Billiard.WinForm.Forms.QLBan
                         bookingInfo.MaKhNavigation.Sdt ?? "-", reservedCardY, panelWidth);
 
                     // Hiển thị email nếu có
-                    if (!string.IsNullOrEmpty(bookingInfo.MaKhNavigation.Email))
+                    if (!string.IsNullOrEmpty(_ban.GhiChu))
                     {
-                        reservedCardY = AddInfoRow(pnlReserved, "Email",
-                            bookingInfo.MaKhNavigation.Email, reservedCardY, panelWidth);
+                        // Kiểm tra xem có lịch sử giữ bàn không
+                        if (_ban.GhiChu.Contains("[Giữ bàn"))
+                        {
+                            // Tạo panel đặc biệt cho ghi chú giữ bàn
+                            var pnlHoldNote = new Panel
+                            {
+                                Location = new Point(12, reservedCardY),
+                                Size = new Size(panelWidth - 24, 60),
+                                BackColor = Color.FromArgb(254, 243, 199) // Vàng nhạt
+                            };
+
+                            var lblHoldTitle = new Label
+                            {
+                                Text = "📝 Lịch sử giữ bàn:",
+                                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                                ForeColor = Color.FromArgb(113, 63, 18),
+                                Location = new Point(8, 6),
+                                AutoSize = true
+                            };
+
+                            var lblHoldNote = new Label
+                            {
+                                Text = _ban.GhiChu,
+                                Font = new Font("Segoe UI", 8F),
+                                ForeColor = Color.FromArgb(120, 53, 15),
+                                Location = new Point(8, 24),
+                                Size = new Size(panelWidth - 40, 30),
+                                AutoEllipsis = true
+                            };
+
+                            pnlHoldNote.Controls.AddRange(new Control[] { lblHoldTitle, lblHoldNote });
+                            pnlReserved.Controls.Add(pnlHoldNote);
+                            reservedCardY += 65;
+                        }
+                        else
+                        {
+                            // Ghi chú thường
+                            reservedCardY = AddInfoRow(pnlReserved, "Ghi chú", _ban.GhiChu, reservedCardY, panelWidth);
+                        }
                     }
                 }
                 // Nếu không có MaKhNavigation, lấy từ TenKhach và Sdt trong DatBan
@@ -1548,13 +1585,33 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private int RenderReservedButtons(Panel targetPanel, int yPos, int panelWidth)
         {
-            var btnConfirm = CreateModernButton("Xác nhận khách đến", Color.FromArgb(34, 197, 94), panelWidth);
+            // ============================================================
+            // NÚT 1: XÁC NHẬN KHÁCH ĐẾN (Màu xanh lá)
+            // ============================================================
+            var btnConfirm = CreateModernButton("✓ Xác nhận khách đến", Color.FromArgb(34, 197, 94), panelWidth);
             btnConfirm.Location = new Point(15, yPos + 20);
             btnConfirm.Click += BtnConfirm_Click;
             targetPanel.Controls.Add(btnConfirm);
             yPos += 48;
 
-            var btnCancel = CreateModernButton("Hủy đặt bàn", Color.FromArgb(239, 68, 68), panelWidth);
+            // ============================================================
+            // NÚT 2: GIỮ BÀN - GIA HẠN THỜI GIAN (Màu vàng) ✨ MỚI
+            // ============================================================
+            var btnHold = CreateModernButton("⏰ Giữ bàn (+15 phút)", Color.FromArgb(234, 179, 8), panelWidth);
+            btnHold.Location = new Point(15, yPos + 20);
+            btnHold.Click += BtnHold_Click;
+
+            // Tooltip để giải thích chức năng
+            var toolTip = new ToolTip();
+            toolTip.SetToolTip(btnHold, "Gia hạn thời gian đặt bàn thêm 15 phút khi khách báo đến muộn");
+
+            targetPanel.Controls.Add(btnHold);
+            yPos += 48;
+
+            // ============================================================
+            // NÚT 3: HỦY ĐẶT BÀN (Màu đỏ)
+            // ============================================================
+            var btnCancel = CreateModernButton("✕ Hủy đặt bàn", Color.FromArgb(239, 68, 68), panelWidth);
             btnCancel.Location = new Point(15, yPos + 20);
             btnCancel.Click += BtnCancel_Click;
             targetPanel.Controls.Add(btnCancel);
@@ -1562,7 +1619,121 @@ namespace Billiard.WinForm.Forms.QLBan
 
             return yPos;
         }
+        private async void BtnHold_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // BƯỚC 1: Xác nhận từ user
+                var result = MessageBox.Show(
+                    "🕐 GIỮ BÀN - GIA HẠN THỜI GIAN\n\n" +
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                    "Thời gian đặt bàn sẽ được gia hạn thêm 15 phút.\n\n" +
+                    "Điều này hữu ích khi:\n" +
+                    "  • Khách báo đến muộn\n" +
+                    "  • Cần thêm thời gian chuẩn bị\n" +
+                    "  • Tránh hệ thống tự động hủy đơn\n\n" +
+                    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                    "Bạn có muốn giữ bàn không?",
+                    "⏰ Xác nhận giữ bàn",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
 
+                if (result != DialogResult.Yes)
+                    return;
+
+                // BƯỚC 2: Loading cursor
+                this.Cursor = Cursors.WaitCursor;
+
+                // BƯỚC 3: Tìm đơn đặt bàn active
+                var datBanService = Program.GetService<DatBanService>();
+                var datBans = await datBanService.GetByTableAsync(_ban.MaBan);
+
+                var activeDatBan = datBans
+                    .Where(d => d.TrangThai == "Đang chờ" || d.TrangThai == "Đã đặt")
+                    .OrderBy(d => d.ThoiGianBatDau)
+                    .FirstOrDefault();
+
+                if (activeDatBan == null)
+                {
+                    this.Cursor = Cursors.Default;
+                    MessageBox.Show(
+                        "❌ KHÔNG TÌM THẤY ĐƠN ĐẶT BÀN\n\n" +
+                        "Không tìm thấy đơn đặt bàn đang hoạt động.",
+                        "Lỗi",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Lưu thời gian cũ
+                var oldStartTime = activeDatBan.ThoiGianBatDau;
+                var oldEndTime = activeDatBan.ThoiGianKetThuc;
+
+                // BƯỚC 4: Gọi service giữ bàn
+                var success = await _banBiaService.HoldReservationAsync(activeDatBan.MaDat, 15);
+
+                this.Cursor = Cursors.Default;
+
+                // BƯỚC 5: Xử lý kết quả
+                if (success)
+                {
+                    var newStartTime = oldStartTime?.AddMinutes(15);
+                    var newEndTime = oldEndTime?.AddMinutes(15);
+
+                    MessageBox.Show(
+                        "✅ ĐÃ GIỮ BÀN THÀNH CÔNG!\n\n" +
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                        $"🏷️  Bàn: {_ban.TenBan}\n" +
+                        $"👤  Khách: {activeDatBan.TenKhach}\n" +
+                        $"📞  SĐT: {activeDatBan.Sdt}\n" +
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+                        "⏰  THỜI GIAN CŨ:\n" +
+                        $"    {oldStartTime:HH:mm} → {oldEndTime:HH:mm}\n\n" +
+                        "⏰  THỜI GIAN MỚI:\n" +
+                        $"    {newStartTime:HH:mm} → {newEndTime:HH:mm}\n\n" +
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                        "Bàn đã được gia hạn thêm 15 phút.",
+                        "✅ Giữ bàn thành công",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+
+                    // BƯỚC 6: Cập nhật UI
+                    OnDataChanged?.Invoke(this, EventArgs.Empty);
+                    await Task.Delay(100);
+                    await LoadBanDetail(forceReload: true);
+
+                    System.Diagnostics.Debug.WriteLine(
+                        $"✅ Đã giữ bàn {_ban.TenBan} - Đơn #{activeDatBan.MaDat} +15p");
+                }
+                else
+                {
+                    MessageBox.Show(
+                        "❌ KHÔNG THỂ GIỮ BÀN\n\n" +
+                        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                        "Có thể do:\n" +
+                        "  • Gia hạn sẽ trùng với đơn đặt khác\n" +
+                        "  • Đơn đặt đã bị hủy hoặc xác nhận\n" +
+                        "  • Lỗi kết nối cơ sở dữ liệu\n\n" +
+                        "Vui lòng thử lại.",
+                        "❌ Lỗi",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                this.Cursor = Cursors.Default;
+
+                System.Diagnostics.Debug.WriteLine($"❌ Exception: {ex.Message}");
+
+                MessageBox.Show(
+                    $"❌ LỖI KHI GIỮ BÀN\n\n" +
+                    $"Chi tiết: {ex.Message}",
+                    "Lỗi hệ thống",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
         private int RenderAvailableContent(Panel targetPanel, int yPos, int panelWidth)
         {
             var pnlAvailable = CreateModernCard(panelWidth);
