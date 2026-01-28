@@ -1,8 +1,10 @@
-﻿using Billiard.BLL.Services.QLBan;
+﻿using Billiard.BLL.Services;
+using Billiard.BLL.Services.QLBan;
 using Billiard.DAL.Data;
 using Billiard.DAL.Entities;
 using Billiard.WinForm.Forms.Auth;
 using Billiard.WinForm.Forms.Helpers;
+using Billiard.WinForm.Forms.QLBan;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -18,7 +20,7 @@ using Timer = System.Windows.Forms.Timer;
 namespace Billiard.WinForm.Forms.Users
 {
     public partial class User : Form
-    { 
+    {
         private Timer posterTimer;
 
         private ContextMenuStrip accountMenu;
@@ -358,21 +360,42 @@ namespace Billiard.WinForm.Forms.Users
         // Button Login
         private void btnLogin_Click(object sender, EventArgs e)
         {
-            if (!UserSession.IsLoggedIn)
+            if (UserSession.IsLoggedIn)
             {
-                var loginForm = Program.GetService<LoginForm>();
+                accountMenu.Show(btnLogin, 0, btnLogin.Height);
+                return;
+            }
 
-                if (loginForm.ShowDialog() == DialogResult.OK)
+            var loginForm = Program.GetService<LoginForm>();
+            var result = loginForm.ShowDialog();
+
+            if (result == DialogResult.OK)
+            {
+                // ===== ADMIN / NHÂN VIÊN =====
+                if (loginForm.LoggedUserType == UserType.NhanVien)
                 {
+                    var nv = loginForm.LoggedNhanVien;
+
+                    var mainForm = Program.GetService<MainForm>();
+                    mainForm.MaNV = nv.MaNv;
+                    mainForm.TenNV = nv.TenNv;
+                    mainForm.ChucVu = nv.MaNhomNavigation?.TenNhom ?? "Nhân viên";
+
+                    this.Hide();                 // 🔥 ẨN USER FORM
+                    mainForm.ShowDialog();       // 🔥 CHỜ ADMIN DÙNG XONG
+                    this.Show();                 // 🔥 HIỆN LẠI KHI ADMIN THOÁT
+
                     UpdateAuthButtonUI();
                 }
-            }
-            else
-            {
-                this.Show();
-                accountMenu.Show(btnLogin, 0, btnLogin.Height);
+                // ===== KHÁCH HÀNG =====
+                else
+                {
+                    UpdateAuthButtonUI();
+                    _ = LoadTablesAsync();
+                }
             }
         }
+
 
         #region Context Menu cho btnLogin và Function
         public void TaoMenu()
@@ -387,6 +410,12 @@ namespace Billiard.WinForm.Forms.Users
             {
                 var profile = Program.GetService<UserProfileForm>();
                 profile.ShowDialog();
+
+                if (profile.CoThayDoiDuLieu)
+                {
+                    // Nếu có hủy/đặt gì đó, tải lại toàn bộ danh sách bàn ở màn hình chính
+                    LoadTablesAsync();
+                }
             };
 
             // Đăng xuất
@@ -470,7 +499,7 @@ namespace Billiard.WinForm.Forms.Users
             Color primaryColor = Color.FromArgb(79, 70, 229); // Màu tím indigo
             Color hoverColor = Color.FromArgb(67, 56, 202);   // Màu tím đậm hơn
 
-            ApplyModernStyle(btnLogo, "Bi a Pro", hoverColor, primaryColor);
+            ApplyModernStyle(btnSoDoBan, "Sơ đồ bàn", hoverColor, primaryColor);
             ApplyModernStyle(btnDatMon, "🍔 Đặt món", hoverColor, primaryColor);
             ApplyModernStyle(btnHoTro, "🆘 Hỗ trợ", hoverColor, primaryColor);
             ApplyModernStyle(btnGacha, "Gacha", hoverColor, primaryColor);
@@ -509,5 +538,59 @@ namespace Billiard.WinForm.Forms.Users
         #endregion
 
 
+
+        private void btnSoDoBan_Click(object sender, EventArgs e)
+        {
+            // 1. Lấy instance của SoDoBanForm từ ServiceProvider
+            var mapForm = Program.GetService<SoDoBanForm>();
+
+            // 2. Bật chế độ khách hàng (Ẩn nút sửa/lưu)
+            mapForm.EnableClientMode();
+
+            // 3. Đăng ký sự kiện: Khi khách chọn bàn trên Map
+            mapForm.OnTableSelected += (s, tableSelected) =>
+            {
+                // tableSelected chính là đối tượng BanBium khách vừa click
+
+                // Option A: Mở luôn form đặt bàn cho bàn đó
+                MoFormDatBan(tableSelected);
+
+                // Option B: Hoặc chỉ cuộn danh sách bên ngoài tới bàn đó (nếu muốn)
+                // ScrollToTable(tableSelected.MaBan);
+            };
+
+            // 4. Hiển thị Form
+            mapForm.ShowDialog();
+        }
+        private void MoFormDatBan(BanBium ban)
+        {
+            // Check đăng nhập
+            if (!UserSession.IsLoggedIn)
+            {
+                MessageBox.Show("Vui lòng đăng nhập để đặt bàn!");
+                var login = Program.GetService<LoginForm>();
+                if (login.ShowDialog() != DialogResult.OK) return;
+            }
+
+            // Logic mở form đặt bàn (giống trong TableCardControl)
+            try
+            {
+                var datBanService = Program.GetService<DatBanService>();
+                using (var dialog = new DatBanDialog(datBanService))
+                {
+                    dialog.SetTableInfo(ban.MaBan, ban.TenBan);
+                    if (dialog.ShowDialog() == DialogResult.OK)
+                    {
+                        // Refresh lại list bàn ở form User nếu cần
+                        LoadTablesAsync();
+                        MessageBox.Show("Đặt bàn thành công!", "Thông báo");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi: " + ex.Message);
+            }
+        }
     }
 }

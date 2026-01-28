@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Billiard.WinForm.Forms.Users;
+using Billiard.DAL.Entities;
 
 namespace Billiard.WinForm.Forms.Auth
 {
@@ -18,6 +19,10 @@ namespace Billiard.WinForm.Forms.Auth
         private readonly BilliardDbContext _context;
         private readonly AuthService _authService;
         private bool _isLoggingIn;
+
+        public UserType LoggedUserType { get; private set; }
+        public Billiard.DAL.Entities.NhanVien LoggedNhanVien { get; private set; }
+
 
         // Label để hiển thị lỗi validation
         private Label lblUsernameError;
@@ -377,31 +382,18 @@ namespace Billiard.WinForm.Forms.Auth
                     return;
                 }
 
+                LoggedUserType = (UserType)result.UserType;
+
                 Debug.WriteLine("LOGIN SUCCESS!");
 
                 if (result.UserType == UserType.NhanVien)
                 {
-                    Debug.WriteLine("User Type: NHAN VIEN");
-                    var nhanVien = result.NhanVien;
-                    Debug.WriteLine($"NhanVien ID: {nhanVien.MaNv}");
-                    Debug.WriteLine($"NhanVien Name: {nhanVien.TenNv}");
-                    Debug.WriteLine($"NhanVien Role: {nhanVien.MaNhomNavigation?.TenNhom}");
-
-                    var mainForm = Program.GetService<MainForm>();
-                    mainForm.MaNV = nhanVien.MaNv;
-                    mainForm.TenNV = nhanVien.TenNv;
-                    mainForm.ChucVu = nhanVien.MaNhomNavigation?.TenNhom ?? "Nhân viên";
-
-                    Debug.WriteLine("Opening MainForm...");
-                    mainForm.Show();
-                    mainForm.FormClosed += (s, args) => {
-                        Debug.WriteLine("MainForm closed, showing LoginForm");
-                        this.Show();
-                        ResetForm();
-                    };
-                    this.Hide();
-                    Debug.WriteLine("LoginForm hidden");
+                    LoggedUserType = UserType.NhanVien;
+                    LoggedNhanVien = result.NhanVien; // lưu lại để User form dùng
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
                 }
+
                 else if (result.UserType == UserType.KhachHang)
                 {
                     Debug.WriteLine("User Type: KHACH HANG");
@@ -520,7 +512,7 @@ namespace Billiard.WinForm.Forms.Auth
             if (result == DialogResult.Yes)
             {
                 Debug.WriteLine("Application Exit");
-                Application.Exit();
+                this.Hide();
             }
         }
 

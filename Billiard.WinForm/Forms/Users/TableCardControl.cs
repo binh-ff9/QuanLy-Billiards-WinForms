@@ -11,6 +11,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace Billiard.WinForm.Forms.Users
 {
@@ -35,10 +36,12 @@ namespace Billiard.WinForm.Forms.Users
             lblTenBan.Text = ban.TenBan;
             lblLoaiBan.Text = ban.MaLoaiNavigation?.TenLoai;
             lblGia.Text = (ban.MaLoaiNavigation?.GiaGio ?? 0).ToString("N0") + " đ/giờ";
-            lblTrangThai.Text = ban.TrangThai;
 
-            lblTrangThai.ForeColor = ban.TrangThai == "Trống" ? Color.Green : Color.Red;
+            string statusHienThi = GetTrangThaiHienThi();
+            lblTrangThai.Text = statusHienThi;
 
+            lblTrangThai.ForeColor = statusHienThi == "Trống" ? Color.Green :
+                                                 (statusHienThi == "Đã đặt" ? Color.FromArgb(234, 179, 8) : Color.Red);
             if (!string.IsNullOrEmpty(ban.HinhAnh))
             {
                 try
@@ -74,23 +77,32 @@ namespace Billiard.WinForm.Forms.Users
         }
         private void SetUpUI()
         {
-            this.BackColor = Color.White;
             this.BorderStyle = BorderStyle.FixedSingle;
             this.Size = new Size(220, 350);
 
-            this.MouseEnter += (s, e) => this.BackColor = Color.FromArgb(245, 247, 250);
-            this.MouseLeave += (s, e) => this.BackColor = Color.White;
+            string statusHienThi = GetTrangThaiHienThi();
 
-            this.BackColor = ban.TrangThai switch
+            this.BackColor = statusHienThi switch
             {
                 "Trống" => Color.FromArgb(240, 253, 244),
                 "Đang chơi" => Color.FromArgb(254, 242, 242),
                 "Đã đặt" => Color.FromArgb(255, 251, 235),
                 _ => Color.White
             };
+
+            // Sự kiện hover
+            this.MouseEnter += (s, e) => this.BackColor = Color.FromArgb(245, 247, 250);
+            this.MouseLeave += (s, e) => this.BackColor = statusHienThi switch
+            {
+                "Trống" => Color.FromArgb(240, 253, 244),
+                "Đang chơi" => Color.FromArgb(254, 242, 242),
+                "Đã đặt" => Color.FromArgb(255, 251, 235),
+                _ => Color.White
+            };
+
             this.Paint += (s, e) =>
             {
-                var borderColor = ban.TrangThai switch
+                var borderColor = statusHienThi switch
                 {
                     "Trống" => Color.FromArgb(34, 197, 94),
                     "Đang chơi" => Color.FromArgb(239, 68, 68),
@@ -107,9 +119,10 @@ namespace Billiard.WinForm.Forms.Users
             };
 
             //lblTrangThai
+            lblTrangThai.Text = statusHienThi;
             lblTrangThai.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             lblTrangThai.ForeColor = Color.White;
-            lblTrangThai.BackColor = ban.TrangThai switch
+            lblTrangThai.BackColor = statusHienThi switch
             {
                 "Trống" => Color.FromArgb(34, 197, 94),
                 "Đang chơi" => Color.FromArgb(239, 68, 68),
@@ -162,8 +175,10 @@ namespace Billiard.WinForm.Forms.Users
         // Hàm này dùng để vẽ lại giao diện dựa trên trạng thái hiện tại của _ban
         private void UpdateUI()
         {
+            string statusHienThi = GetTrangThaiHienThi();
+
             // 1. Cập nhật màu nền
-            this.BackColor = ban.TrangThai switch
+            this.BackColor = statusHienThi switch
             {
                 "Trống" => Color.FromArgb(240, 253, 244), // Xanh nhạt
                 "Đang chơi" => Color.FromArgb(254, 242, 242), // Đỏ nhạt
@@ -175,8 +190,8 @@ namespace Billiard.WinForm.Forms.Users
             // Giả sử bạn đã lưu lblStatus là biến toàn cục trong class này
             if (lblTrangThai != null)
             {
-                lblTrangThai.Text = ban.TrangThai;
-                lblTrangThai.BackColor = ban.TrangThai switch
+                lblTrangThai.Text = statusHienThi;
+                lblTrangThai.BackColor = statusHienThi switch
                 {
                     "Trống" => Color.FromArgb(34, 197, 94),
                     "Đang chơi" => Color.FromArgb(239, 68, 68),
@@ -227,12 +242,24 @@ namespace Billiard.WinForm.Forms.Users
                     if (dialog.ShowDialog() == DialogResult.OK)
                     {
                         // --- XỬ LÝ KHI ĐẶT THÀNH CÔNG ---
-                        if (ban.TrangThai == "Trống")
-                        {
-                            ban.TrangThai = "Đã đặt";
-                            UpdateUI(); // Hàm vẽ lại màu sắc Card
-                        }
+                        // --- KHẮC PHỤC LỖI KHÔNG CẬP NHẬT UI ---
 
+                        // Vì dialog đã lưu vào DB rồi, ta cần "giả lập" dữ liệu đó vào biến `ban` 
+                        // để hàm GetTrangThaiHienThi() nhận diện được ngay lập tức.
+
+                        if (ban.DatBans == null) ban.DatBans = new List<DatBan>();
+
+                        // Thêm 1 đơn đặt "ảo" vào list để UI đổi màu
+                        ban.DatBans.Add(new DatBan
+                        {
+                            ThoiGianBatDau = DateTime.Now,
+                            TrangThai = "Chưa nhận"
+                        });
+
+                        // Gọi hàm này để tính toán lại màu sắc và text
+                        UpdateUI();
+
+                        MessageBox.Show("Đặt bàn thành công!", "Thông báo");
                     }
                 }
             }
@@ -240,6 +267,29 @@ namespace Billiard.WinForm.Forms.Users
             {
                 MessageBox.Show("Có lỗi khi mở form đặt bàn: " + ex.Message);
             }
+        }
+
+        private string GetTrangThaiHienThi()
+        {
+            // Ưu tiên 1: Nếu bàn đang có khách chơi thật -> Luôn hiện Đang chơi
+            if (ban.TrangThai == "Đang chơi")
+            {
+                return "Đang chơi";
+            }
+
+            // Ưu tiên 2: Nếu không chơi, kiểm tra xem hôm nay có lịch đặt không
+            // Điều kiện: Có đơn trong DatBans + Ngày đặt là Hôm nay + Chưa bị hủy
+            if (ban.DatBans != null && ban.DatBans.Any(d =>
+                d.ThoiGianBatDau.HasValue &&
+                d.ThoiGianBatDau.Value.Date == DateTime.Today && // Chỉ check ngày hôm nay
+                d.TrangThai != "Đã hủy" &&
+                d.TrangThai != "Đã xong"))
+            {
+                return "Đã đặt";
+            }
+
+            // Ưu tiên 3: Nếu không rơi vào 2 trường hợp trên -> Hiện Trống
+            return "Trống";
         }
     }
 }

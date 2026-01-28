@@ -122,7 +122,7 @@ namespace Billiard.WinForm
             services.AddTransient<KhachHangForm>();
             services.AddTransient<ClientMainForm>();
             services.AddTransient<User>(); // User
-            services.AddTransient<DatBanDialog>();   // Đăng ký luôn các Dialog con
+            services.AddTransient<DatBanDialog>();
             services.AddTransient<UserProfileForm>();
 
             // NhanVien Forms
@@ -135,6 +135,9 @@ namespace Billiard.WinForm
             services.AddTransient<ucKiemSoatKho>();
             services.AddTransient<ucLichSuHoatDong>();
             services.AddTransient<ucPhieuNhapXuat>();
+
+            // User
+            services.AddTransient<SoDoBanForm>(); // Thêm dòng này
         }
 
         public static IServiceScope CreateScope()

@@ -89,6 +89,7 @@
             // btnLogout
             // 
             btnLogout.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnLogout.AutoSize = true;
             btnLogout.BackColor = Color.FromArgb(220, 53, 69);
             btnLogout.Cursor = Cursors.Hand;
             btnLogout.FlatAppearance.BorderSize = 0;
@@ -113,7 +114,7 @@
             lblUserRole.ForeColor = Color.FromArgb(173, 181, 189);
             lblUserRole.Location = new Point(91, 50);
             lblUserRole.Name = "lblUserRole";
-            lblUserRole.Size = new Size(91, 25);
+            lblUserRole.Size = new Size(75, 20);
             lblUserRole.TabIndex = 2;
             lblUserRole.Text = "Nhân viên";
             // 
@@ -125,7 +126,7 @@
             lblUserName.ForeColor = Color.White;
             lblUserName.Location = new Point(91, 20);
             lblUserName.Name = "lblUserName";
-            lblUserName.Size = new Size(117, 30);
+            lblUserName.Size = new Size(102, 25);
             lblUserName.TabIndex = 1;
             lblUserName.Text = "Nhân viên";
             // 
@@ -149,7 +150,7 @@
             lblTitle.ForeColor = Color.White;
             lblTitle.Location = new Point(20, 25);
             lblTitle.Name = "lblTitle";
-            lblTitle.Size = new Size(461, 48);
+            lblTitle.Size = new Size(384, 41);
             lblTitle.TabIndex = 0;
             lblTitle.Text = "🎱 Quản Lý Quán Bi-a Pro";
             // 
@@ -556,7 +557,7 @@
             // 
             // MainForm
             // 
-            AutoScaleDimensions = new SizeF(10F, 25F);
+            AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1400, 1510);
             Controls.Add(pnlDetail);

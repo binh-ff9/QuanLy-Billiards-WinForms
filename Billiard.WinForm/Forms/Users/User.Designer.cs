@@ -32,7 +32,7 @@
             layoutRoot = new TableLayoutPanel();
             pnlNav = new Panel();
             btnLogin = new Button();
-            btnLogo = new Button();
+            btnSoDoBan = new Button();
             btnDatMon = new Button();
             btnHoTro = new Button();
             btnGacha = new Button();
@@ -80,7 +80,7 @@
             main.Dock = DockStyle.Fill;
             main.Location = new Point(0, 0);
             main.Name = "main";
-            main.Size = new Size(902, 743);
+            main.Size = new Size(907, 743);
             main.TabIndex = 0;
             // 
             // layoutRoot
@@ -96,21 +96,21 @@
             layoutRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 70F));
             layoutRoot.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             layoutRoot.RowStyles.Add(new RowStyle(SizeType.Absolute, 20F));
-            layoutRoot.Size = new Size(902, 743);
+            layoutRoot.Size = new Size(907, 743);
             layoutRoot.TabIndex = 0;
             // 
             // pnlNav
             // 
             pnlNav.BackColor = Color.FromArgb(73, 77, 126);
             pnlNav.Controls.Add(btnLogin);
-            pnlNav.Controls.Add(btnLogo);
+            pnlNav.Controls.Add(btnSoDoBan);
             pnlNav.Controls.Add(btnDatMon);
             pnlNav.Controls.Add(btnHoTro);
             pnlNav.Controls.Add(btnGacha);
             pnlNav.Dock = DockStyle.Top;
             pnlNav.Location = new Point(3, 3);
             pnlNav.Name = "pnlNav";
-            pnlNav.Size = new Size(896, 64);
+            pnlNav.Size = new Size(901, 64);
             pnlNav.TabIndex = 0;
             // 
             // btnLogin
@@ -125,15 +125,16 @@
             btnLogin.UseVisualStyleBackColor = false;
             btnLogin.Click += btnLogin_Click;
             // 
-            // btnLogo
+            // btnSoDoBan
             // 
-            btnLogo.BackColor = Color.FromArgb(198, 159, 165);
-            btnLogo.Location = new Point(9, 16);
-            btnLogo.Name = "btnLogo";
-            btnLogo.Size = new Size(134, 33);
-            btnLogo.TabIndex = 3;
-            btnLogo.Text = "Logo";
-            btnLogo.UseVisualStyleBackColor = false;
+            btnSoDoBan.BackColor = Color.FromArgb(198, 159, 165);
+            btnSoDoBan.Location = new Point(9, 16);
+            btnSoDoBan.Name = "btnSoDoBan";
+            btnSoDoBan.Size = new Size(134, 33);
+            btnSoDoBan.TabIndex = 3;
+            btnSoDoBan.Text = "Sơ đồ bàn";
+            btnSoDoBan.UseVisualStyleBackColor = false;
+            btnSoDoBan.Click += btnSoDoBan_Click;
             // 
             // btnDatMon
             // 
@@ -173,7 +174,7 @@
             pnlContent.Dock = DockStyle.Fill;
             pnlContent.Location = new Point(3, 73);
             pnlContent.Name = "pnlContent";
-            pnlContent.Size = new Size(896, 667);
+            pnlContent.Size = new Size(901, 667);
             pnlContent.TabIndex = 1;
             // 
             // flpMain
@@ -188,7 +189,7 @@
             flpMain.FlowDirection = FlowDirection.TopDown;
             flpMain.Location = new Point(0, 0);
             flpMain.Name = "flpMain";
-            flpMain.Size = new Size(896, 546);
+            flpMain.Size = new Size(901, 546);
             flpMain.TabIndex = 0;
             flpMain.WrapContents = false;
             // 
@@ -562,7 +563,7 @@
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(902, 743);
+            ClientSize = new Size(907, 743);
             Controls.Add(main);
             Name = "User";
             Text = "User";
@@ -595,7 +596,7 @@
         private Panel pnlFooter;
         private TableLayoutPanel layoutRoot;
         private Button btnLogin;
-        private Button btnLogo;
+        private Button btnSoDoBan;
         private Button btnDatMon;
         private Button btnHoTro;
         private Button btnGacha;

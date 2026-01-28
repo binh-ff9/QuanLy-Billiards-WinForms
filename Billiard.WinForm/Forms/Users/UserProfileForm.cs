@@ -20,6 +20,8 @@ namespace Billiard.WinForm.Forms.Users
         private readonly DatBanService _datBanService;
         private readonly HoaDonService _hoaDonService;
 
+        public bool CoThayDoiDuLieu { get; private set; } = false;
+
         // Controls
         private TextBox txtName, txtPhone, txtEmail, txtAddress;
         private DataGridView dgvBooking, dgvInvoice;
@@ -254,6 +256,8 @@ namespace Billiard.WinForm.Forms.Users
                 int maDat = (int)dgvBooking.Rows[e.RowIndex].Cells["MaDat"].Value;
                 await _datBanService.CancelBookingAsync(maDat);
                 await LoadAllData(); // Refresh lưới
+                CoThayDoiDuLieu = true;
+                MessageBox.Show("Hủy thành công!");
             }
         }
 

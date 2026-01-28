@@ -25,6 +25,7 @@ namespace Billiard.BLL.Services.QLBan
                 .AsNoTracking()
                 .Include(b => b.MaKhuVucNavigation)
                 .Include(b => b.MaLoaiNavigation)
+                .Include(b=> b.DatBans)
                 .Include(b => b.MaKhNavigation)
                 .Where(b => b.TrangThai != "Bảo trì")
                 .ToListAsync();
