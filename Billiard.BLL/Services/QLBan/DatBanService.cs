@@ -62,7 +62,7 @@ namespace Billiard.BLL.Services.QLBan
                     .ThenInclude(b => b!.MaKhuVucNavigation)
                 .Include(d => d.MaBanNavigation)
                     .ThenInclude(b => b!.MaLoaiNavigation)
-                .Where(d => d.MaKh == maKh && d.TrangThai == "Đang chờ")
+                .Where(d => d.MaKh == maKh && d.TrangThai == "Đang chờ" || d.TrangThai == "Đã Đặt")
                 .OrderBy(d => d.ThoiGianDat)
                 .ToListAsync();
         }

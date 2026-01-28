@@ -68,4 +68,25 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Forms\Resources\img\avatar_khach_hang\09363b77-bd18-4898-9d89-d51f3e623773.JPG">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Forms\Resources\img\avatar_khach_hang\779b894b-d627-4b9c-bbdd-655c63f00fec.jpg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Forms\Resources\img\avatar_khach_hang\8108069d-ca71-4e10-b1b3-0927c993fcf3.JPG">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Forms\Resources\img\avatar_khach_hang\a07bec70-3725-46f3-8a63-06741cd5ccae.JPG">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Forms\Resources\img\avatar_khach_hang\bb756ff6-07a2-41f7-98b2-bd008f706807.JPG">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Forms\Resources\img\avatar_khach_hang\user.svg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

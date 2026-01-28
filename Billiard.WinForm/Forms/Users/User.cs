@@ -344,15 +344,15 @@ namespace Billiard.WinForm.Forms.Users
         {
             btnHoTro.Enabled = false;
 
-            using (HttpClient client = new HttpClient())
-            {
-                var response = await client.PostAsync("https://yourserver/api/support", null);
+            //using (HttpClient client = new HttpClient())
+            //{
+            //    var response = await client.PostAsync("https://yourserver/api/support", null);
 
-                if (response.IsSuccessStatusCode)
-                    MessageBox.Show("Yêu cầu hỗ trợ đã gửi. Nhân viên sẽ tới sớm!");
-                else
-                    MessageBox.Show("Gửi yêu cầu thất bại!");
-            }
+            //    if (response.IsSuccessStatusCode)
+            //        MessageBox.Show("Yêu cầu hỗ trợ đã gửi. Nhân viên sẽ tới sớm!");
+            //    else
+            //        MessageBox.Show("Gửi yêu cầu thất bại!");
+            //}
 
             btnHoTro.Enabled = true;
 
@@ -500,9 +500,9 @@ namespace Billiard.WinForm.Forms.Users
             Color hoverColor = Color.FromArgb(67, 56, 202);   // Màu tím đậm hơn
 
             ApplyModernStyle(btnSoDoBan, "Sơ đồ bàn", hoverColor, primaryColor);
-            ApplyModernStyle(btnDatMon, "🍔 Đặt món", hoverColor, primaryColor);
+            //ApplyModernStyle(btnDatMon, "", hoverColor, primaryColor);
             ApplyModernStyle(btnHoTro, "🆘 Hỗ trợ", hoverColor, primaryColor);
-            ApplyModernStyle(btnGacha, "Gacha", hoverColor, primaryColor);
+            ApplyModernStyle(btnGacha, "Hotline: 0336608117", hoverColor, primaryColor);
             ApplyModernStyle(btnLogin, "Đăng nhập", hoverColor, primaryColor);
         }
         // Style Button
