@@ -267,7 +267,38 @@ namespace Billiard.BLL.Services.QLBan
                             System.Diagnostics.Debug.WriteLine($"❌ Không tìm thấy bàn {maBan}");
                             return (false, "Không tìm thấy bàn", false);
                         }
+                        if (ban.TrangThai == "Đã đặt")
+                        {
+                            var now = DateTime.Now;
+                            var datBan = await _context.DatBans
+                                .Where(d => d.MaBan == maBan && (d.TrangThai == "Đang chờ" || d.TrangThai == "Đã đặt"))
+                                .OrderBy(d => d.ThoiGianBatDau)
+                                .FirstOrDefaultAsync();
 
+                            if (datBan != null && datBan.ThoiGianBatDau.HasValue)
+                            {
+                                // Thời điểm sớm nhất được phép bắt đầu (giờ đặt - 10 phút)
+                                var earliestAllowed = datBan.ThoiGianBatDau.Value.AddMinutes(-10);
+
+                                if (now < earliestAllowed)
+                                {
+                                    var minutesToWait = (int)Math.Ceiling((earliestAllowed - now).TotalMinutes);
+                                    return (false,
+                                        $"⚠️ Chưa đến giờ nhận bàn!\n\n" +
+                                        $"Giờ đặt: {datBan.ThoiGianBatDau.Value:HH:mm}\n" +
+                                        $"Bạn chỉ có thể bắt đầu từ: {earliestAllowed:HH:mm}\n" +
+                                        $"(Vui lòng đợi thêm {minutesToWait} phút)",
+                                        false);
+                                }
+
+                                // Nếu đã quá giờ kết thúc đặt bàn (ví dụ quá 15 phút chưa đến)
+                                if (datBan.ThoiGianKetThuc.HasValue && now > datBan.ThoiGianKetThuc.Value)
+                                {
+                                    // Tùy chọn: Có thể yêu cầu hủy đặt bàn trước hoặc xử lý tùy nghiệp vụ
+                                    return (false, "⚠️ Đơn đặt bàn này đã quá giờ kết thúc!", false);
+                                }
+                            }
+                        }
                         System.Diagnostics.Debug.WriteLine($"Bàn: {ban.TenBan} - Trạng thái: {ban.TrangThai}");
 
                         // ✅ 2. KIỂM TRA TRẠNG THÁI BÀN
@@ -630,10 +661,58 @@ namespace Billiard.BLL.Services.QLBan
 
         public async Task<HoaDon> GetActiveInvoiceAsync(int maBan)
         {
-            return await _context.HoaDons
-                .Include(h => h.ChiTietHoaDons)
-                    .ThenInclude(ct => ct.MaDvNavigation)
-                .FirstOrDefaultAsync(h => h.MaBan == maBan && h.TrangThai == "Đang chơi");
+            // ✅ Retry logic để xử lý trường hợp DB chưa commit xong hoặc có cache
+            int maxRetries = 3;
+            int delayMs = 100;
+
+            for (int i = 0; i < maxRetries; i++)
+            {
+                // ✅ AsNoTracking: Bắt buộc EF đọc từ DB mới nhất, không dùng cache
+                var hoaDon = await _context.HoaDons
+                    .AsNoTracking()
+                    .Include(h => h.ChiTietHoaDons)
+                        .ThenInclude(ct => ct.MaDvNavigation)
+                    .FirstOrDefaultAsync(h => h.MaBan == maBan && h.TrangThai == "Đang chơi");
+
+                if (hoaDon != null)
+                {
+                    System.Diagnostics.Debug.WriteLine($"✓ [Attempt {i + 1}] Tìm thấy hóa đơn HD{hoaDon.MaHd} cho bàn {maBan}");
+                    return hoaDon;
+                }
+
+                // Nếu chưa tìm thấy và vẫn còn lần thử
+                if (i < maxRetries - 1)
+                {
+                    System.Diagnostics.Debug.WriteLine($"⏳ [Attempt {i + 1}/{maxRetries}] Chưa tìm thấy hóa đơn cho bàn {maBan}, retry sau {delayMs}ms...");
+                    await Task.Delay(delayMs);
+                    delayMs *= 2; // Exponential backoff: 100ms → 200ms → 400ms
+                }
+            }
+
+            // Sau tất cả các lần thử vẫn không tìm thấy
+            System.Diagnostics.Debug.WriteLine($"❌ KHÔNG TÌM THẤY hóa đơn đang chơi cho bàn {maBan} sau {maxRetries} lần thử");
+
+            // ✅ THÊM: Log tất cả hóa đơn của bàn để debug
+            var allInvoices = await _context.HoaDons
+                .AsNoTracking()
+                .Where(h => h.MaBan == maBan)
+                .Select(h => new { h.MaHd, h.TrangThai, h.ThoiGianBatDau })
+                .ToListAsync();
+
+            if (allInvoices.Any())
+            {
+                System.Diagnostics.Debug.WriteLine($"📋 Danh sách hóa đơn của bàn {maBan}:");
+                foreach (var inv in allInvoices)
+                {
+                    System.Diagnostics.Debug.WriteLine($"  - HD{inv.MaHd}: {inv.TrangThai} (Bắt đầu: {inv.ThoiGianBatDau:HH:mm dd/MM})");
+                }
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"📋 Bàn {maBan} CHƯA CÓ hóa đơn nào trong DB!");
+            }
+
+            return null;
         }
 
         // Lấy chi tiết hóa đơn
@@ -834,62 +913,132 @@ namespace Billiard.BLL.Services.QLBan
                 using var transaction = await _context.Database.BeginTransactionAsync();
                 try
                 {
-                    System.Diagnostics.Debug.WriteLine($"\n=== ConfirmReservationAsync ===");
-                    System.Diagnostics.Debug.WriteLine($"MaDat: {maDat}, MaNV: {maNv}");
+                    System.Diagnostics.Debug.WriteLine($"\n╔═══════════════════════════════════════════════════════════╗");
+                    System.Diagnostics.Debug.WriteLine($"║  XÁC NHẬN ĐẶT BÀN VÀ BẮT ĐẦU CHƠI (CÓ KIỂM TRA THỜI GIAN)");
+                    System.Diagnostics.Debug.WriteLine($"╠═══════════════════════════════════════════════════════════╣");
+                    System.Diagnostics.Debug.WriteLine($"║  Mã đặt: {maDat}");
+                    System.Diagnostics.Debug.WriteLine($"║  Nhân viên: {maNv}");
+                    System.Diagnostics.Debug.WriteLine($"║  Thời gian hiện tại: {DateTime.Now:HH:mm:ss dd/MM/yyyy}");
+                    System.Diagnostics.Debug.WriteLine($"╚═══════════════════════════════════════════════════════════╝");
 
+                    // ═══════════════════════════════════════════════════════════
+                    // BƯỚC 1: Lấy thông tin đơn đặt bàn
+                    // ═══════════════════════════════════════════════════════════
                     var datBan = await _context.DatBans
                         .Include(d => d.MaBanNavigation)
                         .FirstOrDefaultAsync(d => d.MaDat == maDat);
 
                     if (datBan == null)
                     {
-                        System.Diagnostics.Debug.WriteLine("❌ Không tìm thấy đơn đặt bàn");
+                        System.Diagnostics.Debug.WriteLine("❌ LỖI: Không tìm thấy đơn đặt bàn");
                         return false;
                     }
 
                     if (datBan.MaBanNavigation == null)
                     {
-                        System.Diagnostics.Debug.WriteLine("❌ Không tìm thấy thông tin bàn");
-                        return false;
-                    }
-
-                    System.Diagnostics.Debug.WriteLine($"Đơn đặt: {datBan.TenKhach} - Bàn: {datBan.MaBanNavigation.TenBan}");
-                    System.Diagnostics.Debug.WriteLine($"Trạng thái đơn: {datBan.TrangThai}");
-                    System.Diagnostics.Debug.WriteLine($"Trạng thái bàn: {datBan.MaBanNavigation.TrangThai}");
-
-                    if (datBan.TrangThai != "Đang chờ" && datBan.TrangThai != "Đã đặt")
-                    {
-                        System.Diagnostics.Debug.WriteLine($"❌ Trạng thái đơn không hợp lệ: {datBan.TrangThai}");
+                        System.Diagnostics.Debug.WriteLine("❌ LỖI: Không tìm thấy thông tin bàn");
                         return false;
                     }
 
                     var ban = datBan.MaBanNavigation;
-                    if (ban.TrangThai != "Đã đặt" && ban.TrangThai != "Trống")
+                    System.Diagnostics.Debug.WriteLine($"\n📋 THÔNG TIN ĐƠN ĐẶT:");
+                    System.Diagnostics.Debug.WriteLine($"   - Khách hàng: {datBan.TenKhach}");
+                    System.Diagnostics.Debug.WriteLine($"   - Bàn: {ban.TenBan}");
+                    System.Diagnostics.Debug.WriteLine($"   - Thời gian đặt: {datBan.ThoiGianBatDau:HH:mm dd/MM} - {datBan.ThoiGianKetThuc:HH:mm dd/MM}");
+                    System.Diagnostics.Debug.WriteLine($"   - Trạng thái đơn: {datBan.TrangThai}");
+                    System.Diagnostics.Debug.WriteLine($"   - Trạng thái bàn: {ban.TrangThai}");
+
+                    // ═══════════════════════════════════════════════════════════
+                    // BƯỚC 2: KIỂM TRA TRẠNG THÁI ĐƠN ĐẶT
+                    // ═══════════════════════════════════════════════════════════
+                    if (datBan.TrangThai != "Đang chờ" && datBan.TrangThai != "Đã đặt")
                     {
-                        System.Diagnostics.Debug.WriteLine($"❌ Bàn có trạng thái không hợp lệ: {ban.TrangThai}");
+                        System.Diagnostics.Debug.WriteLine($"❌ LỖI: Trạng thái đơn không hợp lệ: {datBan.TrangThai}");
+                        System.Diagnostics.Debug.WriteLine($"   Chỉ chấp nhận: 'Đang chờ' hoặc 'Đã đặt'");
                         return false;
                     }
 
+                    // ═══════════════════════════════════════════════════════════
+                    // BƯỚC 3: ✅ KIỂM TRA THỜI GIAN CHO PHÉP XÁC NHẬN
+                    // Chỉ cho phép xác nhận trong khoảng:
+                    // - TỪ: 10 phút trước giờ bắt đầu
+                    // - ĐẾN: Sau giờ bắt đầu (nếu khách đến muộn)
+                    // ═══════════════════════════════════════════════════════════
+                    if (!datBan.ThoiGianBatDau.HasValue)
+                    {
+                        System.Diagnostics.Debug.WriteLine("❌ LỖI: Đơn đặt không có thời gian bắt đầu");
+                        return false;
+                    }
+
+                    var now = DateTime.Now;
+                    var thoiGianBatDau = datBan.ThoiGianBatDau.Value;
+                    var thoiGianChoPhepSom = thoiGianBatDau.AddMinutes(-10); // Cho phép xác nhận sớm 10 phút
+
+                    System.Diagnostics.Debug.WriteLine($"\n⏰ KIỂM TRA THỜI GIAN:");
+                    System.Diagnostics.Debug.WriteLine($"   - Giờ bắt đầu đặt: {thoiGianBatDau:HH:mm:ss}");
+                    System.Diagnostics.Debug.WriteLine($"   - Cho phép xác nhận từ: {thoiGianChoPhepSom:HH:mm:ss}");
+                    System.Diagnostics.Debug.WriteLine($"   - Thời gian hiện tại: {now:HH:mm:ss}");
+
+                    if (now < thoiGianChoPhepSom)
+                    {
+                        var soPhutConLai = (thoiGianChoPhepSom - now).TotalMinutes;
+                        System.Diagnostics.Debug.WriteLine($"❌ LỖI: Chưa đến giờ cho phép xác nhận!");
+                        System.Diagnostics.Debug.WriteLine($"   Cần chờ thêm: {Math.Ceiling(soPhutConLai)} phút");
+                        System.Diagnostics.Debug.WriteLine($"   Có thể xác nhận từ: {thoiGianChoPhepSom:HH:mm:ss dd/MM/yyyy}");
+                        return false;
+                    }
+
+                    System.Diagnostics.Debug.WriteLine($"✓ Thời gian hợp lệ - Cho phép xác nhận");
+
+                    // ═══════════════════════════════════════════════════════════
+                    // BƯỚC 4: KIỂM TRA TRẠNG THÁI BÀN
+                    // ═══════════════════════════════════════════════════════════
+                    // Bàn phải ở trạng thái "Trống" hoặc "Đã đặt" (cho đơn này)
+                    if (ban.TrangThai != "Trống" && ban.TrangThai != "Đã đặt")
+                    {
+                        System.Diagnostics.Debug.WriteLine($"❌ LỖI: Bàn có trạng thái không hợp lệ: {ban.TrangThai}");
+                        System.Diagnostics.Debug.WriteLine($"   Trạng thái yêu cầu: 'Trống' hoặc 'Đã đặt'");
+                        return false;
+                    }
+
+                    // ═══════════════════════════════════════════════════════════
+                    // BƯỚC 5: KIỂM TRA KHÔNG CÓ HÓA ĐƠN ĐANG CHẠY
+                    // ═══════════════════════════════════════════════════════════
                     var existingInvoice = await _context.HoaDons
                         .FirstOrDefaultAsync(h => h.MaBan == ban.MaBan && h.TrangThai == "Đang chơi");
 
                     if (existingInvoice != null)
                     {
-                        System.Diagnostics.Debug.WriteLine($"❌ Bàn đã có hóa đơn đang hoạt động: HD{existingInvoice.MaHd}");
+                        System.Diagnostics.Debug.WriteLine($"❌ LỖI: Bàn đã có hóa đơn đang hoạt động!");
+                        System.Diagnostics.Debug.WriteLine($"   Mã hóa đơn: HD{existingInvoice.MaHd}");
+                        System.Diagnostics.Debug.WriteLine($"   Bắt đầu lúc: {existingInvoice.ThoiGianBatDau:HH:mm dd/MM}");
                         return false;
                     }
 
-                    ban.TrangThai = "Đang chơi";
-                    ban.GioBatDau = DateTime.Now;
-                    ban.MaKh = datBan.MaKh;
-                    System.Diagnostics.Debug.WriteLine($"✓ Cập nhật bàn: {ban.TenBan} -> Đang chơi");
+                    System.Diagnostics.Debug.WriteLine($"✓ Bàn không có hóa đơn đang chạy");
 
+                    // ═══════════════════════════════════════════════════════════
+                    // BƯỚC 6: CẬP NHẬT TRẠNG THÁI BÀN
+                    // ═══════════════════════════════════════════════════════════
+                    ban.TrangThai = "Đang chơi";
+                    ban.GioBatDau = now;
+                    ban.MaKh = datBan.MaKh;
+                    ban.GhiChu = $"Xác nhận lúc {now:HH:mm dd/MM}";
+
+                    System.Diagnostics.Debug.WriteLine($"\n✓ CẬP NHẬT BÀN:");
+                    System.Diagnostics.Debug.WriteLine($"   - Bàn: {ban.TenBan}");
+                    System.Diagnostics.Debug.WriteLine($"   - Trạng thái: Đang chơi");
+                    System.Diagnostics.Debug.WriteLine($"   - Giờ bắt đầu: {now:HH:mm:ss}");
+
+                    // ═══════════════════════════════════════════════════════════
+                    // BƯỚC 7: TẠO HÓA ĐƠN MỚI
+                    // ═══════════════════════════════════════════════════════════
                     var hoaDon = new HoaDon
                     {
                         MaBan = datBan.MaBan,
                         MaNv = maNv,
                         MaKh = datBan.MaKh,
-                        ThoiGianBatDau = DateTime.Now,
+                        ThoiGianBatDau = now,
                         TrangThai = "Đang chơi",
                         TienBan = 0,
                         TienDichVu = 0,
@@ -900,14 +1049,22 @@ namespace Billiard.BLL.Services.QLBan
                     _context.HoaDons.Add(hoaDon);
                     System.Diagnostics.Debug.WriteLine($"✓ Tạo hóa đơn mới cho bàn {ban.TenBan}");
 
+                    // ═══════════════════════════════════════════════════════════
+                    // BƯỚC 8: CẬP NHẬT TRẠNG THÁI ĐƠN ĐẶT
+                    // ═══════════════════════════════════════════════════════════
                     datBan.TrangThai = "Đã xác nhận";
-                    System.Diagnostics.Debug.WriteLine($"✓ Cập nhật trạng thái đơn đặt -> Đã xác nhận");
+                    System.Diagnostics.Debug.WriteLine($"✓ Cập nhật trạng thái đơn đặt → Đã xác nhận");
 
+                    // ═══════════════════════════════════════════════════════════
+                    // BƯỚC 9: LƯU VÀ COMMIT
+                    // ═══════════════════════════════════════════════════════════
                     await _context.SaveChangesAsync();
                     System.Diagnostics.Debug.WriteLine("✓ SaveChanges thành công");
 
                     await transaction.CommitAsync();
-                    System.Diagnostics.Debug.WriteLine("✓✓✓ HOÀN TẤT XÁC NHẬN ĐẶT BÀN");
+                    System.Diagnostics.Debug.WriteLine("\n╔═══════════════════════════════════════════════════════════╗");
+                    System.Diagnostics.Debug.WriteLine("║  ✓✓✓ HOÀN TẤT XÁC NHẬN ĐẶT BÀN THÀNH CÔNG");
+                    System.Diagnostics.Debug.WriteLine("╚═══════════════════════════════════════════════════════════╝");
 
                     DetachAllEntities();
 
@@ -916,7 +1073,7 @@ namespace Billiard.BLL.Services.QLBan
                 catch (Exception ex)
                 {
                     await transaction.RollbackAsync();
-                    System.Diagnostics.Debug.WriteLine($"❌ Exception trong ConfirmReservationAsync:");
+                    System.Diagnostics.Debug.WriteLine($"\n❌❌❌ EXCEPTION TRONG ConfirmReservationAsync:");
                     System.Diagnostics.Debug.WriteLine($"Message: {ex.Message}");
                     System.Diagnostics.Debug.WriteLine($"Inner: {ex.InnerException?.Message}");
                     System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");

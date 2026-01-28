@@ -2209,12 +2209,33 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private void BtnThemBan_Click(object sender, EventArgs e)
         {
-            MessageBox.Show(
-                "Chức năng 'Thêm bàn mới' đang trong quá trình phát triển.\nVui lòng quay lại sau!",
-                "Thông báo",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information
-            );
+            try
+            {
+                // 1. Lấy các service cần thiết từ DI Container
+                var loaiBanService = Program.GetService<LoaiBanService>();
+                var khuVucService = Program.GetService<KhuVucService>();
+                // _banBiaService đã có sẵn từ constructor của QLBanForm
+
+                // 2. Khởi tạo form thêm bàn
+                using (var themBanForm = new ThemBanForm(_banBiaService, loaiBanService, khuVucService))
+                {
+                    themBanForm.StartPosition = FormStartPosition.CenterParent;
+
+                    // 3. Hiển thị form và kiểm tra kết quả trả về
+                    var result = themBanForm.ShowDialog(this);
+
+                    if (result == DialogResult.OK)
+                    {
+                        // 4. Nếu thêm thành công, thực hiện refresh lại danh sách bàn
+                        _ = RefreshTables();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở form thêm bàn: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         #endregion
