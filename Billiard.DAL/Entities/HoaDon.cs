@@ -16,6 +16,7 @@ public partial class HoaDon
     public DateTime? ThoiGianBatDau { get; set; }
 
     public DateTime? ThoiGianKetThuc { get; set; }
+    public DateTime? ThoiGianThanhToan { get; set; }
 
     public int? ThoiLuongPhut { get; set; }
 

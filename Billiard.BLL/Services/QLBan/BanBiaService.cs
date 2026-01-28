@@ -18,11 +18,11 @@ namespace Billiard.BLL.Services.QLBan
             _context = context;
             _gioHoatDongService = gioHoatDongService;
         }
-
         // Lấy tất cả bàn
         public async Task<List<BanBium>> GetAllTablesAsync()
         {
             var allTables = await _context.BanBia
+                .AsNoTracking()
                 .Include(b => b.MaKhuVucNavigation)
                 .Include(b => b.MaLoaiNavigation)
                 .Include(b => b.MaKhNavigation)
@@ -34,7 +34,6 @@ namespace Billiard.BLL.Services.QLBan
                 .ThenBy(b => b.TenBan)
                 .ToList();
         }
-
         // Lọc bàn theo điều kiện
         public async Task<List<BanBium>> FilterTablesAsync(string areaFilter, string statusFilter, string typeFilter, string searchText)
         {
@@ -62,7 +61,6 @@ namespace Billiard.BLL.Services.QLBan
 
             var results = await query.ToListAsync();
 
-            // Sắp xếp: Bàn khẩn cấp lên đầu
             return results
                 .OrderByDescending(b => b.GhiChu?.Contains("URGENT_PAYMENT") ?? false)
                 .ThenBy(b => b.TenBan)
@@ -70,12 +68,10 @@ namespace Billiard.BLL.Services.QLBan
         }
         public async Task<List<BanBium>> KiemTraBanDenGioDongCua()
         {
-            // Chỉ kiểm tra khi đến giờ đóng cửa
             var gioDongCua = _gioHoatDongService.LayThoiDiemDongCua();
             if (DateTime.Now < gioDongCua)
                 return new List<BanBium>();
 
-            // Lấy danh sách bàn đang chơi và đã quá giờ đóng cửa
             var banDangChoi = await _context.BanBia
                 .Include(b => b.MaKhuVucNavigation)
                 .Include(b => b.MaLoaiNavigation)
@@ -143,16 +139,13 @@ namespace Billiard.BLL.Services.QLBan
             var giaGio = ban.MaLoaiNavigation?.GiaGio ?? 0;
             var gioBatDau = ban.GioBatDau.Value;
 
-            // Lấy thời gian kết thúc hợp lệ (tối đa là giờ đóng cửa)
             var thoiGianKetThuc = _gioHoatDongService.LayThoiGianKetThucHopLe(gioBatDau);
 
-            // Tính số giờ thực tế
             var duration = thoiGianKetThuc - gioBatDau;
             var tongPhut = (int)Math.Ceiling(duration.TotalMinutes);
             var soGio = (decimal)tongPhut / 60m;
             var tienBan = soGio * giaGio;
 
-            // Tạo ghi chú
             var gioDongCua = _gioHoatDongService.LayThoiDiemDongCuaTheoBanBatDau(gioBatDau);
             string ghiChu;
 
@@ -179,10 +172,8 @@ namespace Billiard.BLL.Services.QLBan
                 var ban = await _context.BanBia.FindAsync(maBan);
                 if (ban == null) return false;
 
-                // Lưu flag vào GhiChu hoặc tạo field mới
                 if (canThanhToan)
                 {
-                    // Thêm flag "URGENT_PAYMENT" vào GhiChu
                     if (!ban.GhiChu?.Contains("URGENT_PAYMENT") ?? true)
                     {
                         ban.GhiChu = (ban.GhiChu ?? "") + " URGENT_PAYMENT";
@@ -190,16 +181,17 @@ namespace Billiard.BLL.Services.QLBan
                 }
                 else
                 {
-                    // Remove flag
-                    ban.GhiChu = ban.GhiChu?.Replace("URGENT_PAYMENT", "").Trim();
+                    if (ban.GhiChu?.Contains("URGENT_PAYMENT") ?? false)
+                    {
+                        ban.GhiChu = ban.GhiChu.Replace("URGENT_PAYMENT", "").Trim();
+                    }
                 }
 
                 await _context.SaveChangesAsync();
                 return true;
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine($"Lỗi đánh dấu bàn: {ex.Message}");
                 return false;
             }
         }
@@ -229,19 +221,26 @@ namespace Billiard.BLL.Services.QLBan
 
             return (banDangChoi, true);
         }
-        public async Task<(bool isSuccess, string message, bool needConfirmation)> StartTableAsync(
-    int maBan,
-    int maNv,
-    int? maKh = null,
-    bool skipWarning = false)
+        private void DetachAllEntities()
         {
-            
+            foreach (var entry in _context.ChangeTracker.Entries().ToList())
+            {
+                entry.State = EntityState.Detached;
+            }
+        }
+        public async Task<(bool isSuccess, string message, bool needConfirmation)> StartTableAsync(
+        int maBan,
+        int maNv,
+        int? maKh = null,
+        bool skipWarning = false)
+        {
+            // Kiểm tra giờ đóng cửa
             if (!skipWarning && _gioHoatDongService.SapDenGioDongCua())
             {
                 var phutConLai = _gioHoatDongService.TinhSoPhutConLaiDenDongCua();
                 return (false,
                     $"⚠️ Sắp đến giờ đóng cửa!\nChỉ còn {phutConLai} phút nữa.\n\nBạn có chắc muốn bắt đầu chơi?",
-                    true); // needConfirmation = true
+                    true);
             }
 
             await _semaphore.WaitAsync();
@@ -254,32 +253,61 @@ namespace Billiard.BLL.Services.QLBan
                     using var transaction = await _context.Database.BeginTransactionAsync();
                     try
                     {
+                        System.Diagnostics.Debug.WriteLine($"\n=== StartTableAsync - Bàn {maBan} ===");
+
+                        // ✅ 1. LẤY THÔNG TIN BÀN (với AsNoTracking)
                         var ban = await _context.BanBia
+                            .AsNoTracking()
                             .Include(b => b.MaKhuVucNavigation)
                             .Include(b => b.MaLoaiNavigation)
                             .FirstOrDefaultAsync(b => b.MaBan == maBan);
 
                         if (ban == null)
                         {
+                            System.Diagnostics.Debug.WriteLine($"❌ Không tìm thấy bàn {maBan}");
                             return (false, "Không tìm thấy bàn", false);
                         }
 
+                        System.Diagnostics.Debug.WriteLine($"Bàn: {ban.TenBan} - Trạng thái: {ban.TrangThai}");
+
+                        // ✅ 2. KIỂM TRA TRẠNG THÁI BÀN
                         if (ban.TrangThai != "Trống" && ban.TrangThai != "Đã đặt")
                         {
+                            System.Diagnostics.Debug.WriteLine($"❌ Bàn có trạng thái không hợp lệ: {ban.TrangThai}");
                             return (false, $"Bàn có trạng thái: {ban.TrangThai}", false);
                         }
 
+                        // ✅ 3. KIỂM TRA HÓA ĐƠN HIỆN TẠI (QUAN TRỌNG)
                         var existingInvoice = await _context.HoaDons
-                            .FirstOrDefaultAsync(h => h.MaBan == maBan && h.TrangThai == "Đang chơi");
+                            .AsNoTracking() // ✅ Không tracking để tránh conflict
+                            .Where(h => h.MaBan == maBan)
+                            .OrderByDescending(h => h.MaHd)
+                            .FirstOrDefaultAsync();
 
                         if (existingInvoice != null)
                         {
-                            return (false, "Bàn đã có hóa đơn đang hoạt động", false);
+                            System.Diagnostics.Debug.WriteLine($"Tìm thấy hóa đơn: HD{existingInvoice.MaHd} - Trạng thái: {existingInvoice.TrangThai}");
+
+                            // ✅ CHỈ CHẶN nếu đang chơi
+                            if (existingInvoice.TrangThai == "Đang chơi")
+                            {
+                                System.Diagnostics.Debug.WriteLine($"❌ Bàn đang có hóa đơn đang chơi: HD{existingInvoice.MaHd}");
+                                return (false, "Bàn đã có hóa đơn đang hoạt động", false);
+                            }
+
+                            // ✅ Nếu đã thanh toán hoặc đã hủy -> OK, cho phép tạo mới
+                            System.Diagnostics.Debug.WriteLine($"✓ Hóa đơn cũ HD{existingInvoice.MaHd} đã {existingInvoice.TrangThai}, cho phép tạo mới");
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine("✓ Bàn chưa có hóa đơn nào");
                         }
 
-                        // Xử lý đơn đặt bàn nếu có
+                        // ✅ 4. XỬ LÝ ĐẶT BÀN (nếu có)
                         if (ban.TrangThai == "Đã đặt")
                         {
+                            System.Diagnostics.Debug.WriteLine("Bàn đang được đặt, tìm thông tin đặt bàn...");
+
                             var datBan = await _context.DatBans
                                 .Where(d => d.MaBan == maBan && (d.TrangThai == "Đang chờ" || d.TrangThai == "Đã đặt"))
                                 .OrderBy(d => d.ThoiGianBatDau)
@@ -287,20 +315,34 @@ namespace Billiard.BLL.Services.QLBan
 
                             if (datBan != null)
                             {
+                                System.Diagnostics.Debug.WriteLine($"✓ Tìm thấy đơn đặt: {datBan.TenKhach}");
+
                                 if (!maKh.HasValue && datBan.MaKh.HasValue)
                                 {
                                     maKh = datBan.MaKh;
+                                    System.Diagnostics.Debug.WriteLine($"✓ Lấy MaKH từ đơn đặt: {maKh}");
                                 }
+
                                 datBan.TrangThai = "Đã xác nhận";
+                                System.Diagnostics.Debug.WriteLine("✓ Cập nhật trạng thái đơn đặt -> Đã xác nhận");
                             }
                         }
 
-                        // Cập nhật trạng thái bàn
-                        ban.TrangThai = "Đang chơi";
-                        ban.GioBatDau = DateTime.Now;
-                        ban.MaKh = maKh;
+                        // ✅ 5. LẤY LẠI BÀN ĐỂ UPDATE (với tracking)
+                        var banToUpdate = await _context.BanBia.FindAsync(maBan);
+                        if (banToUpdate == null)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"❌ Không tìm thấy bàn để update");
+                            return (false, "Không thể cập nhật bàn", false);
+                        }
 
-                        // Tạo hóa đơn mới
+                        // ✅ 6. CẬP NHẬT BÀN
+                        banToUpdate.TrangThai = "Đang chơi";
+                        banToUpdate.GioBatDau = DateTime.Now;
+                        banToUpdate.MaKh = maKh;
+                        System.Diagnostics.Debug.WriteLine($"✓ Cập nhật bàn: Trống/Đã đặt → Đang chơi");
+
+                        // ✅ 7. TẠO HÓA ĐƠN MỚI
                         var hoaDon = new HoaDon
                         {
                             MaBan = maBan,
@@ -315,23 +357,32 @@ namespace Billiard.BLL.Services.QLBan
                         };
 
                         _context.HoaDons.Add(hoaDon);
+                        System.Diagnostics.Debug.WriteLine($"✓ Tạo hóa đơn mới");
 
-                        await _context.SaveChangesAsync();
+                        // ✅ 8. LƯU THAY ĐỔI
+                        var savedCount = await _context.SaveChangesAsync();
+                        System.Diagnostics.Debug.WriteLine($"✓ Đã lưu {savedCount} thay đổi");
+
                         await transaction.CommitAsync();
+                        System.Diagnostics.Debug.WriteLine($"✓✓✓ HOÀN TẤT - HD{hoaDon.MaHd}\n");
+
+                        // ✅ 9. DETACH SAU KHI COMMIT
+                        DetachAllEntities();
 
                         return (true, "Đã bắt đầu chơi thành công", false);
                     }
                     catch (Exception ex)
                     {
                         await transaction.RollbackAsync();
-                        System.Diagnostics.Debug.WriteLine($"❌ Inner Exception: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"❌ Exception: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"Stack: {ex.StackTrace}");
                         return (false, $"Lỗi: {ex.Message}", false);
                     }
                 });
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ StartTableAsync Exception: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"❌ Outer Exception: {ex.Message}");
                 return (false, $"Lỗi: {ex.Message}", false);
             }
             finally
@@ -552,7 +603,22 @@ namespace Billiard.BLL.Services.QLBan
                 return false;
             }
         }
+        public async Task<Dictionary<int, int>> GetReservationCountsForDateAsync(DateTime date)
+        {
+            var startOfDay = date.Date;
+            var endOfDay = startOfDay.AddDays(1).AddSeconds(-1);
 
+            var counts = await _context.DatBans
+                .Where(d => (d.TrangThai == "Đang chờ" || d.TrangThai == "Đã đặt" || d.TrangThai == "Đã xác nhận")
+                    && d.ThoiGianBatDau.HasValue
+                    && d.ThoiGianBatDau >= startOfDay
+                    && d.ThoiGianBatDau <= endOfDay)
+                .GroupBy(d => d.MaBan ?? 0)
+                .Select(g => new { MaBan = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            return counts.ToDictionary(x => x.MaBan, x => x.Count);
+        }
         public async Task<BanBium> GetTableByIdAsync(int maBan)
         {
             return await _context.BanBia
@@ -565,12 +631,9 @@ namespace Billiard.BLL.Services.QLBan
         public async Task<HoaDon> GetActiveInvoiceAsync(int maBan)
         {
             return await _context.HoaDons
-                .Include(h => h.MaKhNavigation)
-                .Include(h => h.MaBanNavigation)
-                .ThenInclude(b => b.MaLoaiNavigation)
-                .Include(h => h.MaNvNavigation)
-                .Where(h => h.MaBan == maBan && h.TrangThai == "Đang chơi")
-                .FirstOrDefaultAsync();
+                .Include(h => h.ChiTietHoaDons)
+                    .ThenInclude(ct => ct.MaDvNavigation)
+                .FirstOrDefaultAsync(h => h.MaBan == maBan && h.TrangThai == "Đang chơi");
         }
 
         // Lấy chi tiết hóa đơn
@@ -632,7 +695,75 @@ namespace Billiard.BLL.Services.QLBan
                 return false;
             }
         }
+        public async Task<bool> HoldReservationAsync(int maDat, int additionalMinutes = 15)
+        {
+            var strategy = _context.Database.CreateExecutionStrategy();
 
+            return await strategy.ExecuteAsync(async () =>
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    System.Diagnostics.Debug.WriteLine($"\n=== HoldReservationAsync ===");
+                    System.Diagnostics.Debug.WriteLine($"MaDat: {maDat}, Thêm {additionalMinutes} phút");
+
+                    var datBan = await _context.DatBans
+                        .Include(d => d.MaBanNavigation)
+                        .FirstOrDefaultAsync(d => d.MaDat == maDat);
+
+                    if (datBan == null)
+                    {
+                        System.Diagnostics.Debug.WriteLine("❌ Không tìm thấy đơn đặt bàn");
+                        return false;
+                    }
+
+                    if (!datBan.ThoiGianBatDau.HasValue)
+                    {
+                        System.Diagnostics.Debug.WriteLine("❌ Đơn đặt không có thời gian bắt đầu");
+                        return false;
+                    }
+
+                    // Gia hạn thời gian bắt đầu
+                    var oldStartTime = datBan.ThoiGianBatDau.Value;
+                    var newStartTime = oldStartTime.AddMinutes(additionalMinutes);
+
+                    System.Diagnostics.Debug.WriteLine($"Thời gian cũ: {oldStartTime:HH:mm dd/MM/yyyy}");
+                    System.Diagnostics.Debug.WriteLine($"Thời gian mới: {newStartTime:HH:mm dd/MM/yyyy}");
+
+                    // Cập nhật thời gian
+                    datBan.ThoiGianBatDau = newStartTime;
+                    if (datBan.ThoiGianKetThuc.HasValue)
+                    {
+                        datBan.ThoiGianKetThuc = datBan.ThoiGianKetThuc.Value.AddMinutes(additionalMinutes);
+                    }
+
+                    // Thêm ghi chú
+                    var holdNote = $"[Giữ bàn +{additionalMinutes}p lúc {DateTime.Now:HH:mm dd/MM}]";
+                    datBan.GhiChu = string.IsNullOrEmpty(datBan.GhiChu)
+                        ? holdNote
+                        : datBan.GhiChu + " " + holdNote;
+
+                    System.Diagnostics.Debug.WriteLine($"✓ Đã gia hạn đơn đặt");
+
+                    await _context.SaveChangesAsync();
+                    System.Diagnostics.Debug.WriteLine("✓ SaveChanges thành công");
+
+                    await transaction.CommitAsync();
+                    System.Diagnostics.Debug.WriteLine("✓✓✓ HOÀN TẤT GIỮ BÀN");
+
+                    DetachAllEntities();
+
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    System.Diagnostics.Debug.WriteLine($"❌ Exception: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Inner: {ex.InnerException?.Message}");
+                    throw;
+                }
+            });
+        }
         // Hủy đặt bàn
         public async Task<bool> CancelReservationAsync(int maDat)
         {
@@ -658,7 +789,6 @@ namespace Billiard.BLL.Services.QLBan
 
                     System.Diagnostics.Debug.WriteLine($"Đơn đặt: {datBan.TenKhach}");
 
-                    // Cập nhật trạng thái bàn về Trống
                     if (datBan.MaBanNavigation != null)
                     {
                         var ban = datBan.MaBanNavigation;
@@ -672,7 +802,6 @@ namespace Billiard.BLL.Services.QLBan
                         System.Diagnostics.Debug.WriteLine($"✓ Cập nhật bàn -> Trống");
                     }
 
-                    // Cập nhật trạng thái đơn đặt thành "Đã hủy"
                     datBan.TrangThai = "Đã hủy";
                     System.Diagnostics.Debug.WriteLine($"✓ Cập nhật đơn đặt -> Đã hủy");
 
@@ -681,6 +810,8 @@ namespace Billiard.BLL.Services.QLBan
 
                     await transaction.CommitAsync();
                     System.Diagnostics.Debug.WriteLine("✓✓✓ HOÀN TẤT HỦY ĐẶT BÀN");
+
+                    DetachAllEntities();
 
                     return true;
                 }
@@ -693,11 +824,9 @@ namespace Billiard.BLL.Services.QLBan
                 }
             });
         }
-
         // Xác nhận đặt bàn và bắt đầu chơi
         public async Task<bool> ConfirmReservationAsync(int maDat, int maNv)
         {
-            // Sử dụng Execution Strategy để tránh lỗi transaction
             var strategy = _context.Database.CreateExecutionStrategy();
 
             return await strategy.ExecuteAsync(async () =>
@@ -708,7 +837,6 @@ namespace Billiard.BLL.Services.QLBan
                     System.Diagnostics.Debug.WriteLine($"\n=== ConfirmReservationAsync ===");
                     System.Diagnostics.Debug.WriteLine($"MaDat: {maDat}, MaNV: {maNv}");
 
-                    // 1. Tìm đơn đặt bàn
                     var datBan = await _context.DatBans
                         .Include(d => d.MaBanNavigation)
                         .FirstOrDefaultAsync(d => d.MaDat == maDat);
@@ -729,14 +857,12 @@ namespace Billiard.BLL.Services.QLBan
                     System.Diagnostics.Debug.WriteLine($"Trạng thái đơn: {datBan.TrangThai}");
                     System.Diagnostics.Debug.WriteLine($"Trạng thái bàn: {datBan.MaBanNavigation.TrangThai}");
 
-                    // 2. Kiểm tra trạng thái đơn đặt
                     if (datBan.TrangThai != "Đang chờ" && datBan.TrangThai != "Đã đặt")
                     {
                         System.Diagnostics.Debug.WriteLine($"❌ Trạng thái đơn không hợp lệ: {datBan.TrangThai}");
                         return false;
                     }
 
-                    // 3. Kiểm tra trạng thái bàn
                     var ban = datBan.MaBanNavigation;
                     if (ban.TrangThai != "Đã đặt" && ban.TrangThai != "Trống")
                     {
@@ -744,7 +870,6 @@ namespace Billiard.BLL.Services.QLBan
                         return false;
                     }
 
-                    // 4. Kiểm tra xem bàn có hóa đơn đang hoạt động không
                     var existingInvoice = await _context.HoaDons
                         .FirstOrDefaultAsync(h => h.MaBan == ban.MaBan && h.TrangThai == "Đang chơi");
 
@@ -754,13 +879,11 @@ namespace Billiard.BLL.Services.QLBan
                         return false;
                     }
 
-                    // 5. Cập nhật trạng thái bàn
                     ban.TrangThai = "Đang chơi";
                     ban.GioBatDau = DateTime.Now;
-                    ban.MaKh = datBan.MaKh; // Gán khách hàng từ đơn đặt
+                    ban.MaKh = datBan.MaKh;
                     System.Diagnostics.Debug.WriteLine($"✓ Cập nhật bàn: {ban.TenBan} -> Đang chơi");
 
-                    // 6. Tạo hóa đơn mới
                     var hoaDon = new HoaDon
                     {
                         MaBan = datBan.MaBan,
@@ -777,16 +900,16 @@ namespace Billiard.BLL.Services.QLBan
                     _context.HoaDons.Add(hoaDon);
                     System.Diagnostics.Debug.WriteLine($"✓ Tạo hóa đơn mới cho bàn {ban.TenBan}");
 
-                    // 7. Cập nhật trạng thái đơn đặt thành "Đã xác nhận"
                     datBan.TrangThai = "Đã xác nhận";
                     System.Diagnostics.Debug.WriteLine($"✓ Cập nhật trạng thái đơn đặt -> Đã xác nhận");
 
-                    // 8. Lưu thay đổi
                     await _context.SaveChangesAsync();
                     System.Diagnostics.Debug.WriteLine("✓ SaveChanges thành công");
 
                     await transaction.CommitAsync();
                     System.Diagnostics.Debug.WriteLine("✓✓✓ HOÀN TẤT XÁC NHẬN ĐẶT BÀN");
+
+                    DetachAllEntities();
 
                     return true;
                 }

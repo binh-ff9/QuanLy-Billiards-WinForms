@@ -1,6 +1,7 @@
-﻿using Billiard.DAL.Data;
+﻿using Billiard.BLL.Services.QLBan;
+using Billiard.DAL.Data;
 using Billiard.DAL.Entities;
-using Billiard.BLL.Services.QLBan;
+using Emgu.CV.Ocl;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Threading.Tasks;
@@ -26,6 +27,7 @@ namespace Billiard.BLL.Services.HoaDonServices
             try
             {
                 var hoaDon = await _context.HoaDons
+                    .AsNoTracking()
                     .Include(h => h.MaBanNavigation)
                         .ThenInclude(b => b.MaLoaiNavigation)
                     .Include(h => h.MaKhNavigation)
@@ -174,28 +176,20 @@ namespace Billiard.BLL.Services.HoaDonServices
             {
                 System.Diagnostics.Debug.WriteLine($"\n=== THANH TOÁN TIỀN MẶT HD{maHd} ===");
 
-                // ✅ 1. Tính toán với context hiện tại
                 var thanhToanInfo = await TinhToanThanhToan(maHd);
                 if (thanhToanInfo == null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"❌ Không tìm thấy thông tin hóa đơn");
                     return ThanhToanResult.Fail("Không tìm thấy hóa đơn hoặc hóa đơn đã thanh toán");
                 }
-
-                System.Diagnostics.Debug.WriteLine($"Tổng tiền: {thanhToanInfo.TongTien:N0} đ");
-                System.Diagnostics.Debug.WriteLine($"Tiền khách đưa: {tienKhachDua:N0} đ");
 
                 if (tienKhachDua < thanhToanInfo.TongTien)
                 {
                     var thieu = thanhToanInfo.TongTien - tienKhachDua;
-                    System.Diagnostics.Debug.WriteLine($"❌ Tiền không đủ, còn thiếu: {thieu:N0} đ");
                     return ThanhToanResult.Fail($"Tiền khách đưa không đủ! Còn thiếu {thieu:N0} đ");
                 }
 
                 var tienThua = tienKhachDua - thanhToanInfo.TongTien;
-                System.Diagnostics.Debug.WriteLine($"Tiền thừa: {tienThua:N0} đ");
 
-                // ✅ 2. Sử dụng DbContext MỚI để cập nhật (tránh tracking conflict)
                 using (var newContext = new BilliardDbContext())
                 {
                     var strategy = newContext.Database.CreateExecutionStrategy();
@@ -205,27 +199,29 @@ namespace Billiard.BLL.Services.HoaDonServices
                         using var transaction = await newContext.Database.BeginTransactionAsync();
                         try
                         {
-                            System.Diagnostics.Debug.WriteLine($"✓ Bắt đầu transaction với context mới");
-
-                            // Load hóa đơn
                             var hoaDon = await newContext.HoaDons
                                 .Include(h => h.MaBanNavigation)
                                 .FirstOrDefaultAsync(h => h.MaHd == maHd);
 
                             if (hoaDon == null)
                             {
-                                System.Diagnostics.Debug.WriteLine($"❌ Không tìm thấy hóa đơn trong context mới");
                                 return ThanhToanResult.Fail("Không tìm thấy hóa đơn");
                             }
 
                             if (hoaDon.TrangThai != "Đang chơi")
                             {
-                                System.Diagnostics.Debug.WriteLine($"❌ Trạng thái không hợp lệ: {hoaDon.TrangThai}");
                                 return ThanhToanResult.Fail($"Hóa đơn đã {hoaDon.TrangThai}");
                             }
 
-                            // Cập nhật hóa đơn
-                            hoaDon.ThoiGianKetThuc = DateTime.Now;
+                            // ✅ LƯU THỜI GIAN THANH TOÁN NGAY KHI THANH TOÁN
+                            var thoiGianThanhToan = DateTime.Now;
+
+                            // ✅ Nếu chưa có ThoiGianKetThuc, set = thời gian thanh toán
+                            if (!hoaDon.ThoiGianKetThuc.HasValue)
+                            {
+                                hoaDon.ThoiGianKetThuc = thoiGianThanhToan;
+                            }
+
                             hoaDon.TienBan = Math.Round(thanhToanInfo.TienBan, 2);
                             hoaDon.TienDichVu = Math.Round(thanhToanInfo.TienDichVu, 2);
                             hoaDon.GiamGia = Math.Round(thanhToanInfo.GiamGia, 2);
@@ -233,7 +229,8 @@ namespace Billiard.BLL.Services.HoaDonServices
                             hoaDon.TrangThai = "Đã thanh toán";
                             hoaDon.PhuongThucThanhToan = "Tiền mặt";
 
-                            System.Diagnostics.Debug.WriteLine($"✓ Cập nhật hóa đơn: {hoaDon.TrangThai}");
+                            // ✅ SET THỜI GIAN THANH TOÁN NGAY TẠI ĐÂY
+                            hoaDon.ThoiGianThanhToan = thoiGianThanhToan;
 
                             // Cập nhật bàn
                             if (hoaDon.MaBanNavigation != null)
@@ -243,7 +240,6 @@ namespace Billiard.BLL.Services.HoaDonServices
                                 ban.GioBatDau = null;
                                 ban.MaKh = null;
                                 ban.GhiChu = null;
-                                System.Diagnostics.Debug.WriteLine($"✓ Cập nhật bàn {ban.TenBan}: Trống");
                             }
 
                             // Lưu sổ quỹ
@@ -254,17 +250,14 @@ namespace Billiard.BLL.Services.HoaDonServices
                                 LyDo = $"Thanh toán tiền mặt HD{maHd:D6}",
                                 MaHdLienQuan = maHd,
                                 MaNv = hoaDon.MaNv ?? 1,
-                                NgayLap = DateTime.Now
+                                NgayLap = thoiGianThanhToan
                             };
                             newContext.SoQuies.Add(soQuy);
-                            System.Diagnostics.Debug.WriteLine($"✓ Thêm sổ quỹ");
 
-                            // Lưu thay đổi
-                            var savedCount = await newContext.SaveChangesAsync();
-                            System.Diagnostics.Debug.WriteLine($"✓ Đã lưu {savedCount} thay đổi");
-
+                            await newContext.SaveChangesAsync();
                             await transaction.CommitAsync();
-                            System.Diagnostics.Debug.WriteLine($"✓✓✓ COMMIT TRANSACTION THÀNH CÔNG\n");
+
+                            System.Diagnostics.Debug.WriteLine($"✓✓✓ THANH TOÁN THÀNH CÔNG - Thời gian: {thoiGianThanhToan:HH:mm:ss}\n");
 
                             return ThanhToanResult.Success("Thanh toán tiền mặt thành công", new
                             {
@@ -273,15 +266,12 @@ namespace Billiard.BLL.Services.HoaDonServices
                                 TongTien = thanhToanInfo.TongTien,
                                 TienKhachDua = tienKhachDua,
                                 TienThua = tienThua,
-                                ThoiGianThanhToan = DateTime.Now
+                                ThoiGianThanhToan = thoiGianThanhToan
                             });
                         }
                         catch (Exception ex)
                         {
                             await transaction.RollbackAsync();
-                            System.Diagnostics.Debug.WriteLine($"❌ Exception: {ex.Message}");
-                            System.Diagnostics.Debug.WriteLine($"   Inner: {ex.InnerException?.Message}");
-                            System.Diagnostics.Debug.WriteLine($"   Stack: {ex.StackTrace}");
                             return ThanhToanResult.Fail($"Lỗi: {ex.Message}");
                         }
                     });
@@ -289,11 +279,9 @@ namespace Billiard.BLL.Services.HoaDonServices
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Outer Exception: {ex.Message}");
                 return ThanhToanResult.Fail($"Lỗi: {ex.Message}");
             }
         }
-
         /// <summary>
         /// ✅ FIXED: Thanh toán QR - Sử dụng DbContext riêng
         /// </summary>
@@ -302,32 +290,25 @@ namespace Billiard.BLL.Services.HoaDonServices
             try
             {
                 System.Diagnostics.Debug.WriteLine($"\n=== THANH TOÁN QR HD{maHd} ===");
-                System.Diagnostics.Debug.WriteLine($"Mã giao dịch QR: {maGiaoDichQR}");
 
-                // ✅ 1. Kiểm tra giao dịch QR với context hiện tại
                 var giaoDichQR = await _context.VietqrGiaoDiches
                     .FirstOrDefaultAsync(g => g.MaGiaoDich == maGiaoDichQR);
 
                 if (giaoDichQR == null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"❌ Không tìm thấy giao dịch QR");
                     return ThanhToanResult.Fail("Không tìm thấy giao dịch QR");
                 }
 
                 if (giaoDichQR.TrangThai != "Đã thanh toán")
                 {
-                    System.Diagnostics.Debug.WriteLine($"❌ Giao dịch QR chưa xác nhận: {giaoDichQR.TrangThai}");
                     return ThanhToanResult.Fail("Giao dịch QR chưa được xác nhận thanh toán");
                 }
 
                 int hoaDonId = giaoDichQR.MaHd;
-                System.Diagnostics.Debug.WriteLine($"✓ Mã HD từ QR: {hoaDonId}");
-
-                // ✅ 2. Tính toán
                 var thanhToanInfo = await TinhToanThanhToan(hoaDonId);
+
                 if (thanhToanInfo == null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"❌ Không tìm thấy hóa đơn {hoaDonId}");
                     return ThanhToanResult.Fail($"Không tìm thấy hóa đơn {hoaDonId}");
                 }
 
@@ -337,7 +318,6 @@ namespace Billiard.BLL.Services.HoaDonServices
                     return ThanhToanResult.Fail($"Số tiền QR không đủ! Thiếu {thieu:N0} đ");
                 }
 
-                // ✅ 3. Sử dụng DbContext MỚI để cập nhật
                 using (var newContext = new BilliardDbContext())
                 {
                     var strategy = newContext.Database.CreateExecutionStrategy();
@@ -347,9 +327,6 @@ namespace Billiard.BLL.Services.HoaDonServices
                         using var transaction = await newContext.Database.BeginTransactionAsync();
                         try
                         {
-                            System.Diagnostics.Debug.WriteLine($"✓ Bắt đầu transaction QR");
-
-                            // Load hóa đơn
                             var hoaDon = await newContext.HoaDons
                                 .Include(h => h.MaBanNavigation)
                                 .FirstOrDefaultAsync(h => h.MaHd == hoaDonId);
@@ -364,8 +341,15 @@ namespace Billiard.BLL.Services.HoaDonServices
                                 return ThanhToanResult.Fail($"Hóa đơn đã {hoaDon.TrangThai}");
                             }
 
-                            // Cập nhật hóa đơn
-                            hoaDon.ThoiGianKetThuc = DateTime.Now;
+                            // ✅ LƯU THỜI GIAN THANH TOÁN NGAY KHI THANH TOÁN
+                            var thoiGianThanhToan = DateTime.Now;
+
+                            // ✅ Nếu chưa có ThoiGianKetThuc, set = thời gian thanh toán
+                            if (!hoaDon.ThoiGianKetThuc.HasValue)
+                            {
+                                hoaDon.ThoiGianKetThuc = thoiGianThanhToan;
+                            }
+
                             hoaDon.TienBan = Math.Round(thanhToanInfo.TienBan, 2);
                             hoaDon.TienDichVu = Math.Round(thanhToanInfo.TienDichVu, 2);
                             hoaDon.GiamGia = Math.Round(thanhToanInfo.GiamGia, 2);
@@ -373,7 +357,8 @@ namespace Billiard.BLL.Services.HoaDonServices
                             hoaDon.TrangThai = "Đã thanh toán";
                             hoaDon.PhuongThucThanhToan = "Chuyển khoản";
 
-                            System.Diagnostics.Debug.WriteLine($"✓ Cập nhật hóa đơn QR");
+                            // ✅ SET THỜI GIAN THANH TOÁN NGAY TẠI ĐÂY
+                            hoaDon.ThoiGianThanhToan = thoiGianThanhToan;
 
                             // Cập nhật bàn
                             if (hoaDon.MaBanNavigation != null)
@@ -383,7 +368,6 @@ namespace Billiard.BLL.Services.HoaDonServices
                                 ban.GioBatDau = null;
                                 ban.MaKh = null;
                                 ban.GhiChu = null;
-                                System.Diagnostics.Debug.WriteLine($"✓ Cập nhật bàn {ban.TenBan}");
                             }
 
                             // Lưu sổ quỹ
@@ -394,14 +378,14 @@ namespace Billiard.BLL.Services.HoaDonServices
                                 LyDo = $"Thanh toán QR HD{hoaDonId:D6} - {maGiaoDichQR}",
                                 MaHdLienQuan = hoaDonId,
                                 MaNv = hoaDon.MaNv ?? 1,
-                                NgayLap = DateTime.Now
+                                NgayLap = thoiGianThanhToan
                             };
                             newContext.SoQuies.Add(soQuy);
 
                             await newContext.SaveChangesAsync();
                             await transaction.CommitAsync();
 
-                            System.Diagnostics.Debug.WriteLine($"✓✓✓ THANH TOÁN QR THÀNH CÔNG\n");
+                            System.Diagnostics.Debug.WriteLine($"✓✓✓ THANH TOÁN QR THÀNH CÔNG - Thời gian: {thoiGianThanhToan:HH:mm:ss}\n");
 
                             return ThanhToanResult.Success("Thanh toán QR thành công", new
                             {
@@ -409,13 +393,12 @@ namespace Billiard.BLL.Services.HoaDonServices
                                 TenBan = thanhToanInfo.TenBan,
                                 TongTien = thanhToanInfo.TongTien,
                                 MaGiaoDich = maGiaoDichQR,
-                                ThoiGianThanhToan = DateTime.Now
+                                ThoiGianThanhToan = thoiGianThanhToan
                             });
                         }
                         catch (Exception ex)
                         {
                             await transaction.RollbackAsync();
-                            System.Diagnostics.Debug.WriteLine($"❌ Exception QR: {ex.Message}");
                             return ThanhToanResult.Fail($"Lỗi: {ex.Message}");
                         }
                     });
@@ -423,11 +406,64 @@ namespace Billiard.BLL.Services.HoaDonServices
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"❌ Outer Exception QR: {ex.Message}");
                 return ThanhToanResult.Fail($"Lỗi: {ex.Message}");
             }
         }
+        public async Task<bool> CapNhatThoiGianThanhToan(int maHd, DateTime? thoiGianThanhToan = null)
+        {
+            try
+            {
+                using (var context = new BilliardDbContext())
+                {
+                    var hoaDon = await context.HoaDons.FindAsync(maHd);
 
+                    if (hoaDon == null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"❌ Không tìm thấy hóa đơn {maHd}");
+                        return false;
+                    }
+
+                    // ✅ Sử dụng thời gian truyền vào hoặc thời gian hiện tại
+                    hoaDon.ThoiGianThanhToan = thoiGianThanhToan ?? DateTime.Now;
+
+                    await context.SaveChangesAsync();
+
+                    System.Diagnostics.Debug.WriteLine($"✓ Cập nhật thời gian thanh toán HD{maHd}: {hoaDon.ThoiGianThanhToan:HH:mm:ss dd/MM/yyyy}");
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Lỗi cập nhật thời gian thanh toán: {ex.Message}");
+                return false;
+            }
+        }
+        public async Task<bool> CapNhatThoiGianInHoaDon(int maHd)
+        {
+            try
+            {
+                using (var context = new BilliardDbContext())
+                {
+                    var hoaDon = await context.HoaDons.FindAsync(maHd);
+
+                    if (hoaDon == null || hoaDon.TrangThai != "Đã thanh toán")
+                    {
+                        return false;
+                    }
+
+                    hoaDon.ThoiGianThanhToan = DateTime.Now;
+                    await context.SaveChangesAsync();
+
+                    System.Diagnostics.Debug.WriteLine($"✓ Cập nhật thời gian in hóa đơn HD{maHd}: {DateTime.Now:HH:mm:ss}");
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"❌ Lỗi cập nhật thời gian in: {ex.Message}");
+                return false;
+            }
+        }
         /// <summary>
         /// ✅ CRITICAL FIX: Cập nhật hóa đơn - KHÔNG tự tính lại, dùng ThanhToanInfo đã truyền vào
         /// </summary>
@@ -487,16 +523,57 @@ namespace Billiard.BLL.Services.HoaDonServices
                 System.Diagnostics.Debug.WriteLine($"  - Phương thức: {phuongThuc}");
                 System.Diagnostics.Debug.WriteLine($"  - Trạng thái mới: {hoaDon.TrangThai}");
 
-                // ✅ 4. CẬP NHẬT BÀN
+                // ✅ 4. CẬP NHẬT BÀN - KIỂM TRA ĐƠN ĐẶT TIẾP THEO
                 if (hoaDon.MaBanNavigation != null)
                 {
                     var ban = hoaDon.MaBanNavigation;
-                    System.Diagnostics.Debug.WriteLine($"  - Bàn {ban.TenBan}: {ban.TrangThai} → Trống");
+                    System.Diagnostics.Debug.WriteLine($"  - Bàn {ban.TenBan}: {ban.TrangThai} → Kiểm tra đơn đặt tiếp theo");
 
-                    ban.TrangThai = "Trống";
-                    ban.GioBatDau = null;
-                    ban.MaKh = null;
-                    ban.GhiChu = null;
+                    // ✅ TÌM ĐƠN ĐẶT TIẾP THEO (sử dụng cùng DbContext)
+                    var now = DateTime.Now;
+                    var nextReservation = await _context.DatBans
+                        .Include(d => d.MaBanNavigation)
+                        .Include(d => d.MaKhNavigation)
+                        .Where(d => d.MaBan == ban.MaBan
+                            && (d.TrangThai == "Đang chờ" || d.TrangThai == "Đã đặt")
+                            && d.ThoiGianBatDau.HasValue
+                            && d.ThoiGianBatDau.Value >= now)
+                        .OrderBy(d => d.ThoiGianBatDau)
+                        .FirstOrDefaultAsync();
+
+                    if (nextReservation != null)
+                    {
+                        // ✅ CÓ ĐƠN ĐẶT TIẾP THEO - CHUYỂN BÀN SANG "ĐÃ ĐẶT"
+                        System.Diagnostics.Debug.WriteLine($"  ✓ Tìm thấy đơn đặt tiếp theo:");
+                        System.Diagnostics.Debug.WriteLine($"    - Mã đơn: {nextReservation.MaDat}");
+                        System.Diagnostics.Debug.WriteLine($"    - Khách: {nextReservation.TenKhach}");
+                        System.Diagnostics.Debug.WriteLine($"    - Thời gian: {nextReservation.ThoiGianBatDau:HH:mm} - {nextReservation.ThoiGianKetThuc:HH:mm}");
+
+                        // Cập nhật trạng thái bàn
+                        ban.TrangThai = "Đã đặt";
+                        ban.MaKh = nextReservation.MaKh;
+                        ban.GhiChu = nextReservation.GhiChu;
+                        ban.GioBatDau = null; // Reset giờ bắt đầu, chờ xác nhận
+
+                        // ✅ QUAN TRỌNG: Cập nhật trạng thái đơn đặt thành "Đã đặt" (nếu đang là "Đang chờ")
+                        if (nextReservation.TrangThai == "Đang chờ")
+                        {
+                            nextReservation.TrangThai = "Đã đặt";
+                            _context.Entry(nextReservation).State = EntityState.Modified;
+                            System.Diagnostics.Debug.WriteLine($"    - Đã cập nhật trạng thái đơn đặt: 'Đang chờ' → 'Đã đặt'");
+                        }
+
+                        System.Diagnostics.Debug.WriteLine($"  ✓ Đã chuyển bàn {ban.TenBan} sang 'Đã đặt' cho ca tiếp theo");
+                    }
+                    else
+                    {
+                        // ✅ KHÔNG CÓ ĐƠN ĐẶT TIẾP THEO - TRẢ VỀ TRỐNG
+                        System.Diagnostics.Debug.WriteLine($"  - Không có đơn đặt tiếp theo, bàn {ban.TenBan} về 'Trống'");
+                        ban.TrangThai = "Trống";
+                        ban.GioBatDau = null;
+                        ban.MaKh = null;
+                        ban.GhiChu = null;
+                    }
                 }
 
                 // ✅ 5. MARK ENTITIES AS MODIFIED
@@ -532,7 +609,6 @@ namespace Billiard.BLL.Services.HoaDonServices
                 return false;
             }
         }
-
         /// <summary>
         /// Lưu vào sổ quỹ
         /// </summary>

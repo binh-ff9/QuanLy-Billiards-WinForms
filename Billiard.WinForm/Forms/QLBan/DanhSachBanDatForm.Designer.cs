@@ -31,6 +31,7 @@
             DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
             pnlHeader = new Panel();
+            btnCalendarView = new Button();
             lblTitle = new Label();
             dgvDatBan = new DataGridView();
             MaDat = new DataGridViewTextBoxColumn();
@@ -54,6 +55,7 @@
             // pnlHeader
             // 
             pnlHeader.BackColor = Color.FromArgb(99, 102, 241);
+            pnlHeader.Controls.Add(btnCalendarView);
             pnlHeader.Controls.Add(lblTitle);
             pnlHeader.Dock = DockStyle.Top;
             pnlHeader.Location = new Point(0, 0);
@@ -61,6 +63,21 @@
             pnlHeader.Padding = new Padding(10);
             pnlHeader.Size = new Size(1473, 60);
             pnlHeader.TabIndex = 0;
+            // 
+            // btnCalendarView
+            // 
+            btnCalendarView.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnCalendarView.BackColor = Color.White;
+            btnCalendarView.FlatStyle = FlatStyle.Flat;
+            btnCalendarView.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+            btnCalendarView.ForeColor = Color.FromArgb(99, 102, 241);
+            btnCalendarView.Location = new Point(1273, 10);
+            btnCalendarView.Name = "btnCalendarView";
+            btnCalendarView.Size = new Size(190, 40);
+            btnCalendarView.TabIndex = 1;
+            btnCalendarView.Text = "📆 Xem dạng lịch";
+            btnCalendarView.UseVisualStyleBackColor = false;
+            btnCalendarView.Click += btnCalendarView_Click;
             // 
             // lblTitle
             // 
@@ -239,6 +256,7 @@
         #endregion
 
         private System.Windows.Forms.Panel pnlHeader;
+        private System.Windows.Forms.Button btnCalendarView;
         private System.Windows.Forms.Label lblTitle;
         private System.Windows.Forms.DataGridView dgvDatBan;
         private System.Windows.Forms.Panel pnlFilter;
