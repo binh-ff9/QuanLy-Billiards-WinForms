@@ -23,7 +23,11 @@ public partial class BilliardDbContext : DbContext
         if (!optionsBuilder.IsConfigured)
         {
             // Connection string của bạn
+<<<<<<< Updated upstream
             optionsBuilder.UseSqlServer("your_connection_string_here");
+=======
+            optionsBuilder.UseSqlServer("Server=NOTHUY;Database=QL_QuanBi_a;User Id=LTTQ;Password=Hhh@066205011077;MultipleActiveResultSets=True;TrustServerCertificate=True;");
+>>>>>>> Stashed changes
         }
     }
 
