@@ -114,11 +114,21 @@ namespace Billiard.WinForm.Forms
                 // Load image
                 if (!string.IsNullOrEmpty(_currentService.HinhAnh))
                 {
-                    string imagePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", _currentService.HinhAnh);
-                    if (File.Exists(imagePath))
+                    try
                     {
-                        picPreview.Image = Image.FromFile(imagePath);
+                        var projectRoot = Directory.GetParent(Directory.GetParent(Directory.GetParent(
+                            Directory.GetParent(Application.StartupPath).FullName).FullName).FullName).FullName;
+                        string imagePath = Path.Combine(projectRoot, "Forms", "Resources", "img", _currentService.HinhAnh);
+
+                        if (File.Exists(imagePath))
+                        {
+                            using (var img = Image.FromFile(imagePath))
+                            {
+                                picPreview.Image = new Bitmap(img);
+                            }
+                        }
                     }
+                    catch { }
                 }
             }
         }
@@ -285,7 +295,10 @@ namespace Billiard.WinForm.Forms
         private string SaveImage(string sourcePath)
         {
             string fileName = $"service_{Guid.NewGuid()}{Path.GetExtension(sourcePath)}";
-            string imagesFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images");
+
+            var projectRoot = Directory.GetParent(Directory.GetParent(Directory.GetParent(
+                Directory.GetParent(Application.StartupPath).FullName).FullName).FullName).FullName;
+            string imagesFolder = Path.Combine(projectRoot, "Forms", "Resources", "img");
 
             if (!Directory.Exists(imagesFolder))
             {
@@ -302,7 +315,10 @@ namespace Billiard.WinForm.Forms
         {
             try
             {
-                string imagePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Images", imageName);
+                var projectRoot = Directory.GetParent(Directory.GetParent(Directory.GetParent(
+                    Directory.GetParent(Application.StartupPath).FullName).FullName).FullName).FullName;
+                string imagePath = Path.Combine(projectRoot, "Forms", "Resources", "img", imageName);
+
                 if (File.Exists(imagePath))
                 {
                     File.Delete(imagePath);
