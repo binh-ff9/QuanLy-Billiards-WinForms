@@ -6,6 +6,8 @@
         public static string TenKH { get; set; }
         public static string Sdt { get; set; }
 
+        public static string HangTV { get; set; }
+
         // Kiểm tra đã đăng nhập chưa
         public static bool IsLoggedIn => MaKH > 0;
 

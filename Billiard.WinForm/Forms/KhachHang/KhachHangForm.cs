@@ -66,6 +66,15 @@ namespace Billiard.WinForm.Forms.KhachHang
 
             if (btnXuatBaoCao != null) btnXuatBaoCao.Click += btnXuatBaoCao_Click;
 
+            this.SizeChanged += (s, e) =>
+            {
+                // Chỉ chỉnh lại độ rộng nếu Panel đang mở (Visible = true)
+                if (pnlRightContainer.Visible)
+                {
+                    pnlRightContainer.Width = (int)(this.ClientSize.Width * 0.5); // Giữ nguyên tỉ lệ 50%
+                }
+            };
+
             AssignFilterEvents();
         }
 
@@ -408,6 +417,7 @@ namespace Billiard.WinForm.Forms.KhachHang
         #region Right Panel Container
 
         // Xem Chi Tiết Khi click on Card KhachHang
+        private double _currentRightPanelRatio = 0.4; // 50%
         private async void ShowDetail(int maKh)
         {
             try
@@ -456,7 +466,8 @@ namespace Billiard.WinForm.Forms.KhachHang
                             HideDetailPanel();
                             OnSwitchToHoaDonTab?.Invoke(this, sdt);
                         };
-                        ShowRightPanel(detailControl,375);
+                        int width = (int)(this.ClientSize.Width * _currentRightPanelRatio);
+                        ShowRightPanel(detailControl, width);
                     }
                 }
             }

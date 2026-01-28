@@ -64,7 +64,7 @@ namespace Billiard.WinForm
             ConfigureServices(serviceCollection);
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            Application.Run(ServiceProvider.GetRequiredService<MainForm>());
+            Application.Run(ServiceProvider.GetRequiredService<User>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -121,6 +121,7 @@ namespace Billiard.WinForm
             services.AddTransient<ThongKeForm>();
             services.AddTransient<KhachHangForm>(); // Khách hàng
             services.AddTransient<ClientMainForm>();
+            services.AddTransient<User>(); // User
             services.AddTransient<DatBanDialog>();   // Đăng ký luôn các Dialog con
             services.AddTransient<UserProfileForm>();
             services.AddTransient<KhachHangForm>();

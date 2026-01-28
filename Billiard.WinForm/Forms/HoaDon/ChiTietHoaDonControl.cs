@@ -26,6 +26,7 @@ namespace Billiard.WinForm.Forms.HoaDon
             InitializeComponent();
             this.BackColor = Color.White;
             SetupLayout();
+            SetupResponsiveLayout(); 
             this.Size = new Size(550, 650);
             this.AutoSize = true;
         }
@@ -112,6 +113,36 @@ namespace Billiard.WinForm.Forms.HoaDon
             this.Controls.Add(btnClose);
             btnClose.BringToFront();
         }
+
+        private void SetupResponsiveLayout()
+        {
+            // Khi kích thước khung chứa thay đổi -> Gọi hàm tính toán lại
+            pnlContainer.SizeChanged += (s, e) =>
+            {
+                pnlContainer.SuspendLayout(); // 1. Tạm dừng vẽ để tránh giật lag
+
+                // 2. Tính toán chiều rộng thực tế khả dụng
+                // ClientSize.Width là chiều rộng bên trong (không tính viền)
+                // Trừ đi Padding trái phải của chính nó (đang set là 20)
+                int realWidth = pnlContainer.ClientSize.Width - pnlContainer.Padding.Left - pnlContainer.Padding.Right;
+
+                // 3. Nếu thanh cuộn dọc đang hiện, trừ thêm chiều rộng thanh cuộn để không bị che nội dung
+                if (pnlContainer.VerticalScroll.Visible)
+                {
+                    realWidth -= SystemInformation.VerticalScrollBarWidth;
+                }
+
+                // 4. Ép tất cả các con phải rộng bằng chiều rộng thực tế này
+                foreach (Control c in pnlContainer.Controls)
+                {
+                    // Trừ thêm 2-3px margin an toàn để không bị sát mép quá
+                    c.Width = realWidth - 2;
+                }
+
+                pnlContainer.ResumeLayout(true); // 5. Vẽ lại
+            };
+        }
+
 
         public void LoadData(Billiard.DAL.Entities.HoaDon hd)
         {

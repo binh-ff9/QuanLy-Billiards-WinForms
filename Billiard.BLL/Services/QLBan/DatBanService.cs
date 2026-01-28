@@ -67,6 +67,7 @@ namespace Billiard.BLL.Services.QLBan
         }
 
         // Lấy đặt bàn theo khoảng thời gian
+        // Lấy đặt bàn theo khoảng thời gian (ĐÃ SỬA LỖI LOGIC)
         public async Task<List<DatBan>> GetByDateRangeAsync(DateTime tuNgay, DateTime denNgay)
         {
             return await _context.DatBans
@@ -75,8 +76,10 @@ namespace Billiard.BLL.Services.QLBan
                 .Include(d => d.MaBanNavigation)
                     .ThenInclude(b => b.MaLoaiNavigation)
                 .Include(d => d.MaKhNavigation)
-                .Where(d => d.ThoiGianDat >= tuNgay && d.ThoiGianDat <= denNgay)
-                .OrderBy(d => d.ThoiGianDat)
+                // SỬA TẠI ĐÂY: Lọc những đơn có thời gian CHƠI trùng với khoảng thời gian đang xem
+                // Logic: (Giờ bắt đầu < Cuối ngày xem) VÀ (Giờ kết thúc > Đầu ngày xem)
+                .Where(d => d.ThoiGianBatDau < denNgay && d.ThoiGianKetThuc > tuNgay)
+                .OrderBy(d => d.ThoiGianBatDau) // Nên sắp xếp theo giờ chơi
                 .ToListAsync();
         }
 
