@@ -268,7 +268,14 @@ namespace Billiard.BLL.Services
             }
         }
         #endregion
+        public bool HasVietnameseSigns(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
 
+            // Pattern chứa các ký tự tiếng Việt có dấu phổ biến
+            string pattern = @"[áàảãạâấầẩẫậăắằẳẵặéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠÂẤẦẨẪẬĂẮẰẲẴẶÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ]";
+            return Regex.IsMatch(text, pattern);
+        }
         #region Customer Registration
         public async Task<(bool Success, string Message, KhachHang Customer)> RegisterCustomerAsync(
             string tenKh, string sdt, string email, string matKhau, DateOnly? ngaySinh = null)
@@ -304,6 +311,11 @@ namespace Billiard.BLL.Services
             if (emailExistsInNV || emailExistsInKH)
                 return (false, "Email này đã được đăng ký!", null);
 
+            if (HasVietnameseSigns(matKhau))
+                return (false, "Mật khẩu không được chứa ký tự có dấu!", null);
+
+            if (matKhau.Contains(" "))
+                return (false, "Mật khẩu không được chứa khoảng trắng!", null);
             var khachHang = new KhachHang
             {
                 TenKh = tenKh,

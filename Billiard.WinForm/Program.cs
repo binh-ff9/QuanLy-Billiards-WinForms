@@ -59,7 +59,8 @@ namespace Billiard.WinForm
             ConfigureServices(serviceCollection);
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
+
+            Application.Run(ServiceProvider.GetRequiredService<User>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
@@ -76,7 +77,11 @@ namespace Billiard.WinForm
                 return new BilliardDbContext(optionsBuilder.Options);
             });
 
-            // Services
+            // Đăng ký Factory cho DbContext
+            services.AddDbContextFactory<BilliardDbContext>(options =>
+                options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
+
+            // ✅ Services (Transient)
             services.AddTransient<AuthService>();
             services.AddTransient<EmailService>();
             services.AddTransient<DichVuService>();
@@ -116,7 +121,8 @@ namespace Billiard.WinForm
             services.AddTransient<ThongKeForm>();
             services.AddTransient<KhachHangForm>();
             services.AddTransient<ClientMainForm>();
-            services.AddTransient<DatBanDialog>();
+            services.AddTransient<User>(); // User
+            services.AddTransient<DatBanDialog>();   // Đăng ký luôn các Dialog con
             services.AddTransient<UserProfileForm>();
 
             // NhanVien Forms
