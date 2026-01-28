@@ -18,7 +18,6 @@ namespace Billiard.BLL.Services.QLBan
             _context = context;
             _gioHoatDongService = gioHoatDongService;
         }
-
         // Lấy tất cả bàn
         public async Task<List<BanBium>> GetAllTablesAsync()
         {

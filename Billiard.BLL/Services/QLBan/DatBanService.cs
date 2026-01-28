@@ -51,7 +51,7 @@ namespace Billiard.BLL.Services.QLBan
                     .ThenInclude(b => b!.MaLoaiNavigation)
                 .Where(d => d.MaBan == maBan &&
                     (d.TrangThai == "Đang chờ" || d.TrangThai == "Đã xác nhận" || d.TrangThai == "Đã đặt"))
-                .OrderBy(d => d.ThoiGianDat)
+                .OrderBy(d => d.ThoiGianBatDau)
                 .ToListAsync();
         }
 
@@ -620,17 +620,18 @@ namespace Billiard.BLL.Services.QLBan
             {
                 var now = DateTime.Now;
 
-                System.Diagnostics.Debug.WriteLine($"\n=== TÌM ĐƠN ĐẶT TIẾP THEO ===");
+                System.Diagnostics.Debug.WriteLine($"\n=== TÌM ĐƠN ĐẶT TIẾP THEO (ĐÃ SỬA) ===");
                 System.Diagnostics.Debug.WriteLine($"Bàn: {maBan}");
                 System.Diagnostics.Debug.WriteLine($"Thời gian hiện tại: {now:HH:mm:ss dd/MM/yyyy}");
 
+                // ✅ SỬA: Không lọc theo thời gian hiện tại, chỉ lấy đơn bắt đầu SỚM NHẤT
                 var nextReservation = await _context.DatBans
                     .Include(d => d.MaBanNavigation)
                     .Include(d => d.MaKhNavigation)
                     .Where(d => d.MaBan == maBan
                         && (d.TrangThai == "Đang chờ" || d.TrangThai == "Đã đặt")
-                        && d.ThoiGianBatDau.HasValue
-                        && d.ThoiGianBatDau.Value >= now)
+                        && d.ThoiGianBatDau.HasValue)
+                    // ✅ QUAN TRỌNG: Sắp xếp theo thời gian bắt đầu SỚM NHẤT
                     .OrderBy(d => d.ThoiGianBatDau)
                     .FirstOrDefaultAsync();
 
