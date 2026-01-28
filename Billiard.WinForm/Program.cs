@@ -59,7 +59,7 @@ namespace Billiard.WinForm
             ConfigureServices(serviceCollection);
             ServiceProvider = serviceCollection.BuildServiceProvider();
 
-            Application.Run(ServiceProvider.GetRequiredService<User>());
+            Application.Run(ServiceProvider.GetRequiredService<LoginForm>());
         }
 
         private static void ConfigureServices(IServiceCollection services)
