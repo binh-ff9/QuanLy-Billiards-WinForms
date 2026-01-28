@@ -34,7 +34,11 @@
             numDiem = new NumericUpDown();
             btnLuu = new Button();
             btnHuy = new Button();
+            picAvatar = new PictureBox();
+            btnChonAnh = new Button();
+            btnXoaAnh = new Button();
             ((System.ComponentModel.ISupportInitialize)numDiem).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)picAvatar).BeginInit();
             SuspendLayout();
             // 
             // txtTenKH
@@ -86,11 +90,40 @@
             btnHuy.UseVisualStyleBackColor = true;
             btnHuy.Click += btnHuy_Click;
             // 
+            // picAvatar
+            // 
+            picAvatar.Location = new Point(359, 48);
+            picAvatar.Name = "picAvatar";
+            picAvatar.Size = new Size(140, 78);
+            picAvatar.TabIndex = 7;
+            picAvatar.TabStop = false;
+            // 
+            // btnChonAnh
+            // 
+            btnChonAnh.Location = new Point(359, 148);
+            btnChonAnh.Name = "btnChonAnh";
+            btnChonAnh.Size = new Size(94, 29);
+            btnChonAnh.TabIndex = 8;
+            btnChonAnh.Text = "button1";
+            btnChonAnh.UseVisualStyleBackColor = true;
+            // 
+            // btnXoaAnh
+            // 
+            btnXoaAnh.Location = new Point(459, 148);
+            btnXoaAnh.Name = "btnXoaAnh";
+            btnXoaAnh.Size = new Size(94, 29);
+            btnXoaAnh.TabIndex = 9;
+            btnXoaAnh.Text = "button2";
+            btnXoaAnh.UseVisualStyleBackColor = true;
+            // 
             // KhachHangEditForm
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(800, 450);
+            Controls.Add(btnXoaAnh);
+            Controls.Add(btnChonAnh);
+            Controls.Add(picAvatar);
             Controls.Add(btnHuy);
             Controls.Add(btnLuu);
             Controls.Add(numDiem);
@@ -100,6 +133,7 @@
             Name = "KhachHangEditForm";
             Text = "KhachHangEditForm";
             ((System.ComponentModel.ISupportInitialize)numDiem).EndInit();
+            ((System.ComponentModel.ISupportInitialize)picAvatar).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -112,5 +146,8 @@
         private NumericUpDown numDiem;
         private Button btnLuu;
         private Button btnHuy;
+        private PictureBox picAvatar;
+        private Button btnChonAnh;
+        private Button btnXoaAnh;
     }
 }

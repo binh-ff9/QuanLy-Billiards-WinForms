@@ -43,5 +43,7 @@ public partial class NhanVien
 
     public virtual ICollection<PhieuNhap> PhieuNhaps { get; set; } = new List<PhieuNhap>();
 
-    public virtual ICollection<SoQuy> SoQuies { get; set; } = new List<SoQuy>();
+    public virtual ICollection<SoQuy> SoQuies { get; set; }
+        = new List<SoQuy>();
+    public virtual ICollection<LichLamViec> LichLamViecs { get; set; } = new List<LichLamViec>();
 }

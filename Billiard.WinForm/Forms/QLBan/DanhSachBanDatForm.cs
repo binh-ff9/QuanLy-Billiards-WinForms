@@ -16,7 +16,6 @@ namespace Billiard.WinForm.Forms.QLBan
         private readonly BanBiaService _banBiaService;
         private readonly MainForm _mainForm;
 
-        // Định nghĩa thời gian cảnh báo (ví dụ: 30 phút)
         private const int WarningMinutes = 30;
 
         public DanhSachBanDatForm(DatBanService datBanService, BanBiaService banBiaService, MainForm mainForm)
@@ -27,7 +26,6 @@ namespace Billiard.WinForm.Forms.QLBan
             InitializeComponent();
             this.Text = "Danh sách bàn đặt";
 
-            // Thêm sự kiện CellFormatting cho việc định dạng màu
             dgvDatBan.CellFormatting += dgvDatBan_CellFormatting;
         }
 
@@ -37,13 +35,19 @@ namespace Billiard.WinForm.Forms.QLBan
             await LoadAllActiveDatBanAsync();
         }
 
+        private void btnCalendarView_Click(object sender, EventArgs e)
+        {
+            LichDatBanForm lichForm = new LichDatBanForm(_datBanService, _banBiaService, _mainForm);
+            lichForm.ShowDialog();
+            _ = LoadAllActiveDatBanAsync();
+        }
+
         private async Task LoadAllActiveDatBanAsync()
         {
             try
             {
                 this.Cursor = Cursors.WaitCursor;
 
-                // Lấy tất cả đặt bàn đang chờ và đã đặt, sắp xếp theo ThoiGianBatDau
                 var datBans = await _datBanService.GetAllActiveAsync();
                 var activeDatBans = datBans.OrderBy(d => d.ThoiGianBatDau).ToList();
 
@@ -82,39 +86,52 @@ namespace Billiard.WinForm.Forms.QLBan
             {
                 var row = dgvDatBan.Rows[e.RowIndex];
                 var thoiGianBatDauCell = row.Cells["ThoiGianBatDau"].Value;
+                var thoiGianKetThucCell = row.Cells["ThoiGianKetThuc"].Value;
                 var trangThaiCell = row.Cells["TrangThai"].Value;
 
-                if (thoiGianBatDauCell != null && thoiGianBatDauCell is DateTime thoiGianBatDau)
+                if (thoiGianBatDauCell != null && thoiGianBatDauCell is DateTime thoiGianBatDau &&
+                    thoiGianKetThucCell != null && thoiGianKetThucCell is DateTime thoiGianKetThuc)
                 {
+                    // Kiểm tra nếu đặt bàn đã qua (quá khứ)
+                    if (thoiGianKetThuc < DateTime.Now)
+                    {
+                        // Màu xám cho quá khứ
+                        row.DefaultCellStyle.BackColor = Color.FromArgb(229, 231, 235);
+                        row.DefaultCellStyle.ForeColor = Color.FromArgb(107, 114, 128);
+                        row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(209, 213, 219);
+                        row.DefaultCellStyle.SelectionForeColor = Color.FromArgb(75, 85, 99);
+                        return;
+                    }
+
+                    // Đặt bàn hiện tại hoặc tương lai
                     var timeUntilStart = thoiGianBatDau - DateTime.Now;
 
-                    // Chỉ tô màu cho các đơn "Đang chờ"
                     if (trangThaiCell != null && trangThaiCell.ToString() == "Đang chờ")
                     {
                         if (timeUntilStart.TotalMinutes <= WarningMinutes && timeUntilStart.TotalMinutes > 0)
                         {
-                            // Sắp đến giờ: Tô màu cảnh báo (vàng nhạt)
-                            row.DefaultCellStyle.BackColor = Color.LightYellow;
-                            row.DefaultCellStyle.SelectionBackColor = Color.Yellow;
+                            // Sắp đến giờ: Tô màu vàng
+                            row.DefaultCellStyle.BackColor = Color.FromArgb(254, 249, 195);
+                            row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(253, 224, 71);
                         }
                         else if (timeUntilStart.TotalMinutes <= 0)
                         {
-                            // Quá giờ đặt: Tô màu khẩn cấp (hồng nhạt)
-                            row.DefaultCellStyle.BackColor = Color.LightPink;
-                            row.DefaultCellStyle.SelectionBackColor = Color.Pink;
+                            // Quá giờ đặt: Tô màu hồng
+                            row.DefaultCellStyle.BackColor = Color.FromArgb(254, 202, 202);
+                            row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(252, 165, 165);
                         }
                         else
                         {
-                            // Trở về màu mặc định
+                            // Bình thường: Màu trắng
                             row.DefaultCellStyle.BackColor = dgvDatBan.DefaultCellStyle.BackColor;
                             row.DefaultCellStyle.SelectionBackColor = dgvDatBan.DefaultCellStyle.SelectionBackColor;
                         }
                     }
                     else if (trangThaiCell != null && trangThaiCell.ToString() == "Đã đặt")
                     {
-                        // Tô màu xanh nhạt cho các đơn đã xác nhận
-                        row.DefaultCellStyle.BackColor = Color.LightGreen;
-                        row.DefaultCellStyle.SelectionBackColor = Color.Green;
+                        // Đã xác nhận: Tô màu xanh lá
+                        row.DefaultCellStyle.BackColor = Color.FromArgb(187, 247, 208);
+                        row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(134, 239, 172);
                     }
                 }
             }
@@ -127,8 +144,22 @@ namespace Billiard.WinForm.Forms.QLBan
             var maDat = (int)dgvDatBan.Rows[e.RowIndex].Cells["MaDat"].Value;
             var tenBan = dgvDatBan.Rows[e.RowIndex].Cells["TenBan"].Value?.ToString() ?? "N/A";
             var trangThai = dgvDatBan.Rows[e.RowIndex].Cells["TrangThai"].Value?.ToString() ?? "";
+            var thoiGianKetThuc = (DateTime)dgvDatBan.Rows[e.RowIndex].Cells["ThoiGianKetThuc"].Value;
 
-            // Xử lý nút "Xác nhận" (Actions) - CHỈ cho trạng thái "Đang chờ"
+            // Kiểm tra nếu là đặt bàn quá khứ
+            bool isPast = thoiGianKetThuc < DateTime.Now;
+
+            if (isPast)
+            {
+                MessageBox.Show(
+                    "Không thể thao tác với đặt bàn đã kết thúc (quá khứ).",
+                    "Thông báo",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            // Xử lý nút "Xác nhận" (Actions)
             if (dgvDatBan.Columns[e.ColumnIndex].Name == "Actions")
             {
                 if (trangThai == "Đang chờ")
@@ -145,7 +176,6 @@ namespace Billiard.WinForm.Forms.QLBan
 
                         if (success)
                         {
-                            // Cập nhật trạng thái bàn thành "Đã đặt"
                             var datBan = await _datBanService.GetByIdAsync(maDat);
                             if (datBan != null)
                             {
@@ -180,7 +210,6 @@ namespace Billiard.WinForm.Forms.QLBan
                 }
                 else if (trangThai == "Đã đặt")
                 {
-                    // Nút này sẽ BẮT ĐẦU CHƠI cho các đơn đã xác nhận
                     var result = MessageBox.Show(
                         $"Bắt đầu chơi bàn {tenBan}?",
                         "Bắt đầu chơi",

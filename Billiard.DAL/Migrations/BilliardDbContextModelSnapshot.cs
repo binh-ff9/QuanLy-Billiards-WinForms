@@ -613,6 +613,10 @@ namespace Billiard.DAL.Migrations
                         .HasColumnType("datetime")
                         .HasColumnName("thoi_gian_ket_thuc");
 
+                    b.Property<DateTime?>("ThoiGianThanhToan")
+                        .HasColumnType("datetime")
+                        .HasColumnName("thoi_gian_thanh_toan");
+
                     b.Property<int?>("ThoiLuongPhut")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("int")
@@ -769,6 +773,87 @@ namespace Billiard.DAL.Migrations
                         .IsUnique();
 
                     b.ToTable("khu_vuc", (string)null);
+                });
+
+            modelBuilder.Entity("Billiard.DAL.Entities.LichLamViec", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasColumnName("id");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Ca")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Sang")
+                        .HasColumnName("ca");
+
+                    b.Property<string>("GhiChu")
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("ghi_chu");
+
+                    b.Property<TimeOnly>("GioBatDau")
+                        .HasColumnType("time")
+                        .HasColumnName("gio_bat_dau");
+
+                    b.Property<TimeOnly>("GioKetThuc")
+                        .HasColumnType("time")
+                        .HasColumnName("gio_ket_thuc");
+
+                    b.Property<int>("MaNv")
+                        .HasColumnType("int")
+                        .HasColumnName("ma_nv");
+
+                    b.Property<DateOnly>("Ngay")
+                        .HasColumnType("date")
+                        .HasColumnName("ngay");
+
+                    b.Property<DateTime?>("NgayCapNhat")
+                        .HasColumnType("datetime")
+                        .HasColumnName("ngay_cap_nhat");
+
+                    b.Property<DateTime?>("NgayTao")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime")
+                        .HasColumnName("ngay_tao")
+                        .HasDefaultValueSql("(getdate())");
+
+                    b.Property<int?>("NguoiCapNhat")
+                        .HasColumnType("int")
+                        .HasColumnName("nguoi_cap_nhat");
+
+                    b.Property<int?>("NguoiTao")
+                        .HasColumnType("int")
+                        .HasColumnName("nguoi_tao");
+
+                    b.Property<string>("TrangThai")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("DaXepLich")
+                        .HasColumnName("trang_thai");
+
+                    b.HasKey("Id")
+                        .HasName("PK_lich_lam_viec");
+
+                    b.HasIndex("NguoiCapNhat");
+
+                    b.HasIndex("NguoiTao");
+
+                    b.HasIndex(new[] { "MaNv" }, "idx_lich_lam_viec_ma_nv");
+
+                    b.HasIndex(new[] { "Ngay" }, "idx_lich_lam_viec_ngay");
+
+                    b.HasIndex(new[] { "MaNv", "Ngay", "GioBatDau", "GioKetThuc" }, "idx_lich_lam_viec_unique")
+                        .IsUnique();
+
+                    b.ToTable("lich_lam_viec", (string)null);
                 });
 
             modelBuilder.Entity("Billiard.DAL.Entities.LichSuHoatDong", b =>
@@ -1675,6 +1760,32 @@ namespace Billiard.DAL.Migrations
                     b.Navigation("MaNvNavigation");
                 });
 
+            modelBuilder.Entity("Billiard.DAL.Entities.LichLamViec", b =>
+                {
+                    b.HasOne("Billiard.DAL.Entities.NhanVien", "NhanVien")
+                        .WithMany("LichLamViecs")
+                        .HasForeignKey("MaNv")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_lich_lam_viec_nhan_vien");
+
+                    b.HasOne("Billiard.DAL.Entities.NhanVien", "NguoiCapNhatNavigation")
+                        .WithMany()
+                        .HasForeignKey("NguoiCapNhat")
+                        .HasConstraintName("FK_lich_lam_viec_nguoi_cap_nhat");
+
+                    b.HasOne("Billiard.DAL.Entities.NhanVien", "NguoiTaoNavigation")
+                        .WithMany()
+                        .HasForeignKey("NguoiTao")
+                        .HasConstraintName("FK_lich_lam_viec_nguoi_tao");
+
+                    b.Navigation("NguoiCapNhatNavigation");
+
+                    b.Navigation("NguoiTaoNavigation");
+
+                    b.Navigation("NhanVien");
+                });
+
             modelBuilder.Entity("Billiard.DAL.Entities.LichSuHoatDong", b =>
                 {
                     b.HasOne("Billiard.DAL.Entities.NhanVien", "MaNvNavigation")
@@ -1832,6 +1943,8 @@ namespace Billiard.DAL.Migrations
                     b.Navigation("ChamCongs");
 
                     b.Navigation("HoaDons");
+
+                    b.Navigation("LichLamViecs");
 
                     b.Navigation("LichSuHoatDongs");
 

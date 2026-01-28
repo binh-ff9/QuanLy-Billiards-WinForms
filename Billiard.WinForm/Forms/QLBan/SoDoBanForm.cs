@@ -17,6 +17,9 @@ namespace Billiard.WinForm.Forms.QLBan
         private List<BanBium> _allTables;
         private Dictionary<int, TableControl> _tableControls = new Dictionary<int, TableControl>();
 
+        // Event để thông báo khi chọn bàn
+        public event EventHandler<BanBium> OnTableSelected;
+
         // Kích thước canvas cho mỗi tầng (đơn vị: pixel)
         private readonly Dictionary<string, Size> _floorDimensions = new Dictionary<string, Size>
         {
@@ -183,23 +186,37 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private void DrawGrid(Panel canvas, Size canvasSize)
         {
-            var graphics = canvas.CreateGraphics();
-            var pen = new Pen(Color.FromArgb(30, 0, 0, 0), 1);
-
-            // Vẽ lưới dọc (mỗi 50px)
-            for (int x = 0; x <= canvasSize.Width; x += 50)
+            // Tạo bitmap để vẽ lưới một lần
+            if (canvas.BackgroundImage != null)
             {
-                graphics.DrawLine(pen, x, 0, x, canvasSize.Height);
+                canvas.BackgroundImage.Dispose();
             }
 
-            // Vẽ lưới ngang (mỗi 50px)
-            for (int y = 0; y <= canvasSize.Height; y += 50)
+            Bitmap gridBitmap = new Bitmap(canvasSize.Width, canvasSize.Height);
+            using (Graphics graphics = Graphics.FromImage(gridBitmap))
             {
-                graphics.DrawLine(pen, 0, y, canvasSize.Width, y);
+                // Tô nền trắng
+                graphics.Clear(Color.White);
+
+                using (Pen pen = new Pen(Color.FromArgb(30, 226, 232, 240), 1))
+                {
+                    // Vẽ lưới dọc (mỗi 50px)
+                    for (int x = 0; x <= canvasSize.Width; x += 50)
+                    {
+                        graphics.DrawLine(pen, x, 0, x, canvasSize.Height);
+                    }
+
+                    // Vẽ lưới ngang (mỗi 50px)
+                    for (int y = 0; y <= canvasSize.Height; y += 50)
+                    {
+                        graphics.DrawLine(pen, 0, y, canvasSize.Width, y);
+                    }
+                }
             }
 
-            pen.Dispose();
-            graphics.Dispose();
+            // Đặt bitmap làm background image
+            canvas.BackgroundImage = gridBitmap;
+            canvas.BackgroundImageLayout = ImageLayout.None;
         }
 
         private TableControl CreateTableControl(BanBium table)
@@ -245,29 +262,20 @@ namespace Billiard.WinForm.Forms.QLBan
             var tableControl = sender as TableControl;
             if (tableControl == null) return;
 
-            // Đóng form hiện tại và mở detail ở MainForm
-            this.Close();
+            // Trigger event để QLBanForm xử lý
+            OnTableSelected?.Invoke(this, tableControl.Table);
 
-            if (_mainForm != null)
-            {
-                // Delay một chút để form đóng mượt
-                var timer = new System.Windows.Forms.Timer { Interval = 100 };
-                timer.Tick += (s, args) =>
-                {
-                    timer.Stop();
-                    // Gọi hàm show detail từ QLBanForm nếu có
-                    var qlBanForm = _mainForm.Controls.Find("QLBanForm", true).FirstOrDefault();
-                    // Hoặc có thể trigger event để QLBanForm bắt
-                };
-                timer.Start();
-            }
+            // Đóng form sơ đồ
+            this.DialogResult = DialogResult.OK;
+            this.Close();
         }
 
-        #region Drag and Drop Logic - FIXED
+        #region Drag and Drop Logic - WITH COLLISION DETECTION
 
         private bool _isDragging = false;
         private Point _dragStartPoint;
         private TableControl _draggedControl;
+        private Point _lastValidPosition; // Lưu vị trí hợp lệ cuối cùng
 
         private void TableControl_MouseDown(object sender, MouseEventArgs e)
         {
@@ -291,6 +299,9 @@ namespace Billiard.WinForm.Forms.QLBan
                     // Nếu click vào control con, chuyển đổi tọa độ
                     _dragStartPoint = _draggedControl.PointToClient(control.PointToScreen(e.Location));
                 }
+
+                // Lưu vị trí hợp lệ hiện tại
+                _lastValidPosition = _draggedControl.Location;
 
                 _draggedControl.Cursor = Cursors.SizeAll;
                 _draggedControl.BringToFront();
@@ -329,18 +340,87 @@ namespace Billiard.WinForm.Forms.QLBan
             newX = (newX / 10) * 10;
             newY = (newY / 10) * 10;
 
-            _draggedControl.Location = new Point(newX, newY);
+            // Kiểm tra va chạm với các bàn khác
+            Rectangle proposedBounds = new Rectangle(newX, newY, _draggedControl.Width, _draggedControl.Height);
+
+            if (!HasCollision(proposedBounds, _draggedControl))
+            {
+                // Không có va chạm - cho phép di chuyển
+                _draggedControl.Location = new Point(newX, newY);
+                _lastValidPosition = _draggedControl.Location;
+
+                // Đổi cursor để báo hiệu OK
+                _draggedControl.Cursor = Cursors.SizeAll;
+            }
+            else
+            {
+                // Có va chạm - đổi cursor để báo hiệu không thể di chuyển
+                _draggedControl.Cursor = Cursors.No;
+                // Không di chuyển, giữ nguyên vị trí cũ
+            }
         }
 
         private void TableControl_MouseUp(object sender, MouseEventArgs e)
         {
             if (_draggedControl != null)
             {
+                // Nếu vị trí cuối cùng bị va chạm, đưa về vị trí hợp lệ cuối cùng
+                Rectangle finalBounds = new Rectangle(
+                    _draggedControl.Left,
+                    _draggedControl.Top,
+                    _draggedControl.Width,
+                    _draggedControl.Height
+                );
+
+                if (HasCollision(finalBounds, _draggedControl))
+                {
+                    _draggedControl.Location = _lastValidPosition;
+                }
+
                 _draggedControl.Cursor = Cursors.Hand;
             }
 
             _isDragging = false;
             _draggedControl = null;
+        }
+
+        #endregion
+
+        #region Collision Detection
+        private bool HasCollision(Rectangle proposedBounds, TableControl currentControl)
+        {
+            // Thêm buffer 5px để tránh bàn sát nhau quá
+            const int BUFFER = 5;
+            Rectangle bufferedBounds = new Rectangle(
+                proposedBounds.X - BUFFER,
+                proposedBounds.Y - BUFFER,
+                proposedBounds.Width + (BUFFER * 2),
+                proposedBounds.Height + (BUFFER * 2)
+            );
+
+            foreach (var kvp in _tableControls)
+            {
+                var otherControl = kvp.Value;
+
+                // Bỏ qua bàn đang kéo
+                if (otherControl == currentControl)
+                    continue;
+
+                Rectangle otherBounds = new Rectangle(
+                    otherControl.Left,
+                    otherControl.Top,
+                    otherControl.Width,
+                    otherControl.Height
+                );
+
+                // Kiểm tra va chạm
+                if (bufferedBounds.IntersectsWith(otherBounds))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         #endregion
@@ -486,9 +566,7 @@ namespace Billiard.WinForm.Forms.QLBan
         public BanBium Table { get; private set; }
         public event EventHandler TableClicked;
 
-        private Label _lblIcon;
         private Label _lblName;
-        private Label _lblVIP;
         private bool _isEditMode;
 
         public TableControl(BanBium table, bool isEditMode)
@@ -501,102 +579,83 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private void InitializeControl()
         {
-            // Panel settings
-            this.Size = new Size(100, 100);
-            this.BorderStyle = BorderStyle.FixedSingle;
-            this.Cursor = _isEditMode ? Cursors.Hand : Cursors.Default;
-
-            // Màu nền dựa trên trạng thái
+            // ============================================================
+            // Panel chính - Simple box design
+            // ============================================================
+            this.Size = new Size(100, 60);
             this.BackColor = GetBackgroundColor();
+            this.Cursor = _isEditMode ? Cursors.SizeAll : Cursors.Hand;
 
-            // Icon bàn
-            _lblIcon = new Label
-            {
-                Text = "🎱",
-                Font = new Font("Segoe UI", 28F),
-                AutoSize = false,
-                Size = new Size(100, 50),
-                Location = new Point(0, 10),
-                TextAlign = ContentAlignment.MiddleCenter,
-                BackColor = Color.Transparent
-            };
-
-            // Tên bàn
-            _lblName = new Label
-            {
-                Text = Table.TenBan,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                AutoSize = false,
-                Size = new Size(100, 25),
-                Location = new Point(0, 60),
-                TextAlign = ContentAlignment.MiddleCenter,
-                ForeColor = Color.FromArgb(30, 41, 59),
-                BackColor = Color.Transparent
-            };
-
-            // VIP badge
-            if (Table.MaKhuVucNavigation?.TenKhuVuc == "VIP")
-            {
-                _lblVIP = new Label
-                {
-                    Text = "⭐",
-                    Font = new Font("Segoe UI", 12F),
-                    AutoSize = false,
-                    Size = new Size(25, 25),
-                    Location = new Point(70, 5),
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    BackColor = Color.Transparent
-                };
-                this.Controls.Add(_lblVIP);
-            }
-
-            // Status indicator (viền màu)
+            // Border theo trạng thái
             this.Paint += (s, e) =>
             {
+                var g = e.Graphics;
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+                // Border màu theo trạng thái, đậm hơn
                 var borderColor = GetBorderColor();
                 using (var pen = new Pen(borderColor, 3))
                 {
-                    e.Graphics.DrawRectangle(pen, 1, 1, this.Width - 3, this.Height - 3);
+                    g.DrawRectangle(pen, 1, 1, this.Width - 3, this.Height - 3);
                 }
             };
 
-            this.Controls.Add(_lblIcon);
+            // ============================================================
+            // Tên bàn - Centered trong box
+            // ============================================================
+            _lblName = new Label
+            {
+                Text = Table.TenBan,
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                AutoSize = false,
+                Size = new Size(100, 60),
+                Location = new Point(0, 0),
+                TextAlign = ContentAlignment.MiddleCenter,
+                ForeColor = GetTextColor(),
+                BackColor = Color.Transparent
+            };
+
             this.Controls.Add(_lblName);
 
-            // Click event (chỉ khi KHÔNG ở chế độ edit)
+            // ============================================================
+            // Click events (chỉ khi KHÔNG ở chế độ edit)
+            // ============================================================
             if (!_isEditMode)
             {
                 this.Click += (s, e) => TableClicked?.Invoke(this, e);
-                _lblIcon.Click += (s, e) => TableClicked?.Invoke(this, e);
                 _lblName.Click += (s, e) => TableClicked?.Invoke(this, e);
 
                 // Hover effect
-                this.MouseEnter += (s, e) =>
-                {
-                    this.BorderStyle = BorderStyle.Fixed3D;
-                    var currentColor = this.BackColor;
-                    this.BackColor = Color.FromArgb(
-                        Math.Max(0, currentColor.R - 10),
-                        Math.Max(0, currentColor.G - 10),
-                        Math.Max(0, currentColor.B - 10)
-                    );
-                };
-
-                this.MouseLeave += (s, e) =>
-                {
-                    this.BorderStyle = BorderStyle.FixedSingle;
-                    this.BackColor = GetBackgroundColor();
-                };
+                this.MouseEnter += OnMouseEnterCard;
+                this.MouseLeave += OnMouseLeaveCard;
+                _lblName.MouseEnter += OnMouseEnterCard;
+                _lblName.MouseLeave += OnMouseLeaveCard;
             }
+        }
+
+        private void OnMouseEnterCard(object sender, EventArgs e)
+        {
+            // Làm tối màu nền khi hover
+            var currentColor = this.BackColor;
+            this.BackColor = Color.FromArgb(
+                Math.Max(0, currentColor.R - 20),
+                Math.Max(0, currentColor.G - 20),
+                Math.Max(0, currentColor.B - 20)
+            );
+        }
+
+        private void OnMouseLeaveCard(object sender, EventArgs e)
+        {
+            this.BackColor = GetBackgroundColor();
         }
 
         private Color GetBackgroundColor()
         {
             return Table.TrangThai switch
             {
-                "Trống" => Color.FromArgb(240, 253, 244),
-                "Đang chơi" => Color.FromArgb(254, 242, 242),
-                "Đã đặt" => Color.FromArgb(255, 251, 235),
+                "Trống" => Color.FromArgb(220, 252, 231),      // Light green
+                "Đang chơi" => Color.FromArgb(254, 226, 226),  // Light red
+                "Đã đặt" => Color.FromArgb(254, 249, 195),     // Light yellow
                 _ => Color.White
             };
         }
@@ -605,10 +664,21 @@ namespace Billiard.WinForm.Forms.QLBan
         {
             return Table.TrangThai switch
             {
-                "Trống" => Color.FromArgb(34, 197, 94),
-                "Đang chơi" => Color.FromArgb(239, 68, 68),
-                "Đã đặt" => Color.FromArgb(234, 179, 8),
+                "Trống" => Color.FromArgb(34, 197, 94),        // Green
+                "Đang chơi" => Color.FromArgb(239, 68, 68),    // Red
+                "Đã đặt" => Color.FromArgb(234, 179, 8),       // Yellow
                 _ => Color.Gray
+            };
+        }
+
+        private Color GetTextColor()
+        {
+            return Table.TrangThai switch
+            {
+                "Trống" => Color.FromArgb(22, 101, 52),        // Dark green
+                "Đang chơi" => Color.FromArgb(153, 27, 27),    // Dark red
+                "Đã đặt" => Color.FromArgb(146, 64, 14),       // Dark yellow
+                _ => Color.FromArgb(30, 41, 59)
             };
         }
     }

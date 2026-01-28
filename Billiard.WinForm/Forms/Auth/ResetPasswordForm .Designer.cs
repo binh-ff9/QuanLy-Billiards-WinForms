@@ -23,14 +23,18 @@
             lblDecoTitle = new Label();
             pnlRight = new Panel();
             pnlMain = new Panel();
+            lblBackToLogin = new Label();
             lblResendOTP = new Label();
             lblCountdown = new Label();
             btnCancel = new Button();
             btnResetPassword = new Button();
-            chkShowPassword = new CheckBox();
+            pnlConfirmPassword = new Panel();
             txtConfirmPassword = new TextBox();
+            btnToggleConfirm = new Button();
             lblConfirmPassword = new Label();
+            pnlNewPassword = new Panel();
             txtNewPassword = new TextBox();
+            btnTogglePassword = new Button();
             lblNewPassword = new Label();
             pnlOTPInput = new Panel();
             txtOTP = new TextBox();
@@ -43,6 +47,8 @@
             pnlDecoration.SuspendLayout();
             pnlRight.SuspendLayout();
             pnlMain.SuspendLayout();
+            pnlConfirmPassword.SuspendLayout();
+            pnlNewPassword.SuspendLayout();
             pnlOTPInput.SuspendLayout();
             SuspendLayout();
             // 
@@ -76,7 +82,7 @@
             lblDecoSubtitle.Padding = new Padding(30);
             lblDecoSubtitle.Size = new Size(340, 260);
             lblDecoSubtitle.TabIndex = 1;
-            lblDecoSubtitle.Text = "🔒 Bảo mật mật khẩu:\r\n\r\n✅ Tối thiểu 6 ký tự\r\n✅ Kết hợp chữ và số\r\n✅ Không dùng thông tin cá nhân\r\n✅ Không chia sẻ với người khác\r\n✅ Thay đổi định kỳ\r\n\r\n💡 Mật khẩu mạnh = Tài khoản an toàn!";
+            lblDecoSubtitle.Text = "🔒 Bảo mật mật khẩu:\r\n\r\n✅ Tối thiểu 8 ký tự\r\n✅ Có ít nhất 1 chữ cái\r\n✅ Có ít nhất 1 chữ số\r\n✅ Có ít nhất 1 ký tự đặc biệt\r\n✅ Không dùng thông tin cá nhân\r\n✅ Không chia sẻ với người khác\r\n\r\n💡 Mật khẩu mạnh = Tài khoản an toàn!";
             // 
             // lblDecoTitle
             // 
@@ -105,14 +111,14 @@
             // 
             // pnlMain
             // 
+            pnlMain.Controls.Add(lblBackToLogin);
             pnlMain.Controls.Add(lblResendOTP);
             pnlMain.Controls.Add(lblCountdown);
             pnlMain.Controls.Add(btnCancel);
             pnlMain.Controls.Add(btnResetPassword);
-            pnlMain.Controls.Add(chkShowPassword);
-            pnlMain.Controls.Add(txtConfirmPassword);
+            pnlMain.Controls.Add(pnlConfirmPassword);
             pnlMain.Controls.Add(lblConfirmPassword);
-            pnlMain.Controls.Add(txtNewPassword);
+            pnlMain.Controls.Add(pnlNewPassword);
             pnlMain.Controls.Add(lblNewPassword);
             pnlMain.Controls.Add(pnlOTPInput);
             pnlMain.Controls.Add(lblOTP);
@@ -121,20 +127,35 @@
             pnlMain.Controls.Add(lblTitle);
             pnlMain.Location = new Point(22, 22);
             pnlMain.Name = "pnlMain";
-            pnlMain.Size = new Size(400, 573);
+            pnlMain.Size = new Size(400, 586);
             pnlMain.TabIndex = 0;
             pnlMain.Paint += PnlMain_Paint;
+            // 
+            // lblBackToLogin
+            // 
+            lblBackToLogin.Cursor = Cursors.Hand;
+            lblBackToLogin.Font = new Font("Segoe UI", 9.5F, FontStyle.Underline);
+            lblBackToLogin.ForeColor = Color.FromArgb(99, 102, 241);
+            lblBackToLogin.Location = new Point(50, 522);
+            lblBackToLogin.Name = "lblBackToLogin";
+            lblBackToLogin.Size = new Size(300, 25);
+            lblBackToLogin.TabIndex = 7;
+            lblBackToLogin.Text = "← Quay lại trang đăng nhập";
+            lblBackToLogin.TextAlign = ContentAlignment.MiddleCenter;
+            lblBackToLogin.Click += LblBackToLogin_Click;
+            lblBackToLogin.MouseEnter += LblBackToLogin_MouseEnter;
+            lblBackToLogin.MouseLeave += LblBackToLogin_MouseLeave;
             // 
             // lblResendOTP
             // 
             lblResendOTP.Cursor = Cursors.Hand;
             lblResendOTP.Font = new Font("Segoe UI", 9F, FontStyle.Underline);
             lblResendOTP.ForeColor = Color.FromArgb(16, 185, 129);
-            lblResendOTP.Location = new Point(250, 543);
+            lblResendOTP.Location = new Point(256, 494);
             lblResendOTP.Name = "lblResendOTP";
             lblResendOTP.Size = new Size(100, 25);
             lblResendOTP.TabIndex = 6;
-            lblResendOTP.Text = "🔄 Gửi lại OTP";
+            lblResendOTP.Text = "Gửi lại OTP";
             lblResendOTP.TextAlign = ContentAlignment.MiddleRight;
             lblResendOTP.Click += LblResendOTP_Click;
             lblResendOTP.MouseEnter += LblResendOTP_MouseEnter;
@@ -144,11 +165,11 @@
             // 
             lblCountdown.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             lblCountdown.ForeColor = Color.FromArgb(100, 116, 139);
-            lblCountdown.Location = new Point(50, 543);
+            lblCountdown.Location = new Point(47, 494);
             lblCountdown.Name = "lblCountdown";
-            lblCountdown.Size = new Size(200, 25);
+            lblCountdown.Size = new Size(230, 25);
             lblCountdown.TabIndex = 11;
-            lblCountdown.Text = "⏱️ Thời gian còn lại: 05:00";
+            lblCountdown.Text = "Thời gian còn lại: 05:00";
             lblCountdown.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // btnCancel
@@ -159,7 +180,7 @@
             btnCancel.FlatStyle = FlatStyle.Flat;
             btnCancel.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             btnCancel.ForeColor = Color.White;
-            btnCancel.Location = new Point(50, 490);
+            btnCancel.Location = new Point(50, 444);
             btnCancel.Name = "btnCancel";
             btnCancel.Size = new Size(300, 45);
             btnCancel.TabIndex = 5;
@@ -175,7 +196,7 @@
             btnResetPassword.FlatStyle = FlatStyle.Flat;
             btnResetPassword.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             btnResetPassword.ForeColor = Color.White;
-            btnResetPassword.Location = new Point(50, 425);
+            btnResetPassword.Location = new Point(50, 387);
             btnResetPassword.Name = "btnResetPassword";
             btnResetPassword.Size = new Size(300, 50);
             btnResetPassword.TabIndex = 4;
@@ -183,85 +204,130 @@
             btnResetPassword.UseVisualStyleBackColor = false;
             btnResetPassword.Click += BtnResetPassword_Click;
             // 
-            // chkShowPassword
+            // pnlConfirmPassword
             // 
-            chkShowPassword.AutoSize = true;
-            chkShowPassword.Font = new Font("Segoe UI", 9F);
-            chkShowPassword.ForeColor = Color.FromArgb(100, 116, 139);
-            chkShowPassword.Location = new Point(50, 390);
-            chkShowPassword.Name = "chkShowPassword";
-            chkShowPassword.Size = new Size(183, 29);
-            chkShowPassword.TabIndex = 3;
-            chkShowPassword.Text = "👁️ Hiện mật khẩu";
-            chkShowPassword.UseVisualStyleBackColor = true;
-            chkShowPassword.CheckedChanged += ChkShowPassword_CheckedChanged;
+            pnlConfirmPassword.BackColor = Color.White;
+            pnlConfirmPassword.BorderStyle = BorderStyle.FixedSingle;
+            pnlConfirmPassword.Controls.Add(txtConfirmPassword);
+            pnlConfirmPassword.Controls.Add(btnToggleConfirm);
+            pnlConfirmPassword.Location = new Point(50, 309);
+            pnlConfirmPassword.Name = "pnlConfirmPassword";
+            pnlConfirmPassword.Size = new Size(300, 42);
+            pnlConfirmPassword.TabIndex = 3;
             // 
             // txtConfirmPassword
             // 
-            txtConfirmPassword.BorderStyle = BorderStyle.FixedSingle;
+            txtConfirmPassword.BorderStyle = BorderStyle.None;
             txtConfirmPassword.Font = new Font("Segoe UI", 11F);
-            txtConfirmPassword.Location = new Point(50, 345);
+            txtConfirmPassword.Location = new Point(8, 8);
             txtConfirmPassword.Name = "txtConfirmPassword";
             txtConfirmPassword.PlaceholderText = "Nhập lại mật khẩu mới";
-            txtConfirmPassword.Size = new Size(300, 37);
-            txtConfirmPassword.TabIndex = 2;
+            txtConfirmPassword.Size = new Size(245, 30);
+            txtConfirmPassword.TabIndex = 0;
             txtConfirmPassword.UseSystemPasswordChar = true;
             txtConfirmPassword.KeyPress += TxtConfirmPassword_KeyPress;
+            // 
+            // btnToggleConfirm
+            // 
+            btnToggleConfirm.BackColor = Color.Transparent;
+            btnToggleConfirm.Cursor = Cursors.Hand;
+            btnToggleConfirm.FlatAppearance.BorderSize = 0;
+            btnToggleConfirm.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 240, 240);
+            btnToggleConfirm.FlatStyle = FlatStyle.Flat;
+            btnToggleConfirm.Font = new Font("Segoe UI", 11F);
+            btnToggleConfirm.ForeColor = Color.Gray;
+            btnToggleConfirm.Location = new Point(255, 2);
+            btnToggleConfirm.Name = "btnToggleConfirm";
+            btnToggleConfirm.Size = new Size(40, 36);
+            btnToggleConfirm.TabIndex = 1;
+            btnToggleConfirm.TabStop = false;
+            btnToggleConfirm.Text = "👁";
+            btnToggleConfirm.UseVisualStyleBackColor = false;
+            btnToggleConfirm.Click += BtnToggleConfirm_Click;
             // 
             // lblConfirmPassword
             // 
             lblConfirmPassword.AutoSize = true;
             lblConfirmPassword.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             lblConfirmPassword.ForeColor = Color.FromArgb(51, 65, 85);
-            lblConfirmPassword.Location = new Point(50, 315);
+            lblConfirmPassword.Location = new Point(50, 279);
             lblConfirmPassword.Name = "lblConfirmPassword";
-            lblConfirmPassword.Size = new Size(243, 28);
+            lblConfirmPassword.Size = new Size(209, 28);
             lblConfirmPassword.TabIndex = 7;
-            lblConfirmPassword.Text = "🔐 Xác nhận mật khẩu *";
+            lblConfirmPassword.Text = "Xác nhận mật khẩu *";
+            // 
+            // pnlNewPassword
+            // 
+            pnlNewPassword.BackColor = Color.White;
+            pnlNewPassword.BorderStyle = BorderStyle.FixedSingle;
+            pnlNewPassword.Controls.Add(txtNewPassword);
+            pnlNewPassword.Controls.Add(btnTogglePassword);
+            pnlNewPassword.Location = new Point(50, 221);
+            pnlNewPassword.Name = "pnlNewPassword";
+            pnlNewPassword.Size = new Size(300, 42);
+            pnlNewPassword.TabIndex = 2;
             // 
             // txtNewPassword
             // 
-            txtNewPassword.BorderStyle = BorderStyle.FixedSingle;
+            txtNewPassword.BorderStyle = BorderStyle.None;
             txtNewPassword.Font = new Font("Segoe UI", 11F);
-            txtNewPassword.Location = new Point(50, 270);
+            txtNewPassword.Location = new Point(8, 8);
             txtNewPassword.Name = "txtNewPassword";
             txtNewPassword.PlaceholderText = "Nhập mật khẩu mới";
-            txtNewPassword.Size = new Size(300, 37);
-            txtNewPassword.TabIndex = 1;
+            txtNewPassword.Size = new Size(245, 30);
+            txtNewPassword.TabIndex = 0;
             txtNewPassword.UseSystemPasswordChar = true;
+            // 
+            // btnTogglePassword
+            // 
+            btnTogglePassword.BackColor = Color.Transparent;
+            btnTogglePassword.Cursor = Cursors.Hand;
+            btnTogglePassword.FlatAppearance.BorderSize = 0;
+            btnTogglePassword.FlatAppearance.MouseOverBackColor = Color.FromArgb(240, 240, 240);
+            btnTogglePassword.FlatStyle = FlatStyle.Flat;
+            btnTogglePassword.Font = new Font("Segoe UI", 11F);
+            btnTogglePassword.ForeColor = Color.Gray;
+            btnTogglePassword.Location = new Point(255, 2);
+            btnTogglePassword.Name = "btnTogglePassword";
+            btnTogglePassword.Size = new Size(40, 36);
+            btnTogglePassword.TabIndex = 1;
+            btnTogglePassword.TabStop = false;
+            btnTogglePassword.Text = "👁";
+            btnTogglePassword.UseVisualStyleBackColor = false;
+            btnTogglePassword.Click += BtnTogglePassword_Click;
             // 
             // lblNewPassword
             // 
             lblNewPassword.AutoSize = true;
             lblNewPassword.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             lblNewPassword.ForeColor = Color.FromArgb(51, 65, 85);
-            lblNewPassword.Location = new Point(50, 240);
+            lblNewPassword.Location = new Point(50, 191);
             lblNewPassword.Name = "lblNewPassword";
-            lblNewPassword.Size = new Size(194, 28);
+            lblNewPassword.Size = new Size(160, 28);
             lblNewPassword.TabIndex = 5;
-            lblNewPassword.Text = "🔒 Mật khẩu mới *";
+            lblNewPassword.Text = "Mật khẩu mới *";
             // 
             // pnlOTPInput
             // 
             pnlOTPInput.BackColor = Color.FromArgb(240, 253, 244);
             pnlOTPInput.BorderStyle = BorderStyle.FixedSingle;
             pnlOTPInput.Controls.Add(txtOTP);
-            pnlOTPInput.Location = new Point(50, 165);
+            pnlOTPInput.Location = new Point(50, 147);
             pnlOTPInput.Name = "pnlOTPInput";
             pnlOTPInput.Padding = new Padding(10);
-            pnlOTPInput.Size = new Size(300, 60);
-            pnlOTPInput.TabIndex = 4;
+            pnlOTPInput.Size = new Size(300, 32);
+            pnlOTPInput.TabIndex = 1;
             // 
             // txtOTP
             // 
             txtOTP.BackColor = Color.FromArgb(240, 253, 244);
             txtOTP.BorderStyle = BorderStyle.None;
-            txtOTP.Font = new Font("Segoe UI", 20F, FontStyle.Bold);
-            txtOTP.Location = new Point(12, 0);
+            txtOTP.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            txtOTP.Location = new Point(5, -8);
             txtOTP.MaxLength = 6;
             txtOTP.Name = "txtOTP";
             txtOTP.PlaceholderText = "000000";
-            txtOTP.Size = new Size(270, 54);
+            txtOTP.Size = new Size(280, 38);
             txtOTP.TabIndex = 0;
             txtOTP.TextAlign = HorizontalAlignment.Center;
             txtOTP.KeyPress += TxtOTP_KeyPress;
@@ -271,28 +337,28 @@
             lblOTP.AutoSize = true;
             lblOTP.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
             lblOTP.ForeColor = Color.FromArgb(51, 65, 85);
-            lblOTP.Location = new Point(50, 135);
+            lblOTP.Location = new Point(50, 117);
             lblOTP.Name = "lblOTP";
-            lblOTP.Size = new Size(235, 28);
+            lblOTP.Size = new Size(201, 28);
             lblOTP.TabIndex = 3;
-            lblOTP.Text = "🔢 Mã OTP (6 chữ số) *";
+            lblOTP.Text = "Mã OTP (6 chữ số) *";
             // 
             // lblEmailDisplay
             // 
             lblEmailDisplay.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
             lblEmailDisplay.ForeColor = Color.FromArgb(16, 185, 129);
-            lblEmailDisplay.Location = new Point(50, 100);
+            lblEmailDisplay.Location = new Point(50, 86);
             lblEmailDisplay.Name = "lblEmailDisplay";
             lblEmailDisplay.Size = new Size(300, 25);
             lblEmailDisplay.TabIndex = 2;
-            lblEmailDisplay.Text = "📧 example@email.com";
+            lblEmailDisplay.Text = "example@email.com";
             lblEmailDisplay.TextAlign = ContentAlignment.TopCenter;
             // 
             // lblSubtitle
             // 
             lblSubtitle.Font = new Font("Segoe UI", 9.5F);
             lblSubtitle.ForeColor = Color.FromArgb(100, 116, 139);
-            lblSubtitle.Location = new Point(50, 70);
+            lblSubtitle.Location = new Point(50, 56);
             lblSubtitle.Name = "lblSubtitle";
             lblSubtitle.Size = new Size(300, 25);
             lblSubtitle.TabIndex = 1;
@@ -303,7 +369,7 @@
             // 
             lblTitle.Font = new Font("Segoe UI", 18F, FontStyle.Bold);
             lblTitle.ForeColor = Color.MidnightBlue;
-            lblTitle.Location = new Point(3, 20);
+            lblTitle.Location = new Point(3, 6);
             lblTitle.Name = "lblTitle";
             lblTitle.Size = new Size(392, 50);
             lblTitle.TabIndex = 0;
@@ -318,9 +384,9 @@
             btnClose.FlatStyle = FlatStyle.Flat;
             btnClose.Font = new Font("Segoe UI", 16F, FontStyle.Bold);
             btnClose.ForeColor = Color.Gray;
-            btnClose.Location = new Point(420, 3);
+            btnClose.Location = new Point(428, 3);
             btnClose.Name = "btnClose";
-            btnClose.Size = new Size(40, 54);
+            btnClose.Size = new Size(37, 58);
             btnClose.TabIndex = 10;
             btnClose.TabStop = false;
             btnClose.Text = "✕";
@@ -347,6 +413,10 @@
             pnlRight.ResumeLayout(false);
             pnlMain.ResumeLayout(false);
             pnlMain.PerformLayout();
+            pnlConfirmPassword.ResumeLayout(false);
+            pnlConfirmPassword.PerformLayout();
+            pnlNewPassword.ResumeLayout(false);
+            pnlNewPassword.PerformLayout();
             pnlOTPInput.ResumeLayout(false);
             pnlOTPInput.PerformLayout();
             ResumeLayout(false);
@@ -367,14 +437,18 @@
         private Panel pnlOTPInput;
         private TextBox txtOTP;
         private Label lblNewPassword;
+        private Panel pnlNewPassword;
         private TextBox txtNewPassword;
+        private Button btnTogglePassword;
         private Label lblConfirmPassword;
+        private Panel pnlConfirmPassword;
         private TextBox txtConfirmPassword;
-        private CheckBox chkShowPassword;
+        private Button btnToggleConfirm;
         private Button btnResetPassword;
         private Button btnCancel;
         private Label lblCountdown;
         private Label lblResendOTP;
+        private Label lblBackToLogin;
         private Button btnClose;
     }
 }

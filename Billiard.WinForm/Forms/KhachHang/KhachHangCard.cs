@@ -52,7 +52,7 @@ namespace Billiard.WinForm.Forms.KhachHang
             DrawBadge(g, GetRankName(Data.DiemTichLuy ?? 0));
 
             // 3. Vẽ Avatar (Tròn) - Ở giữa
-            DrawAvatar(g, Data.TenKh);
+            DrawAvatar(g, Data.TenKh, Data.Avatar);
 
             // 4. Vẽ Tên & Thông tin
             int yPos = 110;
@@ -152,27 +152,62 @@ namespace Billiard.WinForm.Forms.KhachHang
             }
         }
 
-        private void DrawAvatar(Graphics g, string name)
+        private void DrawAvatar(Graphics g, string name, string avatarFileName)
         {
-            // Vẽ vòng tròn viền trắng
             int size = 60;
             int x = (this.Width - size) / 2;
             int y = 15;
             Rectangle rectAvt = new Rectangle(x, y, size, size);
 
-            g.FillEllipse(Brushes.White, x - 2, y - 2, size + 4, size + 4); // Viền trắng
+            // 1. Draw White Border
+            g.FillEllipse(Brushes.White, x - 2, y - 2, size + 4, size + 4);
 
-            // Vẽ nền avatar (Màu ngẫu nhiên hoặc cố định)
-            using (var brush = new SolidBrush(Color.FromArgb(51, 65, 85)))
+            // 2. Try to load and draw Image
+            bool imageLoaded = false;
+            if (!string.IsNullOrEmpty(avatarFileName))
             {
-                g.FillEllipse(brush, rectAvt);
+                try
+                {
+                    string imagePath = Path.Combine(Application.StartupPath, "Images", "Avatars", avatarFileName);
+                    if (File.Exists(imagePath))
+                    {
+                        using (var img = Image.FromFile(imagePath))
+                        {
+                            // Create a circular clipping region
+                            using (GraphicsPath path = new GraphicsPath())
+                            {
+                                path.AddEllipse(rectAvt);
+                                g.SetClip(path);
+                                g.DrawImage(img, rectAvt);
+                                g.ResetClip();
+                            }
+                        }
+                        imageLoaded = true;
+                    }
+                }
+                catch
+                {
+                    // Fail silently and fallback to text
+                }
             }
 
-            // Vẽ chữ cái đầu tên
-            string initial = string.IsNullOrEmpty(name) ? "?" : name.Substring(0, 1).ToUpper();
-            var fontAvt = new Font("Segoe UI", 20, FontStyle.Bold);
-            var sz = g.MeasureString(initial, fontAvt);
-            g.DrawString(initial, fontAvt, Brushes.White, x + (size - sz.Width) / 2 + 1, y + (size - sz.Height) / 2);
+            // 3. Fallback: Draw Initials if no image loaded
+            if (!imageLoaded)
+            {
+                using (var brush = new SolidBrush(Color.FromArgb(51, 65, 85)))
+                {
+                    g.FillEllipse(brush, rectAvt);
+                }
+
+                string initial = string.IsNullOrEmpty(name) ? "?" : name.Substring(0, 1).ToUpper();
+                var fontAvt = new Font("Segoe UI", 20, FontStyle.Bold);
+                var sz = g.MeasureString(initial, fontAvt);
+
+                // Centering text
+                g.DrawString(initial, fontAvt, Brushes.White,
+                    x + (size - sz.Width) / 2 + 1,
+                    y + (size - sz.Height) / 2);
+            }
         }
 
         // Hàm hỗ trợ vẽ bo góc

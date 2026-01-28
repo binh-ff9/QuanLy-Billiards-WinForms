@@ -67,6 +67,61 @@ namespace Billiard.BLL.Services.HoaDonServices
                 .ToListAsync();
         }
 
+        public async Task<(List<HoaDon> Data, int TotalCount)> GetListHoaDonPagingAsync(
+            string keyword,
+            string status,
+            DateTime fromDate,
+            DateTime toDate,
+            int pageIndex,
+            int pageSize)
+        {
+            // 1. Khởi tạo truy vấn & Eager Loading (Include các bảng liên quan để hiển thị tên)
+            var query = _context.HoaDons
+                .Include(h => h.MaBanNavigation) // Để lấy Tên Bàn
+                .Include(h => h.MaKhNavigation)  // Để lấy Tên Khách, SĐT
+                .Include(h => h.MaNvNavigation)  // Để lấy Tên Nhân Viên
+                .AsNoTracking()                  // Tối ưu hiệu năng (không theo dõi thay đổi vì chỉ để xem)
+                .AsQueryable();
+
+            // 2. Lọc theo Ngày (Bắt buộc)
+            // Logic: Thời gian bắt đầu nằm trong khoảng Từ ngày -> Đến ngày
+            query = query.Where(h => h.ThoiGianBatDau >= fromDate && h.ThoiGianBatDau <= toDate);
+
+            // 3. Lọc theo Trạng thái
+            if (!string.IsNullOrEmpty(status) && status != "Tất cả")
+            {
+                query = query.Where(h => h.TrangThai == status);
+            }
+
+            // 4. Tìm kiếm theo Từ khóa (Mã HĐ, Tên KH, SĐT)
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                keyword = keyword.ToLower(); // Chuyển về chữ thường để tìm không phân biệt hoa thường
+
+                // Lưu ý: Cần xử lý null cho MaKhNavigation (trường hợp khách vãng lai)
+                query = query.Where(h =>
+                    h.MaHd.ToString().Contains(keyword) || // Tìm theo Mã HĐ
+                    (h.MaKhNavigation != null && (h.MaKhNavigation.TenKh.ToLower().Contains(keyword) || h.MaKhNavigation.Sdt.Contains(keyword))) // Tìm theo Tên/SĐT
+                );
+            }
+
+            // 5. Đếm tổng số bản ghi (Quan trọng để tính số trang)
+            // Phải đếm TRƯỚC khi phân trang
+            int totalCount = await query.CountAsync();
+
+            // 6. Phân trang & Sắp xếp
+            var data = await query
+                .OrderByDescending(h => h.ThoiGianBatDau) // Hóa đơn mới nhất lên đầu
+                .Skip((pageIndex - 1) * pageSize)         // Bỏ qua các dòng của trang trước
+                .Take(pageSize)                           // Lấy số dòng của trang hiện tại
+                .ToListAsync();
+
+            // 7. Trả về kết quả (Tuple)
+            return (data, totalCount);
+        }
+
+
+
         #endregion
 
         #region Thao tác với hóa đơn đang chơi (cho QLBanForm)
@@ -93,57 +148,61 @@ namespace Billiard.BLL.Services.HoaDonServices
         /// </summary>
         public async Task<bool> AddServiceToInvoiceAsync(int maHd, int maDv, int soLuong)
         {
-            using var transaction = await _context.Database.BeginTransactionAsync();
-            try
+            return await Task.Run(() =>
             {
-                var hoaDon = await _context.HoaDons.FindAsync(maHd);
-                if (hoaDon == null || hoaDon.TrangThai != "Đang chơi")
-                    return false;
-
-                var dichVu = await _context.DichVus.FindAsync(maDv);
-                if (dichVu == null || dichVu.TrangThai != "Còn hàng")
-                    return false;
-
-                // Kiểm tra xem dịch vụ đã có trong hóa đơn chưa
-                var chiTiet = await _context.ChiTietHoaDons
-                    .FirstOrDefaultAsync(ct => ct.MaHd == maHd && ct.MaDv == maDv);
-
-                if (chiTiet != null)
+                using (var context = new BilliardDbContext())
                 {
-                    // Cập nhật số lượng
-                    chiTiet.SoLuong += soLuong;
-                    chiTiet.ThanhTien = chiTiet.SoLuong * dichVu.Gia;
-                }
-                else
-                {
-                    // Thêm mới
-                    chiTiet = new ChiTietHoaDon
+                    using (var transaction = context.Database.BeginTransaction())
                     {
-                        MaHd = maHd,
-                        MaDv = maDv,
-                        SoLuong = soLuong,
-                        ThanhTien = soLuong * dichVu.Gia
-                    };
-                    _context.ChiTietHoaDons.Add(chiTiet);
+                        try
+                        {
+                            // Kiểm tra dịch vụ đã tồn tại trong hóa đơn chưa
+                            var existing = context.ChiTietHoaDons
+                                .FirstOrDefault(ct => ct.MaHd == maHd && ct.MaDv == maDv);
+
+                            if (existing != null)
+                            {
+                                // Nếu đã tồn tại, cộng thêm số lượng
+                                existing.SoLuong += soLuong;
+
+                                // Cập nhật thành tiền
+                                var dichVu = context.DichVus.Find(maDv);
+                                if (dichVu != null)
+                                {
+                                    existing.ThanhTien = existing.SoLuong * dichVu.Gia;
+                                }
+                            }
+                            else
+                            {
+                                // Nếu chưa có, thêm mới
+                                var dichVu = context.DichVus.Find(maDv);
+                                if (dichVu == null) return false;
+
+                                var chiTiet = new ChiTietHoaDon
+                                {
+                                    MaHd = maHd,
+                                    MaDv = maDv,
+                                    SoLuong = soLuong,
+                                    ThanhTien = soLuong * dichVu.Gia
+                                };
+
+                                context.ChiTietHoaDons.Add(chiTiet);
+                            }
+
+                            context.SaveChanges();
+                            transaction.Commit();
+
+                            return true;
+                        }
+                        catch (Exception ex)
+                        {
+                            transaction.Rollback();
+                            System.Diagnostics.Debug.WriteLine($"Error: {ex.Message}");
+                            return false;
+                        }
+                    }
                 }
-
-                // Cập nhật tổng tiền dịch vụ
-                var tongTienDv = await _context.ChiTietHoaDons
-                    .Where(ct => ct.MaHd == maHd)
-                    .SumAsync(ct => ct.ThanhTien);
-
-                hoaDon.TienDichVu = tongTienDv;
-
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-
-                return true;
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                return false;
-            }
+            });
         }
 
         /// <summary>
@@ -259,6 +318,22 @@ namespace Billiard.BLL.Services.HoaDonServices
                 return false;
             }
         }
+
+        #endregion
+
+        #region Lịch sử hóa đơn cho User
+        public async Task<List<HoaDon>> GetHistoryByCustomerAsync(int maKh)
+        {
+            return await _context.HoaDons
+                .Include(h => h.MaBanNavigation)
+                .Include(h => h.ChiTietHoaDons) // Để tính tổng tiền hoặc xem chi tiết sau này
+                    .ThenInclude(ct => ct.MaDvNavigation)
+                .Where(h => h.MaKh == maKh && h.TrangThai == "Đã thanh toán") // Chỉ lấy đơn đã xong
+                .OrderByDescending(h => h.ThoiGianBatDau)
+                .ToListAsync();
+        }
+
+
 
         #endregion
     }
