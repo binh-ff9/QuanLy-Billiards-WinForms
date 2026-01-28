@@ -22,7 +22,6 @@ public partial class BilliardDbContext : DbContext
     {
         if (!optionsBuilder.IsConfigured)
         {
-
             optionsBuilder.UseSqlServer("Server=LAPTOP-TMO4AF8B;Database=QL_QuanBi_a;User Id=sa;Password=123;MultipleActiveResultSets=True;TrustServerCertificate=True;");
 
         }

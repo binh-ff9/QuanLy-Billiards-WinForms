@@ -738,7 +738,7 @@ namespace Billiard.WinForm.Forms.QLBan
                 this.Invoke(new Action(() => this.Cursor = Cursors.WaitCursor));
 
                 await _vietQRService.XacNhanThanhToan(_qrGiaoDich.MaGiaoDich);
-                var result = await _thanhToanService.ThanhToanQR(_maHd, _qrGiaoDich.MaGiaoDich);
+                var result = await _thanhToanService.ThanhToanQR(_maHd);//, _qrGiaoDich.MaGiaoDich
 
                 this.Invoke(new Action(() =>
                 {

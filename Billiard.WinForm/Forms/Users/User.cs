@@ -18,7 +18,7 @@ using Timer = System.Windows.Forms.Timer;
 namespace Billiard.WinForm.Forms.Users
 {
     public partial class User : Form
-    {
+    { 
         private Timer posterTimer;
 
         private ContextMenuStrip accountMenu;
