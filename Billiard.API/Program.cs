@@ -1,4 +1,4 @@
-using Billiard.DAL.Data;
+﻿using Billiard.DAL.Data;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);

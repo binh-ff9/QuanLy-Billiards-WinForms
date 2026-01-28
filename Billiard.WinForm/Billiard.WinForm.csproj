@@ -9,6 +9,30 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Forms\Resources\img\ban_maxim.jpg" />
+    <None Remove="Images\Banner\img2.png" />
+    <None Remove="Images\Banner\img3.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Forms\Resources\img\ban_maxim.jpg">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\Banner\img3.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Images\Banner\banner1.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Images\Banner\img2.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="API_Integration\" />
     <Folder Include="Forms\Resources\Images\Services\" />
     <Folder Include="Forms\Resources\Images\Tables\" />
@@ -27,6 +51,21 @@
     <ProjectReference Include="..\Billiard.BLL\Billiard.BLL.csproj" />
     <ProjectReference Include="..\Billiard.DAL\Billiard.DAL.csproj" />
     <ProjectReference Include="..\Billiards.Shared\Billiard.Shared.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

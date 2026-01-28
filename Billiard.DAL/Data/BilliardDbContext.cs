@@ -22,8 +22,9 @@ public partial class BilliardDbContext : DbContext
     {
         if (!optionsBuilder.IsConfigured)
         {
-            // Connection string của bạn
-            optionsBuilder.UseSqlServer("Server=localhost,1434;Database=QL_QuanBi_a;User Id=sa;Password=TuanDat@0608;MultipleActiveResultSets=True;TrustServerCertificate=True;");
+
+            optionsBuilder.UseSqlServer("Server=NOTHUY;Database=QL_QuanBi_a;User Id=LTTQ;Password=Hhh@066205011077;MultipleActiveResultSets=True;TrustServerCertificate=True;");
+
         }
     }
 

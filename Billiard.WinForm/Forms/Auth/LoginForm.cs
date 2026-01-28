@@ -410,13 +410,12 @@ namespace Billiard.WinForm.Forms.Auth
                     Debug.WriteLine($"KhachHang Name: {khachHang.TenKh}");
                     Debug.WriteLine($"KhachHang Rank: {khachHang.HangTv}");
 
+                    // Lưu session
                     UserSession.MaKH = khachHang.MaKh;
                     UserSession.TenKH = khachHang.TenKh;
                     UserSession.Sdt = khachHang.Sdt;
-
-                    var clientForm = Program.GetService<ClientMainForm>();
-                    clientForm.Show();
-
+                    UserSession.HangTV = khachHang.HangTv;
+                    // Thông báo thành công
                     MessageBox.Show(
                         $"✅ Chào mừng {khachHang.TenKh}!\n" +
                         $"🏆 Hạng thành viên: {khachHang.HangTv}\n" +
@@ -425,16 +424,9 @@ namespace Billiard.WinForm.Forms.Auth
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
 
-                    clientForm.FormClosed += (s, args) =>
-                    {
-                        UserSession.Logout();
-                        this.Show();
-                        ResetForm();
-                        txtUsername.Focus();
-                    };
 
-                    this.Hide();
-                    ResetForm();
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
                 }
             }
             catch (Exception ex)
