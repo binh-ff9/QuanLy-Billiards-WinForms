@@ -369,6 +369,7 @@ namespace Billiard.WinForm.Forms.Users
             }
             else
             {
+                this.Show();
                 accountMenu.Show(btnLogin, 0, btnLogin.Height);
             }
         }
