@@ -10,28 +10,23 @@ using Billiard.WinForm.Forms.Auth;
 using Billiard.WinForm.Forms.CaiDat;
 using Billiard.WinForm.Forms.HoaDon;
 using Billiard.WinForm.Forms.KhachHang;
-using Billiard.WinForm.Forms.NhanVien; // ✅ THÊM
+using Billiard.WinForm.Forms.NhanVien;
 using Billiard.WinForm.Forms.QLBan;
 using Billiard.WinForm.Forms.ThongKe;
+using Billiard.WinForm.Forms.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.IO;
-using System.Net.Http;
 using System.Windows.Forms;
-using Billiard.BLL.Services.HoaDonServices;
-using Billiard.BLL.Services.KhachHangServices;
-using Billiard.WinForm.Forms.KhachHang;
-using Billiard.WinForm.Forms.Users;
-using System.Net.Http;
 
 namespace Billiard.WinForm
 {
     internal static class Program
     {
-        public static IServiceProvider ServiceProvider { get; private set; }
-        public static IConfiguration Configuration { get; private set; }
+        public static IServiceProvider ServiceProvider { get; private set; } = null!;
+        public static IConfiguration Configuration { get; private set; } = null!;
 
         [STAThread]
         static void Main()
@@ -43,7 +38,7 @@ namespace Billiard.WinForm
             try
             {
                 var builder = new ConfigurationBuilder()
-                    .SetBasePath(AppDomain.CurrentDomain.BaseDirectory) // ✅ Dùng BaseDirectory thay vì GetCurrentDirectory
+                    .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
                     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
                 Configuration = builder.Build();
@@ -70,7 +65,8 @@ namespace Billiard.WinForm
         private static void ConfigureServices(IServiceCollection services)
         {
             services.AddSingleton<IConfiguration>(Configuration);
-            // DbContext - GIỮ NGUYÊN TRANSIENT
+
+            // DbContext
             services.AddTransient<BilliardDbContext>(provider =>
             {
                 var optionsBuilder = new DbContextOptionsBuilder<BilliardDbContext>();
@@ -80,56 +76,60 @@ namespace Billiard.WinForm
                 return new BilliardDbContext(optionsBuilder.Options);
             });
 
-            // ✅ Services (Transient)
+            // Services
             services.AddTransient<AuthService>();
             services.AddTransient<EmailService>();
             services.AddTransient<DichVuService>();
             services.AddTransient<MatHangService>();
             services.AddTransient<ThongKeService>();
-            services.AddTransient<NhanVienService>(); 
+            services.AddTransient<NhanVienService>();
+            services.AddTransient<System.Net.Http.HttpClient>();
 
-            // HttpClient (Singleton)
-            services.AddSingleton<HttpClient>();
-
-            // BanBia services (Transient)
+            // BanBia services
             services.AddTransient<BanBiaService>();
             services.AddTransient<DatBanService>();
+            services.AddTransient<GioHoatDongService>();
             services.AddTransient<LoaiBanService>();
             services.AddTransient<KhuVucService>();
 
-            // HoaDon services (Transient)
+            // HoaDon services
             services.AddTransient<HoaDonService>();
             services.AddTransient<VietQRService>();
             services.AddTransient<ThanhToanService>();
             services.AddTransient<VietQRConfigForm>();
 
-            services.AddScoped<DatBanService>();
-            // Register Auth Forms
-            // KhachHang services (Transient - chuyển từ Scoped theo chỉ dẫn)
+            // KhachHang services
             services.AddTransient<KhachHangService>();
 
-            // Register Forms (Transient)
+            // Register Auth Forms
             services.AddTransient<LoginForm>();
             services.AddTransient<SignupForm>();
             services.AddTransient<ForgotPasswordForm>();
             services.AddTransient<ResetPasswordForm>();
+
+            // Main Forms
             services.AddTransient<MainForm>();
             services.AddTransient<DichVuForm>();
             services.AddTransient<DichVuEditForm>();
             services.AddTransient<QLBanForm>();
             services.AddTransient<HoaDonForm>();
             services.AddTransient<ThongKeForm>();
-            services.AddTransient<KhachHangForm>(); // Khách hàng
+            services.AddTransient<KhachHangForm>();
             services.AddTransient<ClientMainForm>();
             services.AddTransient<User>(); // User
             services.AddTransient<DatBanDialog>();   // Đăng ký luôn các Dialog con
             services.AddTransient<UserProfileForm>();
-            services.AddTransient<KhachHangForm>();
 
-            // ✅ THÊM: NhanVien Forms
+            // NhanVien Forms
             services.AddTransient<NhanVienForm>();
             services.AddTransient<AddNhanVienForm>();
             services.AddTransient<EditNhanVienForm>();
+
+            // CaiDat Forms & UserControls
+            services.AddTransient<CaiDatForm>();
+            services.AddTransient<ucKiemSoatKho>();
+            services.AddTransient<ucLichSuHoatDong>();
+            services.AddTransient<ucPhieuNhapXuat>();
         }
 
         public static IServiceScope CreateScope()

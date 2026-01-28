@@ -2,6 +2,8 @@
 using Billiard.BLL.Services.HoaDonServices;
 using Billiard.BLL.Services.VietQR;
 using Billiard.DAL.Entities;
+using Billiard.WinForm.Helpers;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Drawing;
 using System.Net.Http;
@@ -456,12 +458,32 @@ namespace Billiard.WinForm.Forms.QLBan
                 if (result.IsSuccess)
                 {
                     var tienThua = tienKhachDua - _thanhToanInfo.TongTien;
-                    MessageBox.Show(
-                        $"✓ Thanh toán thành công!\n\n" +
-                        $"Tổng tiền: {_thanhToanInfo.TongTien:N0} đ\n" +
-                        $"Khách đưa: {tienKhachDua:N0} đ\n" +
-                        $"Tiền thừa: {tienThua:N0} đ",
-                        "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                    // ✅ Lấy thời gian kết thúc để hiển thị
+                    var thoiGianKetThuc = _thanhToanInfo.ThoiGianBatDau.AddMinutes(_thanhToanInfo.ThoiLuongPhut);
+
+                    // ✅ HIỂN thị dialog xác nhận in hóa đơn
+                    var printResult = MessageBox.Show(
+                        $"✓ THANH TOÁN THÀNH CÔNG!\n\n" +
+                        $"━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                        $"📋 Bàn: {_thanhToanInfo.TenBan}\n" +
+                        $"👤 Khách: {_thanhToanInfo.TenKhach}\n\n" +
+                        $"⏰ Giờ vào:  {_thanhToanInfo.ThoiGianBatDau:HH:mm dd/MM/yyyy}\n" +
+                        $"⏰ Giờ ra:   {thoiGianKetThuc:HH:mm dd/MM/yyyy}\n" +
+                        $"💰 Tổng tiền: {_thanhToanInfo.TongTien:N0} đ\n\n" +
+                        $"💵 Khách đưa: {tienKhachDua:N0} đ\n" +
+                        $"💵 Tiền thừa: {tienThua:N0} đ\n" +
+                        $"━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+                        $"🖨️ Bạn có muốn IN HÓA ĐƠN không?",
+                        "Thanh toán thành công",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question);
+
+                    // ✅ Nếu chọn in hóa đơn
+                    if (printResult == DialogResult.Yes)
+                    {
+                        await InHoaDonVaCapNhatThoiGian(_maHd);
+                    }
 
                     this.DialogResult = DialogResult.OK;
                     this.Close();
@@ -479,7 +501,6 @@ namespace Billiard.WinForm.Forms.QLBan
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
         #endregion
 
         #region QR Code Panel
@@ -702,7 +723,6 @@ namespace Billiard.WinForm.Forms.QLBan
 
         private async Task XacNhanThanhToanQR()
         {
-            // Kiểm tra đã xử lý hoặc đang đóng form
             if (_isProcessingPayment || _formClosing)
             {
                 return;
@@ -712,13 +732,11 @@ namespace Billiard.WinForm.Forms.QLBan
 
             try
             {
-                // Dừng timer
                 _cts?.Cancel();
                 _qrCheckTimer?.Stop();
 
                 this.Invoke(new Action(() => this.Cursor = Cursors.WaitCursor));
 
-                // Xác nhận thanh toán
                 await _vietQRService.XacNhanThanhToan(_qrGiaoDich.MaGiaoDich);
                 var result = await _thanhToanService.ThanhToanQR(_maHd, _qrGiaoDich.MaGiaoDich);
 
@@ -728,6 +746,32 @@ namespace Billiard.WinForm.Forms.QLBan
 
                     if (result.IsSuccess)
                     {
+                        // ✅ Lấy thời gian kết thúc để hiển thị
+                        var thoiGianKetThuc = _thanhToanInfo.ThoiGianBatDau.AddMinutes(_thanhToanInfo.ThoiLuongPhut);
+
+                        // ✅ HIỂN thị dialog xác nhận in hóa đơn
+                        var printResult = MessageBox.Show(
+                            $"✓ THANH TOÁN QR THÀNH CÔNG!\n\n" +
+                            $"━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                            $"📋 Bàn: {_thanhToanInfo.TenBan}\n" +
+                            $"👤 Khách: {_thanhToanInfo.TenKhach}\n\n" +
+                            $"⏰ Giờ vào:  {_thanhToanInfo.ThoiGianBatDau:HH:mm dd/MM/yyyy}\n" +
+                            $"⏰ Giờ ra:   {thoiGianKetThuc:HH:mm dd/MM/yyyy}\n" +
+                            $"💰 Tổng tiền: {_thanhToanInfo.TongTien:N0} đ\n\n" +
+                            $"📱 Mã GD: {_qrGiaoDich.MaGiaoDich}\n" +
+                            $"━━━━━━━━━━━━━━━━━━━━━━━━\n\n" +
+                            $"🖨️ Bạn có muốn IN HÓA ĐƠN không?",
+                            "Thanh toán thành công",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question);
+
+                        // ✅ Nếu chọn in hóa đơn
+                        if (printResult == DialogResult.Yes)
+                        {
+                            // Chạy async nhưng không await để không block UI
+                            Task.Run(async () => await InHoaDonVaCapNhatThoiGian(_maHd));
+                        }
+
                         _formClosing = true;
                         this.DialogResult = DialogResult.OK;
                         this.Close();
@@ -747,7 +791,6 @@ namespace Billiard.WinForm.Forms.QLBan
                     this.Cursor = Cursors.Default;
                     _isProcessingPayment = false;
 
-                    // Nếu lỗi do hóa đơn đã thanh toán, đóng form
                     if (ex.Message.Contains("đã thanh toán") || ex.Message.Contains("Không tìm thấy"))
                     {
                         _formClosing = true;
@@ -762,7 +805,45 @@ namespace Billiard.WinForm.Forms.QLBan
                 }));
             }
         }
+        private async Task InHoaDonVaCapNhatThoiGian(int maHd)
+        {
+            try
+            {
+                this.Cursor = Cursors.WaitCursor;
 
+                // 1. Lấy thông tin hóa đơn đầy đủ
+                using (var scope = Program.ServiceProvider.CreateScope())
+                {
+                    var hoaDonService = scope.ServiceProvider.GetRequiredService<HoaDonService>();
+                    var hoaDon = await hoaDonService.GetChiTietHoaDon(maHd);
+
+                    if (hoaDon == null)
+                    {
+                        MessageBox.Show("Không tìm thấy hóa đơn để in!", "Lỗi",
+                            MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    // 2. In hóa đơn
+                    var printer = new InvoicePrinter();
+                    printer.PrintInvoice(hoaDon, "CLB BI-A PRO VIP", "123 Lê Văn Việt, Thủ Đức");
+
+                    // ✅ LOẠI BỎ: Không cần cập nhật thời gian nữa
+                    // await _thanhToanService.CapNhatThoiGianInHoaDon(maHd);
+
+                    System.Diagnostics.Debug.WriteLine($"✓ Đã in hóa đơn HD{maHd}");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi in hóa đơn: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+            }
+        }
         #endregion
 
         protected override void OnFormClosing(FormClosingEventArgs e)

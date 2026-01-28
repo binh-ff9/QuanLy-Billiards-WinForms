@@ -150,7 +150,7 @@ namespace Billiard.WinForm.Forms.HoaDon
             pnlContainer.Controls.Clear();
 
             // --- 1. HEADER (Mã HĐ + Trạng thái) ---
-            var pnlHeader = new Panel { Width = 500,Height = 95, Margin = new Padding(0, 0, 0, 10)};
+            var pnlHeader = new Panel { Width = 500, Height = 95, Margin = new Padding(0, 0, 0, 10) };
 
             var lblMaHD = new Label
             {
@@ -176,35 +176,48 @@ namespace Billiard.WinForm.Forms.HoaDon
                 Padding = new Padding(8, 4, 8, 4),
                 Location = new Point(0, lblMaHD.Bottom + 35)
             };
-            // Bo góc nhẹ cho label status (Hack đơn giản bằng Paint nếu cần đẹp hơn)
 
-            // Ngày giờ vào (Góc phải)
-            var lblDateVao = new Label
+            // ✅ CẬP NHẬT: Hiển thị thời gian vào - ra - thanh toán
+            var lblDateInfo = new Label
             {
-                Text = hd.ThoiGianBatDau?.ToString("Giờ vào: dd/MM/yyyy\nHH:mm") ?? "",
-                Font = new Font("Segoe UI", 10),
+                Font = new Font("Segoe UI", 9),
                 ForeColor = Color.Gray,
                 AutoSize = true,
                 TextAlign = ContentAlignment.TopRight,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
-            lblDateVao.Location = new Point(pnlHeader.Width - 350, 30); // Cần chỉnh lại khi resize
 
-            // Ngày giờ ra
-            var lblDateRa = new Label
+            // ✅ XÂY DỰNG CHUỖI THỜI GIAN
+            string timeInfo = "";
+
+            // Giờ vào
+            if (hd.ThoiGianBatDau.HasValue)
             {
-                Text = hd.ThoiGianKetThuc?.ToString("Giờ ra: dd/MM/yyyy\nHH:mm") ?? "",
-                Font = new Font("Segoe UI", 10),
-                ForeColor = Color.Gray,
-                AutoSize = true,
-                TextAlign = ContentAlignment.TopRight,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
-            };
-            lblDateRa.Location = new Point(pnlHeader.Width - 180, 30); // Cần chỉnh lại khi resize
+                timeInfo += $"🕐 Vào:  {hd.ThoiGianBatDau.Value:HH:mm dd/MM/yyyy}\n";
+            }
 
-            pnlHeader.Controls.AddRange(new Control[] { lblMaHD, lblStatus, lblDateVao, lblDateRa });
+            // Giờ ra
+            if (hd.ThoiGianKetThuc.HasValue)
+            {
+                timeInfo += $"🕐 Ra:   {hd.ThoiGianKetThuc.Value:HH:mm dd/MM/yyyy}\n";
+            }
+
+            // ✅ Thời gian thanh toán/in hóa đơn
+            if (hd.ThoiGianThanhToan.HasValue)
+            {
+                timeInfo += $"🖨️ In:    {hd.ThoiGianThanhToan.Value:HH:mm dd/MM/yyyy}";
+            }
+            else if (hd.TrangThai == "Đã thanh toán")
+            {
+                // Nếu đã thanh toán nhưng chưa có thời gian in, hiển thị "Chưa in"
+                timeInfo += $"🖨️ In:    Chưa in hóa đơn";
+            }
+
+            lblDateInfo.Text = timeInfo.TrimEnd();
+            lblDateInfo.Location = new Point(pnlHeader.Width - 220, 15);
+
+            pnlHeader.Controls.AddRange(new Control[] { lblMaHD, lblStatus, lblDateInfo });
             pnlContainer.Controls.Add(pnlHeader);
-
 
             // --- 2. THÔNG TIN CHÍNH (Bàn, Khách) ---
             var pnlInfo = new TableLayoutPanel
@@ -214,7 +227,7 @@ namespace Billiard.WinForm.Forms.HoaDon
                 ColumnCount = 2,
                 RowCount = 1,
                 Margin = new Padding(0, 0, 0, 20),
-                BackColor = Color.FromArgb(248, 250, 252), // Nền xám nhạt
+                BackColor = Color.FromArgb(248, 250, 252),
                 Location = new Point(pnlContainer.Location.X, 0)
             };
             pnlInfo.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
@@ -231,13 +244,15 @@ namespace Billiard.WinForm.Forms.HoaDon
 
             pnlContainer.Controls.Add(pnlInfo);
 
-
             // --- 3. DANH SÁCH DỊCH VỤ (GRID) ---
-            var lblTitleDichVu = new Label 
-            { 
-                Text = "Chi tiết dịch vụ", 
-                Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = Color.Black, 
-                AutoSize = true, Margin = new Padding(0, 0, 0, 10) };
+            var lblTitleDichVu = new Label
+            {
+                Text = "Chi tiết dịch vụ",
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                ForeColor = Color.Black,
+                AutoSize = true,
+                Margin = new Padding(0, 0, 0, 10)
+            };
             pnlContainer.Controls.Add(lblTitleDichVu);
 
             dgvChiTiet = new DataGridView();
@@ -249,36 +264,32 @@ namespace Billiard.WinForm.Forms.HoaDon
                 TenDichVu = ct.MaDvNavigation?.TenDv ?? "Dịch vụ",
                 SoLuong = ct.SoLuong,
                 DonGia = ct.MaDvNavigation?.Gia,
-                ThanhTien = ct.ThanhTien           
+                ThanhTien = ct.ThanhTien
             }).ToList();
 
-
             dgvChiTiet.DataSource = listMon;
+            dgvChiTiet.AutoGenerateColumns = true;
 
-            dgvChiTiet.AutoGenerateColumns = true; // Đảm bảo tự sinh cột
-
-            // Chờ dgv tạo các cột xong mới Format
             dgvChiTiet.DataBindingComplete += (s, ev) =>
             {
                 FormatGridColumns(dgvChiTiet);
             };
 
             dgvChiTiet.Width = pnlContainer.ClientSize.Width - 40;
-            // Tính chiều cao Grid dựa trên số dòng (để không có scrollbar lồng nhau)
             const int MAX_GRID_HEIGHT = 195;
             int rowHeight = dgvChiTiet.RowTemplate.Height;
             int headerHeight = dgvChiTiet.ColumnHeadersHeight;
             int calculatedHeight = headerHeight + (listMon.Count * rowHeight) + 2;
 
             dgvChiTiet.Height = Math.Min(calculatedHeight, MAX_GRID_HEIGHT);
-            dgvChiTiet.ScrollBars = ScrollBars.Vertical; // Hiện scrollbar dọc nếu cần
+            dgvChiTiet.ScrollBars = ScrollBars.Vertical;
 
             pnlContainer.Controls.Add(dgvChiTiet);
 
-            // -- 4. TIỀN BÀN ---
+            // --- 4. TIỀN BÀN ---
             var pnlTienBan = new TableLayoutPanel
             {
-                Height = 60, // Giảm height vì chỉ 1 hàng
+                Height = 60,
                 Width = pnlContainer.ClientSize.Width - 40,
                 Margin = new Padding(0, 20, 0, 0),
                 BackColor = Color.FromArgb(248, 250, 252),
@@ -286,8 +297,8 @@ namespace Billiard.WinForm.Forms.HoaDon
                 ColumnCount = 2,
                 RowCount = 1
             };
-            pnlTienBan.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70)); // Trái 70%
-            pnlTienBan.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30)); // Phải 30%
+            pnlTienBan.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 70));
+            pnlTienBan.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30));
 
             // Tính tiền bàn
             decimal tienBan = 0;
@@ -302,7 +313,7 @@ namespace Billiard.WinForm.Forms.HoaDon
 
                 int gio = (int)soGio;
                 int phut = (int)((soGio - gio) * 60);
-                thongTinGio = $"{gio}h {phut}ph × {giaGio:N0}đ/h";
+                thongTinGio = $"{gio}h {phut}ph × {_giaGio:N0}đ/h";
             }
             else if (hd.ThoiGianBatDau.HasValue)
             {
@@ -313,10 +324,9 @@ namespace Billiard.WinForm.Forms.HoaDon
 
                 int gio = (int)soGio;
                 int phut = (int)((soGio - gio) * 60);
-                thongTinGio = $"{gio}h {phut}ph × {giaGio:N0}đ/h (đang chơi)";
+                thongTinGio = $"{gio}h {phut}ph × {_giaGio:N0}đ/h (đang chơi)";
             }
 
-            // ✅ BÊN TRÁI: Tiêu đề + Thông tin giờ (1 hàng)
             var lblTienBanInfo = new Label
             {
                 Text = $"🎱 Tiền bàn  •  {thongTinGio}",
@@ -324,10 +334,9 @@ namespace Billiard.WinForm.Forms.HoaDon
                 ForeColor = Color.FromArgb(71, 85, 105),
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
-                AutoEllipsis = true // Tự động ... nếu quá dài
+                AutoEllipsis = true
             };
 
-            // ✅ BÊN PHẢI: Số tiền
             var lblSoTienBan = new Label
             {
                 Text = $"{tienBan:N0} đ",
@@ -342,20 +351,19 @@ namespace Billiard.WinForm.Forms.HoaDon
 
             pnlContainer.Controls.Add(pnlTienBan);
 
-
             // --- 5. TỔNG KẾT TIỀN ---
             var pnlTotalFixed = this.Tag as Panel;
             if (pnlTotalFixed != null)
             {
                 pnlTotalFixed.Controls.Clear();
-                var lblTongCongTitle = new Label 
-                { 
-                    Text = "TỔNG CỘNG", 
-                    Font = new Font("Segoe UI", 12, FontStyle.Bold), 
-                    ForeColor = Color.Gray, 
+                var lblTongCongTitle = new Label
+                {
+                    Text = "TỔNG CỘNG",
+                    Font = new Font("Segoe UI", 12, FontStyle.Bold),
+                    ForeColor = Color.Gray,
                     Location = new Point(0, 8),
                     TextAlign = ContentAlignment.MiddleRight,
-                    AutoSize = true 
+                    AutoSize = true
                 };
 
                 lblTongTien = new Label
@@ -371,11 +379,7 @@ namespace Billiard.WinForm.Forms.HoaDon
                 pnlTotalFixed.Controls.Add(lblTongCongTitle);
                 pnlTotalFixed.Controls.Add(lblTongTien);
             }
-
         }
-
-        // --- CÁC HÀM HỖ TRỢ ---
-
         private Control CreateInfoItem(string label, string value)
         {
             var pnl = new Panel { Dock = DockStyle.Fill, Padding = new Padding(15, 10, 0, 0) };

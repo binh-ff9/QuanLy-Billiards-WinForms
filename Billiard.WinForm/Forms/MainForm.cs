@@ -16,6 +16,7 @@ using Billiard.WinForm.Forms.Auth;
 using Billiard.BLL.Services.QLBan;
 using Billiard.WinForm.Forms.KhachHang;
 using Billiard.WinForm.Forms.NhanVien;
+
 namespace Billiard.WinForm
 {
     public partial class MainForm : Form
@@ -49,14 +50,14 @@ namespace Billiard.WinForm
                 // Load user info from session
                 LoadUserInfo();
 
-                // Load statistics
+                // Load statistics FIRST (thay vì ApplyInitialStyles)
                 await LoadStatistics();
 
                 // Setup auto-refresh timer
                 SetupRefreshTimer();
 
-                // Set initial styles
-                ApplyInitialStyles();
+                // Mở QLBanForm ngay từ đầu
+                OpenQLBanFormInitial();
 
                 this.Cursor = Cursors.Default;
             }
@@ -65,6 +66,26 @@ namespace Billiard.WinForm
                 this.Cursor = Cursors.Default;
                 MessageBox.Show($"Lỗi khi tải dữ liệu: {ex.Message}", "Lỗi",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void OpenQLBanFormInitial()
+        {
+            try
+            {
+                // Activate button Quản lý bàn
+                ActivateButton(btnQuanLyBan);
+
+                // Open QLBanForm
+                var qlBanForm = Program.GetService<QLBanForm>();
+                qlBanForm.SetMainForm(this);
+                OpenChildForm(qlBanForm);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở form quản lý bàn: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                ShowWelcomePanel();
             }
         }
 
@@ -96,22 +117,6 @@ namespace Billiard.WinForm
                 "Phục vụ" => "PV",
                 _ => "NV"
             };
-        }
-
-        private void ApplyInitialStyles()
-        {
-            // Set stat cards initial values
-            lblBanTrongValue.Text = "0";
-            lblDangChoiValue.Text = "0";
-            lblDatTruocValue.Text = "0";
-            lblDoanhThuValue.Text = "0đ";
-            lblKhachHangValue.Text = "0";
-
-            // Show welcome panel
-            ShowWelcomePanel();
-
-            // Hide detail panel initially
-            pnlDetail.Visible = false;
         }
 
         private void ShowWelcomePanel()
@@ -171,23 +176,6 @@ namespace Billiard.WinForm
                 // Get table stats using service
                 var stats = await _banBiaService.GetTableStatsAsync();
 
-                // Update UI on main thread
-                if (InvokeRequired)
-                {
-                    Invoke(new Action(() =>
-                    {
-                        lblBanTrongValue.Text = stats.trong.ToString();
-                        lblDangChoiValue.Text = stats.dangChoi.ToString();
-                        lblDatTruocValue.Text = stats.daDat.ToString();
-                    }));
-                }
-                else
-                {
-                    lblBanTrongValue.Text = stats.trong.ToString();
-                    lblDangChoiValue.Text = stats.dangChoi.ToString();
-                    lblDatTruocValue.Text = stats.daDat.ToString();
-                }
-
                 // Doanh thu hôm nay
                 var today = DateTime.Today;
                 var doanhThu = await _context.HoaDons
@@ -199,24 +187,57 @@ namespace Billiard.WinForm
                 // Tổng khách hàng
                 var tongKH = await _context.KhachHangs.CountAsync();
 
+                // Update UI on main thread
                 if (InvokeRequired)
                 {
                     Invoke(new Action(() =>
                     {
+                        lblBanTrongValue.Text = stats.trong.ToString();
+                        lblDangChoiValue.Text = stats.dangChoi.ToString();
+                        lblDatTruocValue.Text = stats.daDat.ToString();
                         lblDoanhThuValue.Text = FormatCurrency(doanhThu);
                         lblKhachHangValue.Text = tongKH.ToString();
+
+                        // Hide detail panel initially
+                        pnlDetail.Visible = false;
                     }));
                 }
                 else
                 {
+                    lblBanTrongValue.Text = stats.trong.ToString();
+                    lblDangChoiValue.Text = stats.dangChoi.ToString();
+                    lblDatTruocValue.Text = stats.daDat.ToString();
                     lblDoanhThuValue.Text = FormatCurrency(doanhThu);
                     lblKhachHangValue.Text = tongKH.ToString();
+
+                    // Hide detail panel initially
+                    pnlDetail.Visible = false;
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error loading statistics: {ex.Message}");
+
+                // Nếu có lỗi, hiển thị giá trị mặc định
+                if (InvokeRequired)
+                {
+                    Invoke(new Action(() => SetDefaultStatValues()));
+                }
+                else
+                {
+                    SetDefaultStatValues();
+                }
             }
+        }
+
+        private void SetDefaultStatValues()
+        {
+            lblBanTrongValue.Text = "0";
+            lblDangChoiValue.Text = "0";
+            lblDatTruocValue.Text = "0";
+            lblDoanhThuValue.Text = "0đ";
+            lblKhachHangValue.Text = "0";
+            pnlDetail.Visible = false;
         }
 
         private string FormatCurrency(decimal amount)
@@ -265,10 +286,6 @@ namespace Billiard.WinForm
                     case "btnKhachHang":
                         var khForm = Program.GetService<KhachHangForm>();
                         khForm.SetMainForm(this);
-                        khForm.OnSwitchToHoaDonTab += (s, sdt) =>
-                        {
-                            SwitchToHoaDonTab(sdt);
-                        };
                         OpenChildForm(khForm); break;
                     case "btnThongKe":
                         OpenChildForm(Program.GetService<ThongKeForm>());
@@ -280,8 +297,10 @@ namespace Billiard.WinForm
                         OpenChildForm(nhanVienForm);
                         break;
                     case "btnCaiDat":
-                        var vietQRConfigForm = Program.GetService<VietQRConfigForm>();
-                        vietQRConfigForm.ShowDialog();
+                        // ✅ THAY ĐỔI: Mở CaiDatForm thay vì VietQRConfigForm
+                        var caiDatForm = Program.GetService<CaiDatForm>();
+                        caiDatForm.SetMainForm(this);
+                        OpenChildForm(caiDatForm);
                         break;
                 }
             }

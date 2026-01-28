@@ -22,8 +22,9 @@ public partial class BilliardDbContext : DbContext
     {
         if (!optionsBuilder.IsConfigured)
         {
-            // Connection string của bạn
-            optionsBuilder.UseSqlServer("Server=localhost,1434;Database=QL_QuanBi_a;User Id=sa;Password=TuanDat@0608;MultipleActiveResultSets=True;TrustServerCertificate=True;");
+
+            optionsBuilder.UseSqlServer("Server=NOTHUY;Database=QL_QuanBi_a;User Id=LTTQ;Password=Hhh@066205011077;MultipleActiveResultSets=True;TrustServerCertificate=True;");
+
         }
     }
 
@@ -450,6 +451,9 @@ public partial class BilliardDbContext : DbContext
             entity.Property(e => e.ThoiGianKetThuc)
                 .HasColumnType("datetime")
                 .HasColumnName("thoi_gian_ket_thuc");
+            entity.Property(e => e.ThoiGianThanhToan)
+                .HasColumnType("datetime")
+                .HasColumnName("thoi_gian_thanh_toan");
             entity.Property(e => e.ThoiLuongPhut)
                 .HasComputedColumnSql("(case when [thoi_gian_ket_thuc] IS NOT NULL then datediff(minute,[thoi_gian_bat_dau],[thoi_gian_ket_thuc]) else (0) end)", true)
                 .HasColumnName("thoi_luong_phut");
