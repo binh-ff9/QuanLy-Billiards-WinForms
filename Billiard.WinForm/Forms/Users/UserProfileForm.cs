@@ -20,6 +20,11 @@ namespace Billiard.WinForm.Forms.Users
         private readonly DatBanService _datBanService;
         private readonly HoaDonService _hoaDonService;
 
+        private PictureBox picAvatar;
+        private string _avatarFileName;
+
+        public bool CoThayDoiDuLieu { get; private set; } = false;
+
         // Controls
         private TextBox txtName, txtPhone, txtEmail, txtAddress;
         private DataGridView dgvBooking, dgvInvoice;
@@ -96,9 +101,26 @@ namespace Billiard.WinForm.Forms.Users
             int x = 50, y = 40;
             int w = 300;
 
+
+
             // Avatar giả
-            var lblAvatar = new Label { Text = "👤", Font = new Font("Segoe UI", 50), AutoSize = true, Location = new Point(x, y) };
-            page.Controls.Add(lblAvatar);
+            picAvatar = new PictureBox
+            {
+                Size = new Size(120, 120),
+                Location = new Point(x, y),
+                SizeMode = PictureBoxSizeMode.Zoom,
+                BorderStyle = BorderStyle.FixedSingle,
+                Cursor = Cursors.Hand
+            };
+
+            // Bo tròn avatar
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            path.AddEllipse(0, 0, picAvatar.Width, picAvatar.Height);
+            picAvatar.Region = new Region(path);
+
+            picAvatar.Click += PicAvatar_Click;
+
+            page.Controls.Add(picAvatar);
 
             // Hạng & Điểm
             lblRank = new Label { Text = "Hạng: ...", Font = new Font("Segoe UI", 12, FontStyle.Bold), ForeColor = Color.OrangeRed, Location = new Point(x + 300, y + 20), AutoSize = true };
@@ -129,6 +151,32 @@ namespace Billiard.WinForm.Forms.Users
             btnSave.Click += async (s, e) => await UpdateProfile();
             page.Controls.Add(btnSave);
         }
+        private void PicAvatar_Click(object sender, EventArgs e)
+        {
+            using (var ofd = new OpenFileDialog())
+            {
+                ofd.Filter = "Image Files|*.jpg;*.jpeg;*.png";
+
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    var fileName = Guid.NewGuid().ToString() + Path.GetExtension(ofd.FileName);
+
+                    string avatarFolder = Path.Combine(Application.StartupPath, "Forms", "Resources","img", "avatar_khach_hang");
+
+                    if (!Directory.Exists(avatarFolder))
+                        Directory.CreateDirectory(avatarFolder);
+
+                    var destPath = Path.Combine(avatarFolder, fileName);
+
+                    File.Copy(ofd.FileName, destPath, true);
+
+                    picAvatar.Image = Image.FromFile(destPath);
+                    _avatarFileName = fileName;
+                }
+            }
+        }
+
+
 
         private TextBox AddInput(TabPage p, string label, int x, ref int y, int w)
         {
@@ -165,12 +213,25 @@ namespace Billiard.WinForm.Forms.Users
 
             // 1. Load Info
             var kh = await _khService.GetKhachHangDetailAsync(maKh);
+
+            if (!string.IsNullOrEmpty(kh.Avatar))
+            {
+                var path = Path.Combine(Application.StartupPath, "Forms", "Resources", "img","avatar_khach_hang", kh.Avatar);
+
+                if (File.Exists(path))
+                    picAvatar.Image = Image.FromFile(path);
+            }
+
+
             if (kh != null)
             {
                 txtName.Text = kh.TenKh;
                 txtPhone.Text = kh.Sdt;
                 txtEmail.Text = kh.Email;
                 lblPoints.Text = $"Điểm tích lũy: {kh.DiemTichLuy ?? 0}";
+                if (string.IsNullOrEmpty(_avatarFileName))
+                    _avatarFileName = kh.Avatar;
+
 
                 // Logic hạng đơn giản
                 int diem = kh.DiemTichLuy ?? 0;
@@ -222,6 +283,13 @@ namespace Billiard.WinForm.Forms.Users
                     {
                         kh.TenKh = txtName.Text.Trim();
                         kh.Email = txtEmail.Text.Trim();
+                        //kh.Avatar = _avatarBytes;
+
+                        if (!string.IsNullOrEmpty(_avatarFileName))
+                        {
+                            kh.Avatar = _avatarFileName;   // LƯU TÊN FILE VÀO DB
+                        }
+
 
                         await sv.UpdateAsync(kh);
 
@@ -243,7 +311,7 @@ namespace Billiard.WinForm.Forms.Users
             if (e.RowIndex < 0 || e.ColumnIndex != dgvBooking.Columns["btnCancel"].Index) return;
 
             string status = dgvBooking.Rows[e.RowIndex].Cells["TrangThai"].Value.ToString();
-            if (status != "Đang chờ")
+            if (status != "Đang chờ" && status != "Đã Đặt")
             {
                 MessageBox.Show("Chỉ có thể hủy đơn đang chờ xác nhận!", "Không thể hủy", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -254,6 +322,8 @@ namespace Billiard.WinForm.Forms.Users
                 int maDat = (int)dgvBooking.Rows[e.RowIndex].Cells["MaDat"].Value;
                 await _datBanService.CancelBookingAsync(maDat);
                 await LoadAllData(); // Refresh lưới
+                CoThayDoiDuLieu = true;
+                MessageBox.Show("Hủy thành công!");
             }
         }
 

@@ -557,6 +557,16 @@ namespace Billiard.WinForm.Forms.QLBan
         }
 
         #endregion
+
+        // Thêm vào class SoDoBanForm
+        public void EnableClientMode()
+        {
+            // Ẩn panel công cụ chỉnh sửa vì khách không được sửa
+            pnlEditControls.Visible = false;
+
+            // Đổi tiêu đề form cho thân thiện
+            this.Text = "Sơ đồ vị trí bàn - Chọn bàn để đặt";
+        }
     }
 
     #region TableControl - Custom Control cho mỗi bàn
