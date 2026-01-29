@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 using Billiard.BLL.Services.NhanVienService;
 using Billiard.DAL.Entities;
+using ClosedXML.Excel;
+using System.IO;
 
 namespace Billiard.WinForm.Forms.NhanVien
 {
@@ -26,8 +29,21 @@ namespace Billiard.WinForm.Forms.NhanVien
         private Panel pnlAttendanceStatus;
         private Button btnCheckIn;
         private Button btnCheckOut;
+        private Button btnExportExcel;
         private TextBox txtSearch;
         private RichTextBox txtGhiChu;
+
+        // Modern color scheme
+        private readonly Color PrimaryColor = Color.FromArgb(79, 70, 229); // Indigo
+        private readonly Color SecondaryColor = Color.FromArgb(99, 102, 241); // Light Indigo
+        private readonly Color AccentColor = Color.FromArgb(236, 72, 153); // Pink
+        private readonly Color SuccessColor = Color.FromArgb(16, 185, 129); // Green
+        private readonly Color WarningColor = Color.FromArgb(245, 158, 11); // Orange
+        private readonly Color DangerColor = Color.FromArgb(239, 68, 68); // Red
+        private readonly Color BackgroundColor = Color.FromArgb(249, 250, 251); // Light Gray
+        private readonly Color CardBackground = Color.White;
+        private readonly Color TextPrimary = Color.FromArgb(17, 24, 39); // Dark Gray
+        private readonly Color TextSecondary = Color.FromArgb(107, 114, 128); // Medium Gray
         #endregion
 
         #region Constructor
@@ -48,383 +64,495 @@ namespace Billiard.WinForm.Forms.NhanVien
         #region Initialize UI
         private void InitializeCustomControls()
         {
-            this.Text = "🕐 Chấm công nhân viên";
-            this.Size = new Size(900, 700);
+            this.Text = "Chấm Công Nhân Viên";
+            this.Size = new Size(1200, 800);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.FromArgb(248, 249, 250);
+            this.BackColor = BackgroundColor;
+            this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
 
-            // Main container
+            // Main container with better spacing
             var mainPanel = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(30),
-                AutoScroll = true
+                Padding = new Padding(40, 30, 40, 30),
+                AutoScroll = true,
+                BackColor = BackgroundColor
             };
 
-            // Header
-            var header = CreateHeader();
+            // Header with gradient background
+            var header = CreateModernHeader();
             mainPanel.Controls.Add(header);
 
-            // Method Selection
-            pnlMethodSelection = CreateMethodSelection();
-            pnlMethodSelection.Location = new Point(30, 100);
-            mainPanel.Controls.Add(pnlMethodSelection);
+            // Two-column layout
+            var leftColumn = new Panel
+            {
+                Location = new Point(40, 140),
+                Size = new Size(520, 580),
+                BackColor = Color.Transparent
+            };
 
-            // Manual Section (default visible)
-            pnlManualSection = CreateManualSection();
-            pnlManualSection.Location = new Point(30, 200);
-            mainPanel.Controls.Add(pnlManualSection);
+            var rightColumn = new Panel
+            {
+                Location = new Point(580, 140),
+                Size = new Size(520, 580),
+                BackColor = Color.Transparent
+            };
 
-            // Face ID Section (hidden by default)
-            pnlFaceIDSection = CreateFaceIDSection();
-            pnlFaceIDSection.Location = new Point(30, 200);
+            // Left column - Method selection and search
+            pnlMethodSelection = CreateModernMethodSelection();
+            pnlMethodSelection.Location = new Point(0, 0);
+            leftColumn.Controls.Add(pnlMethodSelection);
+
+            pnlManualSection = CreateModernManualSection();
+            pnlManualSection.Location = new Point(0, 150);
+            leftColumn.Controls.Add(pnlManualSection);
+
+            pnlFaceIDSection = CreateModernFaceIDSection();
+            pnlFaceIDSection.Location = new Point(0, 150);
             pnlFaceIDSection.Visible = false;
-            mainPanel.Controls.Add(pnlFaceIDSection);
+            leftColumn.Controls.Add(pnlFaceIDSection);
 
-            // Employee Info
-            pnlEmployeeInfo = CreateEmployeeInfoPanel();
-            pnlEmployeeInfo.Location = new Point(30, 350);
+            // Right column - Employee info and actions
+            pnlEmployeeInfo = CreateModernEmployeeInfoPanel();
+            pnlEmployeeInfo.Location = new Point(0, 0);
             pnlEmployeeInfo.Visible = false;
-            mainPanel.Controls.Add(pnlEmployeeInfo);
+            rightColumn.Controls.Add(pnlEmployeeInfo);
 
-            // Attendance Status
-            pnlAttendanceStatus = CreateAttendanceStatusPanel();
-            pnlAttendanceStatus.Location = new Point(30, 470);
+            pnlAttendanceStatus = CreateModernAttendanceStatusPanel();
+            pnlAttendanceStatus.Location = new Point(0, 330);
             pnlAttendanceStatus.Visible = false;
-            mainPanel.Controls.Add(pnlAttendanceStatus);
+            rightColumn.Controls.Add(pnlAttendanceStatus);
 
-            // Action Buttons
-            var actionPanel = CreateActionButtons();
-            actionPanel.Location = new Point(30, 570);
-            mainPanel.Controls.Add(actionPanel);
+            var actionPanel = CreateModernActionButtons();
+            actionPanel.Location = new Point(0, 450);
+            rightColumn.Controls.Add(actionPanel);
+
+            mainPanel.Controls.Add(leftColumn);
+            mainPanel.Controls.Add(rightColumn);
 
             this.Controls.Add(mainPanel);
         }
 
-        private Panel CreateHeader()
+        private Panel CreateModernHeader()
         {
             var header = new Panel
             {
-                Size = new Size(840, 80),
-                Location = new Point(0, 0),
-                BackColor = Color.White
+                Size = new Size(1120, 100),
+                Location = new Point(0, 0)
+            };
+
+            // Gradient background
+            header.Paint += (s, e) =>
+            {
+                using (LinearGradientBrush brush = new LinearGradientBrush(
+                    header.ClientRectangle,
+                    PrimaryColor,
+                    SecondaryColor,
+                    LinearGradientMode.Horizontal))
+                {
+                    e.Graphics.FillRectangle(brush, header.ClientRectangle);
+                }
             };
 
             var lblTitle = new Label
             {
-                Text = "🕐 Chấm công nhân viên",
-                Font = new Font("Segoe UI", 20F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(26, 26, 46),
+                Text = "⏰ Chấm Công Nhân Viên",
+                Font = new Font("Segoe UI", 24F, FontStyle.Bold),
+                ForeColor = Color.White,
                 AutoSize = true,
-                Location = new Point(20, 15)
+                Location = new Point(30, 20),
+                BackColor = Color.Transparent
             };
 
             var lblSubtitle = new Label
             {
-                Text = "💡 Chọn phương thức chấm công phù hợp",
-                Font = new Font("Segoe UI", 10F, FontStyle.Italic),
-                ForeColor = Color.FromArgb(107, 114, 128),
+                Text = "Hệ thống chấm công thông minh - Chính xác & Tiện lợi",
+                Font = new Font("Segoe UI", 11F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(224, 231, 255),
                 AutoSize = true,
-                Location = new Point(20, 50)
+                Location = new Point(30, 60),
+                BackColor = Color.Transparent
             };
 
-            header.Controls.AddRange(new Control[] { lblTitle, lblSubtitle });
+            var lblDate = new Label
+            {
+                Text = DateTime.Now.ToString("dddd, dd/MM/yyyy"),
+                Font = new Font("Segoe UI", 10F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(224, 231, 255),
+                AutoSize = true,
+                Location = new Point(950, 35),
+                BackColor = Color.Transparent
+            };
+
+            header.Controls.AddRange(new Control[] { lblTitle, lblSubtitle, lblDate });
             return header;
         }
 
-        private Panel CreateMethodSelection()
+        private Panel CreateModernMethodSelection()
         {
-            var panel = new Panel
-            {
-                Size = new Size(840, 80),
-                BackColor = Color.White
-            };
+            var panel = CreateCard(520, 130);
 
             var lblTitle = new Label
             {
-                Text = "📋 Phương thức chấm công",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Text = "📋 Phương Thức Chấm Công",
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                ForeColor = TextPrimary,
                 AutoSize = true,
-                Location = new Point(20, 15)
+                Location = new Point(25, 20)
             };
 
-            var btnManual = new Button
-            {
-                Text = "✍️ Thủ công",
-                Size = new Size(150, 45),
-                Location = new Point(20, 45),
-                BackColor = Color.FromArgb(102, 126, 234),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                Cursor = Cursors.Hand,
-                Tag = "manual"
-            };
-            btnManual.FlatAppearance.BorderSize = 0;
+            var btnManual = CreateMethodButton("✍️ Nhập Thủ Công", 25, 60, true);
+            btnManual.Tag = "manual";
             btnManual.Click += MethodButton_Click;
 
-            var btnFaceID = new Button
-            {
-                Text = "📸 Face ID",
-                Size = new Size(150, 45),
-                Location = new Point(180, 45),
-                BackColor = Color.FromArgb(233, 236, 239),
-                ForeColor = Color.Black,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10F),
-                Cursor = Cursors.Hand,
-                Tag = "faceid"
-            };
-            btnFaceID.FlatAppearance.BorderSize = 0;
+            var btnFaceID = CreateMethodButton("👤 Nhận Diện Khuôn Mặt", 275, 60, false);
+            btnFaceID.Tag = "faceid";
             btnFaceID.Click += MethodButton_Click;
 
-            var btnVanTay = new Button
-            {
-                Text = "👆 Vân tay",
-                Size = new Size(150, 45),
-                Location = new Point(340, 45),
-                BackColor = Color.FromArgb(233, 236, 239),
-                ForeColor = Color.Black,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10F),
-                Cursor = Cursors.Hand,
-                Tag = "vangtay",
-                Enabled = false
-            };
-            btnVanTay.FlatAppearance.BorderSize = 0;
-
-            panel.Controls.AddRange(new Control[] { lblTitle, btnManual, btnFaceID, btnVanTay });
+            panel.Controls.AddRange(new Control[] { lblTitle, btnManual, btnFaceID });
             return panel;
         }
 
-        private Panel CreateManualSection()
+        private Button CreateMethodButton(string text, int x, int y, bool isActive)
         {
-            var panel = new Panel
+            var btn = new Button
             {
-                Size = new Size(840, 130),
-                BackColor = Color.White
+                Text = text,
+                Size = new Size(220, 50),
+                Location = new Point(x, y),
+                BackColor = isActive ? PrimaryColor : Color.FromArgb(243, 244, 246),
+                ForeColor = isActive ? Color.White : TextSecondary,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                TextAlign = ContentAlignment.MiddleCenter
             };
+
+            btn.FlatAppearance.BorderSize = 0;
+            btn.FlatAppearance.MouseOverBackColor = isActive ? SecondaryColor : Color.FromArgb(229, 231, 235);
+
+            // Rounded corners
+            btn.Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, btn.Width, btn.Height, 10, 10));
+
+            return btn;
+        }
+
+        private Panel CreateModernManualSection()
+        {
+            var panel = CreateCard(520, 200);
 
             var lblTitle = new Label
             {
-                Text = "🔍 Tìm kiếm nhân viên",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                Text = "🔍 Tìm Kiếm Nhân Viên",
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                ForeColor = TextPrimary,
                 AutoSize = true,
-                Location = new Point(20, 15)
+                Location = new Point(25, 20)
             };
 
             txtSearch = new TextBox
             {
-                Size = new Size(400, 35),
-                Location = new Point(20, 45),
+                Size = new Size(470, 40),
+                Location = new Point(25, 60),
                 Font = new Font("Segoe UI", 11F),
-                PlaceholderText = "Nhập mã NV, số điện thoại hoặc tên nhân viên..."
+                PlaceholderText = "Nhập mã NV, số điện thoại hoặc tên nhân viên...",
+                BorderStyle = BorderStyle.None
             };
+
+            // Custom border for textbox
+            var txtBorder = new Panel
+            {
+                Location = new Point(25, 60),
+                Size = new Size(470, 42),
+                BackColor = Color.FromArgb(229, 231, 235)
+            };
+            txtBorder.Controls.Add(txtSearch);
+            txtSearch.Location = new Point(15, 10);
+            txtSearch.Size = new Size(440, 22);
             txtSearch.TextChanged += TxtSearch_TextChanged;
 
             var btnSearch = new Button
             {
-                Text = "🔍 Tìm",
-                Size = new Size(100, 35),
-                Location = new Point(430, 45),
-                BackColor = Color.FromArgb(40, 167, 69),
+                Text = "🔍 Tìm Kiếm",
+                Size = new Size(140, 45),
+                Location = new Point(25, 120),
+                BackColor = PrimaryColor,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 Cursor = Cursors.Hand
             };
             btnSearch.FlatAppearance.BorderSize = 0;
+            btnSearch.FlatAppearance.MouseOverBackColor = SecondaryColor;
+            btnSearch.Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, btnSearch.Width, btnSearch.Height, 8, 8));
             btnSearch.Click += BtnSearch_Click;
 
-            var lblHelp = new Label
+            var lblHint = new Label
             {
-                Text = "💡 Nhập ít nhất 3 ký tự để tìm kiếm",
+                Text = "💡 Nhấn Enter để tìm kiếm nhanh",
                 Font = new Font("Segoe UI", 9F, FontStyle.Italic),
-                ForeColor = Color.Gray,
+                ForeColor = TextSecondary,
                 AutoSize = true,
-                Location = new Point(20, 90)
+                Location = new Point(180, 133)
             };
 
-            panel.Controls.AddRange(new Control[] { lblTitle, txtSearch, btnSearch, lblHelp });
+            panel.Controls.AddRange(new Control[] { lblTitle, txtBorder, btnSearch, lblHint });
             return panel;
         }
 
-        private Panel CreateFaceIDSection()
+        private Panel CreateModernFaceIDSection()
         {
-            var panel = new Panel
-            {
-                Size = new Size(840, 130),
-                BackColor = Color.White
-            };
+            var panel = CreateCard(520, 280);
 
             var lblTitle = new Label
             {
-                Text = "📸 Nhận diện khuôn mặt",
+                Text = "👤 Nhận Diện Khuôn Mặt",
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                ForeColor = TextPrimary,
+                AutoSize = true,
+                Location = new Point(25, 20)
+            };
+
+            var picCamera = new PictureBox
+            {
+                Size = new Size(300, 200),
+                Location = new Point(110, 60),
+                BackColor = Color.FromArgb(17, 24, 39),
+                BorderStyle = BorderStyle.None
+            };
+
+            var lblCameraText = new Label
+            {
+                Text = "📷\n\nĐặt khuôn mặt vào khung hình",
                 Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(20, 15)
+                ForeColor = Color.White,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(300, 200),
+                Location = new Point(110, 60),
+                BackColor = Color.Transparent
             };
 
-            var lblStatus = new Label
-            {
-                Text = "⚠️ Chức năng Face ID đang được phát triển",
-                Font = new Font("Segoe UI", 10F, FontStyle.Italic),
-                ForeColor = Color.FromArgb(220, 53, 69),
-                AutoSize = true,
-                Location = new Point(20, 50)
-            };
-
-            var lblInfo = new Label
-            {
-                Text = "Vui lòng sử dụng phương thức chấm công thủ công",
-                Font = new Font("Segoe UI", 9F),
-                ForeColor = Color.Gray,
-                AutoSize = true,
-                Location = new Point(20, 80)
-            };
-
-            panel.Controls.AddRange(new Control[] { lblTitle, lblStatus, lblInfo });
+            panel.Controls.AddRange(new Control[] { lblTitle, picCamera, lblCameraText });
             return panel;
         }
 
-        private Panel CreateEmployeeInfoPanel()
+        private Panel CreateModernEmployeeInfoPanel()
         {
-            var panel = new Panel
-            {
-                Size = new Size(840, 100),
-                BackColor = Color.White
-            };
-
-            // Content will be populated when employee is found
-            return panel;
-        }
-
-        private Panel CreateAttendanceStatusPanel()
-        {
-            var panel = new Panel
-            {
-                Size = new Size(840, 80),
-                BackColor = Color.White
-            };
-
-            // Content will be populated based on attendance status
-            return panel;
-        }
-
-        private Panel CreateActionButtons()
-        {
-            var panel = new Panel
-            {
-                Size = new Size(840, 100),
-                BackColor = Color.White
-            };
+            var panel = CreateCard(520, 310);
 
             var lblTitle = new Label
             {
-                Text = "📝 Ghi chú (tùy chọn)",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Text = "👤 Thông Tin Nhân Viên",
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                ForeColor = TextPrimary,
                 AutoSize = true,
-                Location = new Point(20, 15)
+                Location = new Point(25, 20)
+            };
+
+            // Avatar circle
+            var pnlAvatar = new Panel
+            {
+                Size = new Size(100, 100),
+                Location = new Point(210, 60),
+                BackColor = PrimaryColor
+            };
+            pnlAvatar.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (SolidBrush brush = new SolidBrush(PrimaryColor))
+                {
+                    e.Graphics.FillEllipse(brush, 0, 0, 100, 100);
+                }
+            };
+
+            var lblAvatar = new Label
+            {
+                Text = "NV",
+                Font = new Font("Segoe UI", 28F, FontStyle.Bold),
+                ForeColor = Color.White,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Size = new Size(100, 100),
+                BackColor = Color.Transparent,
+                Location = new Point(0, 25)
+            };
+            pnlAvatar.Controls.Add(lblAvatar);
+
+            var lblEmployeeName = new Label
+            {
+                Text = "Tên nhân viên",
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = TextPrimary,
+                TextAlign = ContentAlignment.MiddleCenter,
+                AutoSize = true,
+                Location = new Point(160, 175)
+            };
+
+            var lblEmployeeInfo = new Label
+            {
+                Text = "Mã NV: --- | SĐT: ---",
+                Font = new Font("Segoe UI", 10F),
+                ForeColor = TextSecondary,
+                TextAlign = ContentAlignment.MiddleCenter,
+                AutoSize = true,
+                Location = new Point(180, 205)
+            };
+
+            var lblNoteTitle = new Label
+            {
+                Text = "📝 Ghi Chú",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = TextPrimary,
+                AutoSize = true,
+                Location = new Point(25, 235)
             };
 
             txtGhiChu = new RichTextBox
             {
-                Size = new Size(400, 60),
-                Location = new Point(20, 40),
-                Font = new Font("Segoe UI", 9F)
+                Size = new Size(470, 50),
+                Location = new Point(25, 260),
+                Font = new Font("Segoe UI", 10F),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            panel.Controls.AddRange(new Control[] { lblTitle, pnlAvatar, lblEmployeeName,
+                lblEmployeeInfo, lblNoteTitle, txtGhiChu });
+            return panel;
+        }
+
+        private Panel CreateModernAttendanceStatusPanel()
+        {
+            var panel = CreateCard(520, 100);
+
+            var lblTitle = new Label
+            {
+                Text = "📊 Trạng Thái Hôm Nay",
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
+                ForeColor = TextPrimary,
+                AutoSize = true,
+                Location = new Point(25, 20)
+            };
+
+            panel.Controls.Add(lblTitle);
+            return panel;
+        }
+
+        private Panel CreateModernActionButtons()
+        {
+            var panel = new Panel
+            {
+                Size = new Size(520, 80),
+                BackColor = Color.Transparent
             };
 
             btnCheckIn = new Button
             {
-                Text = "⏰ Check-in",
-                Size = new Size(180, 50),
-                Location = new Point(450, 30),
-                BackColor = Color.FromArgb(34, 197, 94),
+                Text = "✅ CHECK IN",
+                Size = new Size(250, 60),
+                Location = new Point(0, 0),
+                BackColor = SuccessColor,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
                 Enabled = false
             };
             btnCheckIn.FlatAppearance.BorderSize = 0;
+            btnCheckIn.FlatAppearance.MouseOverBackColor = Color.FromArgb(5, 150, 105);
+            btnCheckIn.Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, btnCheckIn.Width, btnCheckIn.Height, 10, 10));
             btnCheckIn.Click += BtnCheckIn_Click;
 
             btnCheckOut = new Button
             {
-                Text = "🚪 Check-out",
-                Size = new Size(180, 50),
-                Location = new Point(640, 30),
-                BackColor = Color.FromArgb(220, 53, 69),
+                Text = "🚪 CHECK OUT",
+                Size = new Size(250, 60),
+                Location = new Point(270, 0),
+                BackColor = DangerColor,
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Font = new Font("Segoe UI", 13F, FontStyle.Bold),
                 Cursor = Cursors.Hand,
                 Enabled = false
             };
             btnCheckOut.FlatAppearance.BorderSize = 0;
+            btnCheckOut.FlatAppearance.MouseOverBackColor = Color.FromArgb(220, 38, 38);
+            btnCheckOut.Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, btnCheckOut.Width, btnCheckOut.Height, 10, 10));
             btnCheckOut.Click += BtnCheckOut_Click;
 
-            panel.Controls.AddRange(new Control[] { lblTitle, txtGhiChu, btnCheckIn, btnCheckOut });
+            panel.Controls.AddRange(new Control[] { btnCheckIn, btnCheckOut });
             return panel;
         }
+
+        private Panel CreateCard(int width, int height)
+        {
+            var panel = new Panel
+            {
+                Size = new Size(width, height),
+                BackColor = CardBackground
+            };
+
+            // Shadow effect
+            panel.Paint += (s, e) =>
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (Pen shadowPen = new Pen(Color.FromArgb(30, 0, 0, 0), 1))
+                {
+                    e.Graphics.DrawRectangle(shadowPen, 1, 1, width - 3, height - 3);
+                }
+            };
+
+            return panel;
+        }
+
+        // Win32 API for rounded corners
+        [System.Runtime.InteropServices.DllImport("Gdi32.dll", EntryPoint = "CreateRoundRectRgn")]
+        private static extern IntPtr CreateRoundRectRgn(
+            int nLeftRect, int nTopRect, int nRightRect, int nBottomRect,
+            int nWidthEllipse, int nHeightEllipse);
         #endregion
 
         #region Event Handlers
         private void MethodButton_Click(object sender, EventArgs e)
         {
-            var btn = sender as Button;
-            if (btn == null) return;
+            var clickedButton = sender as Button;
+            _currentMethod = clickedButton.Tag.ToString();
 
-            _currentMethod = btn.Tag?.ToString() ?? "manual";
-
-            // Update button styles
-            foreach (Control ctrl in pnlMethodSelection.Controls)
+            // Reset all method buttons
+            foreach (Control control in pnlMethodSelection.Controls)
             {
-                if (ctrl is Button methodBtn && methodBtn.Tag != null)
+                if (control is Button btn && btn.Tag != null)
                 {
-                    if (methodBtn.Tag.ToString() == _currentMethod)
+                    if (btn.Tag.ToString() == _currentMethod)
                     {
-                        methodBtn.BackColor = Color.FromArgb(102, 126, 234);
-                        methodBtn.ForeColor = Color.White;
-                        methodBtn.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+                        btn.BackColor = PrimaryColor;
+                        btn.ForeColor = Color.White;
                     }
                     else
                     {
-                        methodBtn.BackColor = Color.FromArgb(233, 236, 239);
-                        methodBtn.ForeColor = Color.Black;
-                        methodBtn.Font = new Font("Segoe UI", 10F);
+                        btn.BackColor = Color.FromArgb(243, 244, 246);
+                        btn.ForeColor = TextSecondary;
                     }
                 }
             }
 
             // Show/hide sections
-            pnlManualSection.Visible = _currentMethod == "manual";
-            pnlFaceIDSection.Visible = _currentMethod == "faceid";
+            if (_currentMethod == "manual")
+            {
+                pnlManualSection.Visible = true;
+                pnlFaceIDSection.Visible = false;
+            }
+            else if (_currentMethod == "faceid")
+            {
+                pnlManualSection.Visible = false;
+                pnlFaceIDSection.Visible = true;
+                // TODO: Start camera/face recognition
+            }
 
-            // Reset data
             ResetEmployeeData();
         }
 
         private void TxtSearch_TextChanged(object sender, EventArgs e)
         {
-            // Auto-search if input is numeric and has enough digits
-            string text = txtSearch.Text.Trim();
-
-            // Check if it's a valid employee ID (numeric) or phone number
-            if (text.Length >= 3 && (int.TryParse(text, out _) || text.All(char.IsDigit)))
-            {
-                // Delay search to avoid too many queries
-                System.Threading.Tasks.Task.Delay(500).ContinueWith(_ =>
-                {
-                    if (txtSearch.Text.Trim() == text) // Still the same text
-                    {
-                        this.Invoke((MethodInvoker)delegate
-                        {
-                            SearchEmployee(text);
-                        });
-                    }
-                });
-            }
+            // Auto search when typing (debounce can be added)
         }
 
         private void BtnSearch_Click(object sender, EventArgs e)
@@ -433,86 +561,24 @@ namespace Billiard.WinForm.Forms.NhanVien
 
             if (string.IsNullOrEmpty(searchText))
             {
-                MessageBox.Show("⚠️ Vui lòng nhập từ khóa tìm kiếm!", "Thông báo",
+                MessageBox.Show("⚠️ Vui lòng nhập thông tin tìm kiếm!", "Thông báo",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtSearch.Focus();
                 return;
             }
 
-            SearchEmployee(searchText);
-        }
-
-        private void BtnCheckIn_Click(object sender, EventArgs e)
-        {
-            if (_recognizedEmployee == null)
-            {
-                MessageBox.Show("❌ Vui lòng tìm nhân viên trước!", "Lỗi",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            SubmitAttendance(true);
-        }
-
-        private void BtnCheckOut_Click(object sender, EventArgs e)
-        {
-            if (_recognizedEmployee == null)
-            {
-                MessageBox.Show("❌ Vui lòng tìm nhân viên trước!", "Lỗi",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            SubmitAttendance(false);
-        }
-        #endregion
-
-        #region Business Logic
-        private void SearchEmployee(string searchText)
-        {
             try
             {
-                DAL.Entities.NhanVien employee = null;
-
-                // Try to parse as employee ID
-                if (int.TryParse(searchText, out int maNV))
-                {
-                    employee = _nhanVienService.GetEmployeeById(maNV);
-                }
-
-                // If not found, try phone number
-                if (employee == null)
-                {
-                    employee = _nhanVienService.GetEmployeeByPhone(searchText);
-                }
-
-                // If still not found, try name search
-                if (employee == null)
-                {
-                    var allEmployees = _nhanVienService.GetAllEmployees();
-                    employee = allEmployees.FirstOrDefault(e =>
-                        e.TenNv.Contains(searchText, StringComparison.OrdinalIgnoreCase));
-                }
+                var employee = _nhanVienService.SearchEmployee(searchText);
 
                 if (employee == null)
                 {
-                    MessageBox.Show("❌ Không tìm thấy nhân viên!", "Thông báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show($"❌ Không tìm thấy nhân viên với thông tin: {searchText}",
+                        "Không tìm thấy", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     ResetEmployeeData();
                     return;
                 }
 
-                if (employee.TrangThai != "DangLam")
-                {
-                    MessageBox.Show("⚠️ Nhân viên này đã nghỉ việc!", "Cảnh báo",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    ResetEmployeeData();
-                    return;
-                }
-
-                // Load employee data
                 LoadEmployeeData(employee);
-
             }
             catch (Exception ex)
             {
@@ -521,118 +587,108 @@ namespace Billiard.WinForm.Forms.NhanVien
             }
         }
 
+        private void BtnCheckIn_Click(object sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                $"Xác nhận CHECK IN cho nhân viên:\n\n{_recognizedEmployee.TenNv}\nMã NV: {_recognizedEmployee.MaNv}",
+                "Xác nhận Check In",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question
+            );
+
+            if (result == DialogResult.Yes)
+            {
+                SubmitAttendance(true);
+            }
+        }
+
+        private void BtnCheckOut_Click(object sender, EventArgs e)
+        {
+            var result = MessageBox.Show(
+                $"Xác nhận CHECK OUT cho nhân viên:\n\n{_recognizedEmployee.TenNv}\nMã NV: {_recognizedEmployee.MaNv}",
+                "Xác nhận Check Out",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question
+            );
+
+            if (result == DialogResult.Yes)
+            {
+                SubmitAttendance(false);
+            }
+        }
+
+        private void BtnExportExcel_Click(object sender, EventArgs e)
+        {
+            using (var dialog = new ExportAttendanceDialog())
+            {
+                if (dialog.ShowDialog() == DialogResult.OK)
+                {
+                    ExportToExcel(dialog.SelectedMonth, dialog.SelectedYear);
+                }
+            }
+        }
+        #endregion
+
+        #region Business Logic
         private void LoadEmployeeData(DAL.Entities.NhanVien employee)
         {
             _recognizedEmployee = employee;
-            _todayAttendance = _nhanVienService.GetTodayAttendance(employee.MaNv);
 
-            // Update employee info panel
-            UpdateEmployeeInfoPanel();
+            // Update employee info display
+            var lblAvatar = pnlEmployeeInfo.Controls.OfType<Panel>().FirstOrDefault()?.Controls.OfType<Label>().FirstOrDefault();
+            if (lblAvatar != null)
+            {
+                lblAvatar.Text = GetInitials(employee.TenNv);
+            }
 
-            // Update attendance status panel
-            UpdateAttendanceStatusPanel();
+            var lblName = pnlEmployeeInfo.Controls.OfType<Label>().FirstOrDefault(l => l.Font.Size == 14F);
+            if (lblName != null)
+            {
+                lblName.Text = employee.TenNv;
+                lblName.Location = new Point((520 - lblName.PreferredWidth) / 2, 175);
+            }
 
-            // Show panels
+            var lblInfo = pnlEmployeeInfo.Controls.OfType<Label>().FirstOrDefault(l => l.Text.Contains("Mã NV"));
+            if (lblInfo != null)
+            {
+                lblInfo.Text = $"Mã NV: {employee.MaNv} | SĐT: {employee.Sdt ?? "N/A"}";
+                lblInfo.Location = new Point((520 - lblInfo.PreferredWidth) / 2, 205);
+            }
+
             pnlEmployeeInfo.Visible = true;
+
+            // Load today's attendance
+            _todayAttendance = _nhanVienService.GetTodayAttendance(employee.MaNv);
+            UpdateAttendanceStatus();
+
             pnlAttendanceStatus.Visible = true;
         }
 
-        private void UpdateEmployeeInfoPanel()
+        private void UpdateAttendanceStatus()
         {
-            pnlEmployeeInfo.Controls.Clear();
-
-            if (_recognizedEmployee == null) return;
-
-            var lblTitle = new Label
+            // Clear existing status
+            var existingStatus = pnlAttendanceStatus.Controls.OfType<Panel>().Where(p => p.Location.Y > 50).ToList();
+            foreach (var panel in existingStatus)
             {
-                Text = "👤 Thông tin nhân viên",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(20, 15)
-            };
+                pnlAttendanceStatus.Controls.Remove(panel);
+            }
 
-            var avatar = new Panel
-            {
-                Size = new Size(60, 60),
-                Location = new Point(20, 45),
-                BackColor = Color.FromArgb(102, 126, 234)
-            };
-
-            var lblInitial = new Label
-            {
-                Text = GetInitials(_recognizedEmployee.TenNv),
-                Font = new Font("Segoe UI", 20F, FontStyle.Bold),
-                ForeColor = Color.White,
-                Size = new Size(60, 60),
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-            avatar.Controls.Add(lblInitial);
-
-            var lblName = new Label
-            {
-                Text = _recognizedEmployee.TenNv,
-                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(26, 26, 46),
-                AutoSize = true,
-                Location = new Point(90, 50)
-            };
-
-            var lblRole = new Label
-            {
-                Text = $"👔 {_recognizedEmployee.MaNhomNavigation?.TenNhom ?? "Nhân viên"} • Ca {_recognizedEmployee.CaMacDinh}",
-                Font = new Font("Segoe UI", 9F),
-                ForeColor = Color.Gray,
-                AutoSize = true,
-                Location = new Point(90, 75)
-            };
-
-            var lblPhone = new Label
-            {
-                Text = $"📱 {_recognizedEmployee.Sdt}",
-                Font = new Font("Segoe UI", 9F),
-                ForeColor = Color.Gray,
-                AutoSize = true,
-                Location = new Point(300, 75)
-            };
-
-            pnlEmployeeInfo.Controls.AddRange(new Control[]
-            {
-                lblTitle, avatar, lblName, lblRole, lblPhone
-            });
-        }
-
-        private void UpdateAttendanceStatusPanel()
-        {
-            pnlAttendanceStatus.Controls.Clear();
-
-            if (_recognizedEmployee == null) return;
-
-            var lblTitle = new Label
-            {
-                Text = "📊 Trạng thái chấm công hôm nay",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                AutoSize = true,
-                Location = new Point(20, 15)
-            };
-
-            pnlAttendanceStatus.Controls.Add(lblTitle);
-
-            if (_todayAttendance == null || !_todayAttendance.GioVao.HasValue)
+            if (_todayAttendance == null)
             {
                 // Chưa check-in
                 var statusPanel = new Panel
                 {
-                    Size = new Size(800, 40),
-                    Location = new Point(20, 45),
-                    BackColor = Color.FromArgb(255, 243, 205)
+                    Size = new Size(470, 50),
+                    Location = new Point(25, 60),
+                    BackColor = Color.FromArgb(254, 243, 199)
                 };
 
                 var lblStatus = new Label
                 {
-                    Text = "⏰ Chưa chấm công hôm nay - Sẵn sàng Check-in",
-                    Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                    ForeColor = Color.FromArgb(133, 100, 4),
-                    Location = new Point(15, 10),
+                    Text = "⏰ Chưa chấm công hôm nay",
+                    Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(180, 83, 9),
+                    Location = new Point(15, 15),
                     AutoSize = true
                 };
 
@@ -642,14 +698,14 @@ namespace Billiard.WinForm.Forms.NhanVien
                 btnCheckIn.Enabled = true;
                 btnCheckOut.Enabled = false;
             }
-            else if (_todayAttendance.GioVao.HasValue && !_todayAttendance.GioRa.HasValue)
+            else if (_todayAttendance.GioRa == null)
             {
                 // Đã check-in, chưa check-out
                 var statusPanel = new Panel
                 {
-                    Size = new Size(800, 40),
-                    Location = new Point(20, 45),
-                    BackColor = Color.FromArgb(212, 237, 218)
+                    Size = new Size(470, 50),
+                    Location = new Point(25, 60),
+                    BackColor = Color.FromArgb(209, 250, 229)
                 };
 
                 var gioVao = _todayAttendance.GioVao.Value.ToString("HH:mm");
@@ -657,10 +713,10 @@ namespace Billiard.WinForm.Forms.NhanVien
 
                 var lblStatus = new Label
                 {
-                    Text = $"✅ Đã Check-in lúc {gioVao} • Đang làm việc: {workingHours:F1}h",
-                    Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                    ForeColor = Color.FromArgb(21, 87, 36),
-                    Location = new Point(15, 10),
+                    Text = $"✅ Check-in: {gioVao} • Làm việc: {workingHours:F1}h",
+                    Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(6, 95, 70),
+                    Location = new Point(15, 15),
                     AutoSize = true
                 };
 
@@ -675,9 +731,9 @@ namespace Billiard.WinForm.Forms.NhanVien
                 // Đã hoàn thành
                 var statusPanel = new Panel
                 {
-                    Size = new Size(800, 40),
-                    Location = new Point(20, 45),
-                    BackColor = Color.FromArgb(209, 231, 221)
+                    Size = new Size(470, 50),
+                    Location = new Point(25, 60),
+                    BackColor = Color.FromArgb(220, 252, 231)
                 };
 
                 var gioVao = _todayAttendance.GioVao.Value.ToString("HH:mm");
@@ -686,10 +742,10 @@ namespace Billiard.WinForm.Forms.NhanVien
 
                 var lblStatus = new Label
                 {
-                    Text = $"✅ Đã hoàn thành: {gioVao} → {gioRa} • Tổng: {soGio:F1}h",
-                    Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                    ForeColor = Color.FromArgb(16, 109, 74),
-                    Location = new Point(15, 10),
+                    Text = $"✅ Hoàn thành: {gioVao} → {gioRa} ({soGio:F1}h)",
+                    Font = new Font("Segoe UI", 11F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(5, 122, 85),
+                    Location = new Point(15, 15),
                     AutoSize = true
                 };
 
@@ -731,8 +787,8 @@ namespace Billiard.WinForm.Forms.NhanVien
                     var now = DateTime.Now.ToString("HH:mm");
 
                     MessageBox.Show(
-                        $"✅ {actionType} thành công lúc {now}!\n\nNhân viên: {_recognizedEmployee.TenNv}",
-                        "Thành công",
+                        $"✅ {actionType} thành công!\n\nThời gian: {now}\nNhân viên: {_recognizedEmployee.TenNv}",
+                        "Thành Công",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information
                     );
@@ -760,6 +816,82 @@ namespace Billiard.WinForm.Forms.NhanVien
             catch (Exception ex)
             {
                 MessageBox.Show($"❌ Lỗi: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void ExportToExcel(int month, int year)
+        {
+            try
+            {
+                var data = _nhanVienService.GetAttendanceReport(month, year);
+
+                if (data == null || data.Count == 0)
+                {
+                    MessageBox.Show("Không có dữ liệu chấm công trong tháng này!",
+                        "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                using (var workbook = new XLWorkbook())
+                {
+                    var worksheet = workbook.Worksheets.Add($"Cham_Cong_{month}_{year}");
+
+                    // Headers
+                    worksheet.Cell(1, 1).Value = "Mã NV";
+                    worksheet.Cell(1, 2).Value = "Tên nhân viên";
+                    worksheet.Cell(1, 3).Value = "Ngày";
+                    worksheet.Cell(1, 4).Value = "Giờ vào";
+                    worksheet.Cell(1, 5).Value = "Giờ ra";
+                    worksheet.Cell(1, 6).Value = "Số giờ làm";
+                    worksheet.Cell(1, 7).Value = "Ghi chú";
+
+                    // Data
+                    int row = 2;
+                    foreach (var item in data)
+                    {
+                        // item is ChamCong (entity) — use its properties and the navigation property for employee name
+                        worksheet.Cell(row, 1).Value = item.MaNv;
+                        worksheet.Cell(row, 2).Value = item.MaNvNavigation?.TenNv ?? string.Empty;
+
+                        // ChamCong.Ngay is DateOnly; guard nullability if necessary
+                        try
+                        {
+                            worksheet.Cell(row, 3).Value = item.Ngay.ToString("dd/MM/yyyy");
+                        }
+                        catch
+                        {
+                            worksheet.Cell(row, 3).Value = string.Empty;
+                        }
+
+                        worksheet.Cell(row, 4).Value = item.GioVao?.ToString("HH:mm") ?? string.Empty;
+                        worksheet.Cell(row, 5).Value = item.GioRa?.ToString("HH:mm") ?? string.Empty;
+                        worksheet.Cell(row, 6).Value = item.SoGioLam ?? 0;
+                        worksheet.Cell(row, 7).Value = item.GhiChu ?? string.Empty;
+                        row++;
+                    }
+
+                    // Auto-fit columns
+                    worksheet.Columns().AdjustToContents();
+
+                    // Save dialog
+                    using (var sfd = new SaveFileDialog())
+                    {
+                        sfd.Filter = "Excel Files|*.xlsx";
+                        sfd.FileName = $"BaoCaoChamCong_{month}_{year}.xlsx";
+
+                        if (sfd.ShowDialog() == DialogResult.OK)
+                        {
+                            workbook.SaveAs(sfd.FileName);
+                            MessageBox.Show("✅ Xuất báo cáo thành công!", "Thành công",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"❌ Lỗi khi xuất Excel: {ex.Message}", "Lỗi",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -792,4 +924,120 @@ namespace Billiard.WinForm.Forms.NhanVien
         }
         #endregion
     }
+
+    #region Export Dialog
+    public class ExportAttendanceDialog : Form
+    {
+        public int SelectedMonth { get; private set; }
+        public int SelectedYear { get; private set; }
+
+        private ComboBox cboMonth;
+        private ComboBox cboYear;
+
+        public ExportAttendanceDialog()
+        {
+            InitializeComponent();
+        }
+
+        private void InitializeComponent()
+        {
+            this.Text = "Chọn Tháng Xuất Báo Cáo";
+            this.Size = new Size(400, 250);
+            this.StartPosition = FormStartPosition.CenterParent;
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.BackColor = Color.FromArgb(249, 250, 251);
+
+            var lblTitle = new Label
+            {
+                Text = "📊 Xuất Báo Cáo Chấm Công",
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(79, 70, 229),
+                AutoSize = true,
+                Location = new Point(30, 20)
+            };
+
+            var lblMonth = new Label
+            {
+                Text = "Tháng:",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(40, 70),
+                AutoSize = true
+            };
+
+            cboMonth = new ComboBox
+            {
+                Location = new Point(130, 68),
+                Width = 220,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10F)
+            };
+            for (int i = 1; i <= 12; i++)
+            {
+                cboMonth.Items.Add($"Tháng {i}");
+            }
+            cboMonth.SelectedIndex = DateTime.Now.Month - 1;
+
+            var lblYear = new Label
+            {
+                Text = "Năm:",
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Location = new Point(40, 110),
+                AutoSize = true
+            };
+
+            cboYear = new ComboBox
+            {
+                Location = new Point(130, 108),
+                Width = 220,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 10F)
+            };
+            int currentYear = DateTime.Now.Year;
+            for (int i = currentYear - 5; i <= currentYear + 1; i++)
+            {
+                cboYear.Items.Add(i);
+            }
+            cboYear.SelectedItem = currentYear;
+
+            var btnOK = new Button
+            {
+                Text = "✅ Xuất Excel",
+                Location = new Point(90, 160),
+                Size = new Size(120, 40),
+                BackColor = Color.FromArgb(16, 185, 129),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                DialogResult = DialogResult.OK
+            };
+            btnOK.FlatAppearance.BorderSize = 0;
+            btnOK.Click += (s, e) =>
+            {
+                SelectedMonth = cboMonth.SelectedIndex + 1;
+                SelectedYear = (int)cboYear.SelectedItem;
+            };
+
+            var btnCancel = new Button
+            {
+                Text = "❌ Hủy",
+                Location = new Point(230, 160),
+                Size = new Size(120, 40),
+                BackColor = Color.FromArgb(239, 68, 68),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Cursor = Cursors.Hand,
+                DialogResult = DialogResult.Cancel
+            };
+            btnCancel.FlatAppearance.BorderSize = 0;
+
+            this.Controls.AddRange(new Control[] { lblTitle, lblMonth, cboMonth, lblYear, cboYear, btnOK, btnCancel });
+            this.AcceptButton = btnOK;
+            this.CancelButton = btnCancel;
+        }
+    }
+    #endregion
 }

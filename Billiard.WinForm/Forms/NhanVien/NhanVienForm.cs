@@ -19,10 +19,10 @@ namespace Billiard.WinForm.Forms.NhanVien
         private int _currentUserId;
         private string _currentUserRole;
 
-        // [MODIFIED] Thêm tham chiếu đến MainForm và loại bỏ panel detail nội bộ
         private MainForm _mainForm;
         private ChiTietNhanVienControl _currentDetailControl;
-        private int _currentSelectedEmployeeId = -1; // Track employee đang được xem
+        private int _currentSelectedEmployeeId = -1;
+        private const int DETAIL_PANEL_WIDTH = 450;
         #endregion
 
         #region Constructor
@@ -30,17 +30,21 @@ namespace Billiard.WinForm.Forms.NhanVien
         {
             InitializeComponent();
             _nhanVienService = nhanVienService;
-            // [REMOVED] Bỏ InitializeDetailPanel()
+
+            // [OPTIMIZED] Enable double buffering cho form để giảm flicker
+            SetStyle(ControlStyles.OptimizedDoubleBuffer |
+                     ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.UserPaint, true);
+            UpdateStyles();
+
+            // [OPTIMIZED] Enable double buffering cho FlowLayoutPanel
+            typeof(FlowLayoutPanel).InvokeMember("DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic,
+                null, flowLayoutEmployees, new object[] { true });
         }
         #endregion
-
-        // [MODIFIED] Thêm phương thức SetMainForm
-        public void SetMainForm(MainForm mainForm)
-        {
-            _mainForm = mainForm;
-        }
-
-        // [REMOVED] Logic InitializeDetailPanel đã được xóa
 
         public void SetUserInfo(int userId, string userRole)
         {
@@ -49,22 +53,34 @@ namespace Billiard.WinForm.Forms.NhanVien
             SetupPermissions();
         }
 
+        public void SetMainForm(MainForm mainForm)
+        {
+            _mainForm = mainForm;
+        }
+
         #region Form Events
         private void NhanVienForm_Load(object sender, EventArgs e)
         {
             try
             {
-                // [MODIFIED] Đảm bảo panel detail trên MainForm bị ẩn khi load form
-                _mainForm?.HideDetailPanel();
+                // [OPTIMIZED] Suspend layout để tránh redraw nhiều lần
+                SuspendLayout();
+
+                // Ẩn detail panel khi load form
+                HideDetailPanel();
                 LoadEmployees();
+
+                // [OPTIMIZED] Resume layout sau khi hoàn tất
+                ResumeLayout(false);
+                PerformLayout();
             }
             catch (Exception ex)
             {
+                ResumeLayout(false);
                 MessageBox.Show($"Lỗi khi tải dữ liệu: {ex.Message}", "Lỗi", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        // [MODIFIED] Thêm OnFormClosing để ẩn detail panel khi form con đóng
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
             HideDetailPanel();
@@ -99,26 +115,42 @@ namespace Billiard.WinForm.Forms.NhanVien
 
         private void DisplayEmployees()
         {
-            flowLayoutEmployees.Controls.Clear();
-            if (_filteredEmployees == null || !_filteredEmployees.Any())
+            // [OPTIMIZED] Suspend layout để giảm flicker
+            flowLayoutEmployees.SuspendLayout();
+            try
             {
-                ShowEmptyState();
-                return;
+                flowLayoutEmployees.Controls.Clear();
+
+                if (_filteredEmployees == null || !_filteredEmployees.Any())
+                {
+                    ShowEmptyState();
+                    return;
+                }
+
+                // [OPTIMIZED] Tạo tất cả cards trước khi add vào flow layout
+                var cards = new List<Panel>(_filteredEmployees.Count);
+                foreach (var emp in _filteredEmployees)
+                {
+                    var card = CreateEmployeeCard(emp);
+                    cards.Add(card);
+                }
+
+                // [OPTIMIZED] Add tất cả cards một lúc
+                flowLayoutEmployees.Controls.AddRange(cards.ToArray());
             }
-            foreach (var emp in _filteredEmployees)
+            finally
             {
-                var card = CreateEmployeeCard(emp);
-                flowLayoutEmployees.Controls.Add(card);
+                // [OPTIMIZED] Resume layout một lần duy nhất
+                flowLayoutEmployees.ResumeLayout(true);
             }
         }
 
         private void ShowEmptyState()
         {
             var emptyPanel = new Panel { Size = new Size(flowLayoutEmployees.Width - 40, 300), BackColor = Color.White };
-            var lblIcon = new Label { Text = "👥", Font = new Font("Segoe UI", 48F), AutoSize = true, Location = new Point((emptyPanel.Width - 100) / 2, 60) };
             var lblTitle = new Label { Text = "Không có nhân viên nào", Font = new Font("Segoe UI", 16F, FontStyle.Bold), AutoSize = true, Location = new Point((emptyPanel.Width - 250) / 2, 140) };
             var lblText = new Label { Text = "Chưa có nhân viên trong hệ thống", Font = new Font("Segoe UI", 11F), ForeColor = Color.Gray, AutoSize = true, Location = new Point((emptyPanel.Width - 280) / 2, 180) };
-            emptyPanel.Controls.AddRange(new Control[] { lblIcon, lblTitle, lblText });
+            emptyPanel.Controls.AddRange(new Control[] { lblTitle, lblText });
             flowLayoutEmployees.Controls.Add(emptyPanel);
         }
         #endregion
@@ -134,6 +166,19 @@ namespace Billiard.WinForm.Forms.NhanVien
                 Cursor = Cursors.Hand,
                 Tag = emp
             };
+
+            // [OPTIMIZED] Enable double buffering cho card
+            typeof(Panel).InvokeMember("DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.NonPublic,
+                null, card, new object[] { true });
+
+            // Highlight card nếu đang được chọn
+            if (_currentSelectedEmployeeId == emp.MaNv)
+            {
+                card.BackColor = Color.FromArgb(232, 240, 254);
+            }
 
             // Hover effects
             card.MouseEnter += (s, e) =>
@@ -155,7 +200,6 @@ namespace Billiard.WinForm.Forms.NhanVien
             {
                 foreach (Control child in parent.Controls)
                 {
-                    // Bỏ qua buttons
                     if (child is Button) continue;
 
                     child.Click += (s, e) => ViewEmployeeDetail(emp);
@@ -173,18 +217,6 @@ namespace Billiard.WinForm.Forms.NhanVien
             {
                 try
                 {
-                    // Lỗi: đường dẫn asset/img/{emp.FaceidAnh} không khả dụng trong môi trường này. 
-                    // Tạm thời hiển thị placeholder.
-                    // var pic = new PictureBox
-                    // {
-                    //     Size = new Size(280, 200),
-                    //     Image = Image.FromFile($"asset/img/{emp.FaceidAnh}"),
-                    //     SizeMode = PictureBoxSizeMode.Zoom,
-                    //     Location = new Point(0, 0)
-                    // };
-                    // pic.Click += (s, e) => ViewEmployeeDetail(emp);
-                    // pic.Cursor = Cursors.Hand;
-                    // imgPanel.Controls.Add(pic);
                     AddAvatarPlaceholder(imgPanel, emp.TenNv);
                 }
                 catch
@@ -223,157 +255,162 @@ namespace Billiard.WinForm.Forms.NhanVien
             };
             imgPanel.Controls.AddRange(new Control[] { statusBadge, roleBadge });
 
-            // Nút Edit - CHỈ HIỂN THỊ CHO ADMIN/QUẢN LÝ
+            // Nút Edit
             if (_currentUserRole == "Admin" || _currentUserRole == "Quản lý")
             {
                 var btnQuickEdit = new Button
                 {
                     Text = "✏️",
-                    Font = new Font("Segoe UI", 12F, FontStyle.Bold),
                     Size = new Size(35, 35),
-                    Location = new Point(238, 8),
-                    BackColor = Color.FromArgb(59, 130, 246),
-                    ForeColor = Color.White,
+                    Location = new Point(235, 10),
+                    BackColor = Color.White,
+                    ForeColor = Color.FromArgb(102, 126, 234),
                     FlatStyle = FlatStyle.Flat,
-                    Cursor = Cursors.Hand,
-                    Tag = emp,
-                    TabStop = false // Tránh focus khi tab
+                    Font = new Font("Segoe UI", 12F),
+                    Cursor = Cursors.Hand
                 };
                 btnQuickEdit.FlatAppearance.BorderSize = 0;
-
-                // Hover effect cho nút edit
-                btnQuickEdit.MouseEnter += (s, e) => btnQuickEdit.BackColor = Color.FromArgb(37, 99, 235);
-                btnQuickEdit.MouseLeave += (s, e) => btnQuickEdit.BackColor = Color.FromArgb(59, 130, 246);
-
-                // Event click cho nút Edit - NGĂN PROPAGATION
-                btnQuickEdit.Click += (s, e) =>
-                {
-                    OpenEditForm(emp);
-                };
-
+                btnQuickEdit.Click += (s, e) => { e = e ?? EventArgs.Empty; OpenEditForm(emp); };
                 imgPanel.Controls.Add(btnQuickEdit);
-                btnQuickEdit.BringToFront();
             }
 
-            // Content panel
-            var contentPanel = new Panel { Size = new Size(280, 180), Location = new Point(0, 200), BackColor = Color.White };
-            var lblName = new Label { Text = emp.TenNv, Font = new Font("Segoe UI", 12F, FontStyle.Bold), Location = new Point(15, 15), Size = new Size(250, 25), ForeColor = Color.FromArgb(26, 26, 46) };
-            var lblId = new Label { Text = $"#{emp.MaNv}", Font = new Font("Segoe UI", 9F), Location = new Point(15, 42), ForeColor = Color.Gray, AutoSize = true };
-            var lblPhone = new Label { Text = $"📱 {emp.Sdt}", Font = new Font("Segoe UI", 9F), Location = new Point(15, 65), Size = new Size(250, 20) };
-            var lblShift = new Label { Text = $"{GetShiftIcon(emp.CaMacDinh)} {emp.CaMacDinh}", BackColor = Color.FromArgb(233, 236, 239), Font = new Font("Segoe UI", 8F), Padding = new Padding(6, 3, 6, 3), AutoSize = true, Location = new Point(15, 95) };
-            decimal total = (emp.LuongCoBan ?? 0) + (emp.PhuCap ?? 0);
-            var lblSalary = new Label { Text = $"💵 {total:N0}đ", Font = new Font("Segoe UI", 10F, FontStyle.Bold), ForeColor = Color.FromArgb(102, 126, 234), Location = new Point(15, 130), Size = new Size(250, 25) };
+            // Info panel
+            var infoPanel = new Panel { Size = new Size(280, 180), Location = new Point(0, 200), BackColor = Color.White };
 
-            contentPanel.Controls.AddRange(new Control[] { lblName, lblId, lblPhone, lblShift, lblSalary });
-            card.Controls.AddRange(new Control[] { imgPanel, contentPanel });
-
-            // Áp dụng click handler cho tất cả children
-            AddClickHandlerToChildren(card);
-
-            // Highlight card nếu đang được chọn
-            if (_currentSelectedEmployeeId == emp.MaNv)
+            var lblName = new Label
             {
-                card.BackColor = Color.FromArgb(224, 231, 255);
-            }
+                Text = emp.TenNv,
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(26, 26, 46),
+                Location = new Point(15, 15),
+                Size = new Size(250, 30),
+                AutoSize = false,
+                AutoEllipsis = true
+            };
+
+            var lblPhone = new Label
+            {
+                Text = $"📱 {emp.Sdt ?? "Chưa có SĐT"}",
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = Color.Gray,
+                Location = new Point(15, 50),
+                AutoSize = true
+            };
+
+            var lblEmail = new Label
+            {
+                Text = $"📧 {emp.Email ?? "Chưa có email"}",
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = Color.Gray,
+                Location = new Point(15, 75),
+                Size = new Size(250, 20),
+                AutoSize = false,
+                AutoEllipsis = true
+            };
+
+            var lblSalary = new Label
+            {
+                Text = $"💰 {emp.LuongCoBan:N0}đ",
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(40, 167, 69),
+                Location = new Point(15, 100),
+                AutoSize = true
+            };
+
+            var lblShift = new Label
+            {
+                Text = GetShiftText(emp.CaMacDinh),
+                Font = new Font("Segoe UI", 9F),
+                ForeColor = Color.FromArgb(102, 126, 234),
+                Location = new Point(15, 125),
+                AutoSize = true
+            };
+
+            infoPanel.Controls.AddRange(new Control[] { lblName, lblPhone, lblEmail, lblSalary, lblShift });
+            card.Controls.AddRange(new Control[] { imgPanel, infoPanel });
+
+            AddClickHandlerToChildren(card);
 
             return card;
         }
 
-        private void AddAvatarPlaceholder(Panel panel, string name)
+        private void AddAvatarPlaceholder(Panel imgPanel, string tenNv)
         {
-            var initial = name?.Length > 0 ? name.Substring(0, 1).ToUpper() : "?";
-            var lbl = new Label
+            var lblAvatar = new Label
             {
-                Text = initial,
+                Text = !string.IsNullOrEmpty(tenNv) ? tenNv.Substring(0, 1).ToUpper() : "?",
                 Font = new Font("Segoe UI", 48F, FontStyle.Bold),
                 ForeColor = Color.White,
                 Size = new Size(280, 200),
-                TextAlign = ContentAlignment.MiddleCenter
+                TextAlign = ContentAlignment.MiddleCenter,
+                BackColor = Color.Transparent
             };
-            lbl.Click += (s, e) =>
+            imgPanel.Controls.Add(lblAvatar);
+        }
+
+        private static Color GetRoleColor(string role)
+        {
+            return role switch
             {
-                if (panel.Tag is DAL.Entities.NhanVien emp)
-                    ViewEmployeeDetail(emp);
+                "Admin" => Color.FromArgb(220, 53, 69),
+                "Quản lý" => Color.FromArgb(255, 193, 7),
+                "Thu ngân" => Color.FromArgb(23, 162, 184),
+                "Phục vụ" => Color.FromArgb(40, 167, 69),
+                _ => Color.Gray
             };
-            lbl.Cursor = Cursors.Hand;
-            panel.Controls.Add(lbl);
+        }
+
+        private static string GetRoleIcon(string role)
+        {
+            return role switch
+            {
+                "Admin" => "👑",
+                "Quản lý" => "📋",
+                "Thu ngân" => "💰",
+                "Phục vụ" => "🍽️",
+                _ => "👤"
+            };
+        }
+
+        private static string GetShiftText(string shift)
+        {
+            return shift switch
+            {
+                "Sang" => "🌅 Ca sáng",
+                "Chieu" => "☀️ Ca chiều",
+                "Toi" => "🌙 Ca tối",
+                "FullTime" => "⏰ Full time",
+                _ => shift
+            };
         }
         #endregion
 
-        #region Helper Methods
-        private string GetRoleIcon(string role) => role switch
-        {
-            "Admin" => "👑",
-            "Quản lý" => "⭐",
-            "Thu ngân" => "💰",
-            "Phục vụ" => "👨‍🍳",
-            _ => "👤"
-        };
-
-        private Color GetRoleColor(string role) => role switch
-        {
-            "Admin" => Color.FromArgb(220, 53, 69),
-            "Quản lý" => Color.FromArgb(255, 193, 7),
-            "Thu ngân" => Color.FromArgb(23, 162, 184),
-            "Phục vụ" => Color.FromArgb(40, 167, 69),
-            _ => Color.Gray
-        };
-
-        private string GetShiftIcon(string shift) => shift switch
-        {
-            "Sang" => "🌅",
-            "Chieu" => "☀️",
-            "Toi" => "🌙",
-            "FullTime" => "⏰",
-            _ => "⏰"
-        };
-        #endregion
-
-        #region Filter Methods
+        #region Filter Events
         private void FilterStatus_Click(object sender, EventArgs e)
         {
-            var btn = sender as Button;
-            if (btn == null) return;
-            _currentStatusFilter = btn.Tag?.ToString() ?? "all";
-            UpdateStatusButtonStyles(btn);
-            ApplyFilters();
+            if (sender is Button btn)
+            {
+                _currentStatusFilter = btn.Tag?.ToString() ?? "all";
+                UpdateFilterButtons(new[] { btnFilterAll, btnFilterActive, btnFilterInactive }, btn);
+                ApplyFilters();
+            }
         }
 
         private void FilterRole_Click(object sender, EventArgs e)
         {
-            var btn = sender as Button;
-            if (btn == null) return;
-            _currentRoleFilter = btn.Tag?.ToString() ?? "all";
-            UpdateRoleButtonStyles(btn);
-            ApplyFilters();
-        }
-
-        private void UpdateStatusButtonStyles(Button activeBtn)
-        {
-            var statusBtns = new[] { btnFilterAll, btnFilterActive, btnFilterInactive };
-            foreach (var b in statusBtns)
+            if (sender is Button btn)
             {
-                if (b == activeBtn)
-                {
-                    b.BackColor = Color.FromArgb(102, 126, 234);
-                    b.ForeColor = Color.White;
-                    b.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-                }
-                else
-                {
-                    b.BackColor = Color.FromArgb(233, 236, 239);
-                    b.ForeColor = Color.Black;
-                    b.Font = new Font("Segoe UI", 9F);
-                }
+                _currentRoleFilter = btn.Tag?.ToString() ?? "all";
+                UpdateFilterButtons(new[] { btnRoleAll, btnRoleAdmin, btnRoleManager, btnRoleCashier, btnRoleStaff }, btn);
+                ApplyFilters();
             }
         }
 
-        private void UpdateRoleButtonStyles(Button activeBtn)
+        private void UpdateFilterButtons(Button[] buttons, Button activeButton)
         {
-            var roleBtns = new[] { btnRoleAll, btnRoleAdmin, btnRoleManager, btnRoleCashier, btnRoleStaff };
-            foreach (var b in roleBtns)
+            foreach (var b in buttons)
             {
-                if (b == activeBtn)
+                if (b == activeButton)
                 {
                     b.BackColor = Color.FromArgb(102, 126, 234);
                     b.ForeColor = Color.White;
@@ -411,7 +448,6 @@ namespace Billiard.WinForm.Forms.NhanVien
             if (addForm.ShowDialog() == DialogResult.OK)
             {
                 LoadEmployees();
-                // Ẩn detail panel khi thêm mới
                 HideDetailPanel();
             }
         }
@@ -423,8 +459,6 @@ namespace Billiard.WinForm.Forms.NhanVien
                 var chamCongForm = new ChamCongForm();
                 chamCongForm.SetUserInfo(_currentUserId, _currentUserRole);
                 chamCongForm.ShowDialog(this);
-
-                // Reload data nếu cần
                 LoadEmployees();
             }
             catch (Exception ex)
@@ -448,50 +482,81 @@ namespace Billiard.WinForm.Forms.NhanVien
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        private void btnSalary_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var salaryForm = new SalaryManagementForm(_nhanVienService);
+                salaryForm.SetUserInfo(_currentUserId, _currentUserRole);
+                salaryForm.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Lỗi khi mở form bảng lương: {ex.Message}", "Lỗi",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
         #endregion
 
         #region Navigation Methods
         private void ViewEmployeeDetail(DAL.Entities.NhanVien emp)
         {
-            if (_mainForm == null) return;
+            // [OPTIMIZED] Suspend layout trong khi thay đổi UI
+            tableLayoutMain.SuspendLayout();
+            pnlDetailContainer.SuspendLayout();
 
-            // [MODIFIED] KIỂM TRA: Nếu đang xem cùng nhân viên thì chỉ reload detail
-            if (_currentSelectedEmployeeId == emp.MaNv && _mainForm.pnlDetail.Visible)
+            try
             {
-                // Reload data trong control hiện tại
-                _ = _currentDetailControl?.LoadNhanVienDetail();
-                return;
+                if (_currentSelectedEmployeeId == emp.MaNv && pnlDetailContainer.Visible)
+                {
+                    _ = _currentDetailControl?.LoadNhanVienDetail();
+                    return;
+                }
+
+                _currentSelectedEmployeeId = emp.MaNv;
+                DisplayEmployees();
+
+                if (_currentDetailControl != null)
+                {
+                    _currentDetailControl.OnDataChanged -= DetailControl_OnDataChanged;
+                    _currentDetailControl.Dispose();
+                    _currentDetailControl = null;
+                }
+
+                _currentDetailControl = new ChiTietNhanVienControl(_nhanVienService, emp, _currentUserId, _currentUserRole);
+                _currentDetailControl.OnDataChanged += DetailControl_OnDataChanged;
+
+                ShowDetailPanel();
+
+                pnlDetailContainer.Controls.Clear();
+                _currentDetailControl.Dock = DockStyle.Fill;
+                pnlDetailContainer.Controls.Add(_currentDetailControl);
             }
-
-            // Cập nhật ID nhân viên đang được chọn
-            _currentSelectedEmployeeId = emp.MaNv;
-
-            // Refresh lại display để highlight card được chọn
-            DisplayEmployees();
-
-            // Xử lý control cũ
-            if (_currentDetailControl != null)
+            finally
             {
-                _currentDetailControl.OnDataChanged -= DetailControl_OnDataChanged;
-                _currentDetailControl.Dispose();
-                _currentDetailControl = null;
+                // [OPTIMIZED] Resume layout
+                pnlDetailContainer.ResumeLayout(true);
+                tableLayoutMain.ResumeLayout(true);
             }
+        }
 
-            // Tạo control mới
-            _currentDetailControl = new ChiTietNhanVienControl(_nhanVienService, emp, _currentUserId, _currentUserRole);
-
-            // Subscribe events
-            _currentDetailControl.OnDataChanged += DetailControl_OnDataChanged;
-
-            // [MODIFIED] Gọi MainForm để hiển thị control trong pnlDetail
-            _mainForm.UpdateDetailPanel($"Chi tiết nhân viên: {emp.TenNv}", _currentDetailControl, 450);
+        private void ShowDetailPanel()
+        {
+            tableLayoutMain.ColumnStyles[1].SizeType = SizeType.Absolute;
+            tableLayoutMain.ColumnStyles[1].Width = DETAIL_PANEL_WIDTH;
+            tableLayoutMain.ColumnStyles[0].SizeType = SizeType.Percent;
+            tableLayoutMain.ColumnStyles[0].Width = 100F;
+            pnlDetailContainer.Visible = true;
         }
 
         private void HideDetailPanel()
         {
-            // [MODIFIED] Gọi MainForm để ẩn pnlDetail
-            _mainForm?.HideDetailPanel();
-
+            pnlDetailContainer.Visible = false;
+            tableLayoutMain.ColumnStyles[1].SizeType = SizeType.Absolute;
+            tableLayoutMain.ColumnStyles[1].Width = 0;
+            tableLayoutMain.ColumnStyles[0].SizeType = SizeType.Percent;
+            tableLayoutMain.ColumnStyles[0].Width = 100F;
             _currentSelectedEmployeeId = -1;
 
             if (_currentDetailControl != null)
@@ -501,19 +566,15 @@ namespace Billiard.WinForm.Forms.NhanVien
                 _currentDetailControl = null;
             }
 
-            // Refresh để bỏ highlight
             DisplayEmployees();
         }
 
         private void DetailControl_OnDataChanged(object sender, EventArgs e)
         {
-            // Reload danh sách nhân viên
             LoadEmployees();
 
-            // Reload detail nếu panel đang hiển thị
-            if (_currentDetailControl != null && _mainForm.pnlDetail.Visible && _currentSelectedEmployeeId > 0)
+            if (_currentDetailControl != null && pnlDetailContainer.Visible && _currentSelectedEmployeeId > 0)
             {
-                // Lấy lại thông tin nhân viên mới nhất
                 var updatedEmp = _allEmployees.FirstOrDefault(x => x.MaNv == _currentSelectedEmployeeId);
                 if (updatedEmp != null)
                 {
@@ -529,8 +590,7 @@ namespace Billiard.WinForm.Forms.NhanVien
             {
                 LoadEmployees();
 
-                // Reload detail nếu đang hiển thị nhân viên này
-                if (_currentDetailControl != null && _mainForm.pnlDetail.Visible && _currentSelectedEmployeeId == emp.MaNv)
+                if (_currentDetailControl != null && pnlDetailContainer.Visible && _currentSelectedEmployeeId == emp.MaNv)
                 {
                     _ = _currentDetailControl.LoadNhanVienDetail();
                 }
@@ -540,21 +600,6 @@ namespace Billiard.WinForm.Forms.NhanVien
 
         private void flowLayoutEmployees_Paint(object sender, PaintEventArgs e)
         {
-        }
-
-        private void btnSalary_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                var salaryForm = new SalaryManagementForm(_nhanVienService);
-                salaryForm.SetUserInfo(_currentUserId, _currentUserRole);
-                salaryForm.ShowDialog(this);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Lỗi khi mở form bảng lương: {ex.Message}", "Lỗi",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
         }
     }
 }

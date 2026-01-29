@@ -1,5 +1,6 @@
-﻿using Billiard.DAL.Entities;
-using Billiard.DAL.Data;
+﻿using Billiard.DAL.Data;
+using Billiard.DAL.Entities;
+using Emgu.CV.Ocl;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -20,7 +21,43 @@ namespace Billiard.BLL.Services.NhanVienService
                     .ToList();
             }
         }
+        public DAL.Entities.NhanVien SearchEmployee(string searchText)
+        {
+            using (var context = new BilliardDbContext())
+            {
+                if (string.IsNullOrWhiteSpace(searchText))
+                    return null;
 
+                if (int.TryParse(searchText, out var id))
+                {
+                    return context.NhanViens
+                        .Include(n => n.MaNhomNavigation)
+                        .FirstOrDefault(nv =>
+                            nv.MaNv == id ||
+                            nv.Sdt == searchText ||
+                            nv.TenNv.Contains(searchText));
+                }
+                else
+                {
+                    return context.NhanViens
+                        .Include(n => n.MaNhomNavigation)
+                        .FirstOrDefault(nv =>
+                            nv.Sdt == searchText ||
+                            nv.TenNv.Contains(searchText));
+                }
+            }   
+        }
+        public List<ChamCong> GetAttendanceReport(int month, int year)
+        {
+            using (var context = new BilliardDbContext())
+            {
+                return context.ChamCongs
+                    .Where(cc => cc.Ngay.Month == month &&
+                                 cc.Ngay.Year == year)
+                    .OrderBy(cc => cc.Ngay)
+                    .ToList();
+            }
+        }
         public DAL.Entities.NhanVien GetEmployeeById(int maNV)
         {
             using (var context = new BilliardDbContext())
@@ -144,7 +181,11 @@ namespace Billiard.BLL.Services.NhanVienService
                 return context.SaveChanges() > 0;
             }
         }
-
+        public (int shifts, decimal hours) GetMonthlyAttendanceStats(int maNV, int month, int year)
+        {
+            var stats = GetMonthlyStats(maNV, month, year);
+            return (stats.totalDays, stats.totalHours);
+        }
         public bool DeleteEmployee(int maNV)
         {
             using (var context = new BilliardDbContext())
